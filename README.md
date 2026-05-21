@@ -1,17 +1,18 @@
 # RudderStack Agent Skills
 
-A Claude Code plugin **marketplace** that teaches Claude how to drive the [RudderStack](https://www.rudderstack.com/) CLI surface with the right preflight checks, commands, and recovery paths.
+A Claude Code plugin **marketplace** that teaches Claude how to drive RudderStack's programmatic surfaces ([RudderStack](https://www.rudderstack.com/) CLI and MCP server) with the right preflight checks, commands, and recovery paths.
 
 ## What's inside
 
-One marketplace (`rudder-agent-skills`) bundling two plugins. Install the ones you use.
+One marketplace (`rudder-agent-skills`) bundling three plugins. Install the ones you use.
 
 | Plugin | Status | Scope |
 |---|---|---|
 | [`rudder-core`](plugins/rudder-core/) | ✅ Available | Cross-tool domain knowledge: data catalog, tracking plans, data graphs, instrumentation planning & debugging |
 | [`rudder-cli`](plugins/rudder-cli/) | ✅ Available | Workflows for [`rudder-cli`](https://github.com/rudderlabs/rudder-iac) and [`rudder-typer`](https://www.rudderstack.com/docs/features/ruddertyper/) |
+| [`rudder-mcp`](plugins/rudder-mcp/) | ✅ Available | Workflows for [`rudder-mcp-server`](https://github.com/rudderlabs/rudder-mcp-server) |
 
-The domain knowledge lives in `rudder-core` so it never duplicates across tool-specific plugins.
+Most users drive RudderStack with more than one tool. Install `rudder-core` plus whichever tool plugins you use; the domain knowledge lives in `rudder-core` so it never duplicates across tool-specific plugins.
 
 ## Installation
 
@@ -104,6 +105,13 @@ Pin to a release by appending `@v1.0.0` to the marketplace slug. Update later wi
 | `rudder-transformations` | Creating, editing, or managing transformations and libraries |
 | `rudder-cli-setup` | Installing and authenticating rudder-cli |
 
+### `rudder-mcp`
+
+| Skill | When to use |
+|---|---|
+| `rudder-mcp-workflow` | Connecting AI/LLM agents to RudderStack via MCP server |
+| `rudder-mcp-setup` | Configuring Claude Code to connect to MCP server |
+
 ## How skills work together
 
 ```
@@ -151,7 +159,10 @@ rudder-agent-skills/
     ├── rudder-core/
     │   ├── .claude-plugin/plugin.json
     │   └── skills/<skill>/SKILL.md
-    └── rudder-cli/
+    ├── rudder-cli/
+    │   ├── .claude-plugin/plugin.json
+    │   └── skills/<skill>/SKILL.md
+    └── rudder-mcp/
         ├── .claude-plugin/plugin.json
         └── skills/<skill>/SKILL.md
 ```
@@ -165,6 +176,7 @@ Each plugin includes a setup skill that guides you through installing and config
 | Plugin | Setup Skill | What it installs |
 |--------|-------------|------------------|
 | `rudder-cli` | `/rudder-cli-setup` | Downloads `rudder-cli` binary, authenticates with RudderStack |
+| `rudder-mcp` | `/rudder-mcp-setup` | Configures Claude Code to connect to `rudder-mcp-server` |
 
 After installing a plugin, run its setup skill to get started. Use `/rudder-environment-check` to verify your full setup.
 

@@ -1,0 +1,4 @@
+{
+  "name": "rudder-mcp",
+  "description": "Workflows for the rudder-mcp-server: connect AI/LLM agents to a RudderStack workspace and drive catalog, sources, destinations, transformations, RETL, tracking plans, and live events via MCP tool calls."
+}

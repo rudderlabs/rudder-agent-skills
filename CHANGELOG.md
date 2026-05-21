@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `rudder-environment-check` skill (rudder-core): Central diagnostic for tool prerequisites
 - `rudder-cli-setup` skill (rudder-cli): Installation and authentication guide for rudder-cli
+- `rudder-mcp-setup` skill (rudder-mcp): MCP server connection configuration
 - Vercel Skills CLI compatibility - skills can now be installed via `npx skills add rudderlabs/rudder-agent-skills` for 40+ coding agents
 - Updated installation documentation with Skills CLI instructions (pre-release and post-release)
 - Credential Security sections to skills handling authentication tokens
