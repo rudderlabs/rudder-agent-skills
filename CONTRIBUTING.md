@@ -19,14 +19,15 @@ python3 scripts/review-skills.py . --strict # warnings are errors
 
 ## Where a new skill belongs
 
-The marketplace ships two plugins. A new skill goes into exactly one:
+The marketplace ships three plugins. A new skill goes into exactly one:
 
 | Plugin | Pick this when |
 |---|---|
-| `rudder-core` | The skill teaches a **cross-tool** RudderStack concept (data modeling, tracking plan design, instrumentation strategy, debugging). Content should apply regardless of which tool the user drives. |
+| `rudder-core` | The skill teaches a **cross-tool** RudderStack concept (data modeling, tracking plan design, instrumentation strategy, debugging). Content should apply regardless of whether the user drives via CLI or Terraform. |
 | `rudder-cli` | The skill teaches how to drive `rudder-cli` or `rudder-typer` — commands, flags, YAML authoring for CLI-managed resources. |
+| `rudder-terraform` | The skill teaches Terraform-provider workflows — resource/data-source usage, state management, HCL patterns specific to RudderStack. |
 
-If a new skill spans both surfaces, default to `rudder-core` and reference surface-specific material through `references/*.md` files rather than duplicating across plugins.
+If a new skill spans multiple surfaces, default to `rudder-core` and reference surface-specific material through `references/*.md` files rather than duplicating across plugins.
 
 ## Authoring a skill
 
@@ -57,7 +58,7 @@ Frontmatter rules:
 ## Naming conventions
 
 - Every plugin and skill uses the **`rudder-`** prefix. Do not use `rudderstack-`.
-- Tool-plugin seed/workflow skills keep the **`-workflow`** suffix (e.g., `rudder-cli-workflow`).
+- Tool-plugin seed/workflow skills keep the **`-workflow`** suffix (e.g., `rudder-cli-workflow`, `rudder-terraform-workflow`).
 - Domain skills in `rudder-core` do not use a suffix (e.g., `rudder-data-catalog`, `rudder-tracking-plans`).
 
 ## Progressive disclosure
@@ -113,7 +114,7 @@ Your PR description should include:
 2. **Which plugin it belongs in** and why.
 3. **An example prompt that should trigger it** — copy-pasteable.
 4. **An example prompt that should not trigger it** — to verify you've narrowed the description.
-5. **Link to the source** — if you're documenting a CLI subcommand, link to its implementation or docs.
+5. **Link to the source** — if you're documenting a CLI subcommand or Terraform resource, link to its implementation or docs.
 
 ## Versioning & release
 

@@ -1,0 +1,4 @@
+{
+  "name": "rudder-terraform",
+  "description": "Workflows for managing RudderStack workspaces with the Terraform provider: provider setup, resource and data-source usage, init/plan/apply cycles, module structure, and state management."
+}

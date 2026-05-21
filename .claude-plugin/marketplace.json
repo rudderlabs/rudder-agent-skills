@@ -38,6 +38,21 @@
       "category": "devtools",
       "keywords": ["rudderstack", "rudder-cli", "rudder-typer", "cli", "devtools"],
       "tags": ["rudderstack", "cli"]
+    },
+    {
+      "name": "rudder-terraform",
+      "source": "./plugins/rudder-terraform",
+      "description": "Workflows for managing RudderStack with the Terraform provider: provider setup, resource/data-source usage, and plan/apply cycles.",
+      "version": "0.1.0",
+      "author": {
+        "name": "RudderStack"
+      },
+      "homepage": "https://github.com/rudderlabs/terraform-provider-rudderstack",
+      "repository": "https://github.com/rudderlabs/rudder-agent-skills",
+      "license": "MIT",
+      "category": "devtools",
+      "keywords": ["rudderstack", "terraform", "iac", "hcl"],
+      "tags": ["rudderstack", "terraform"]
     }
   ]
 }
