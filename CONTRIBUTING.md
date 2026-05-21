@@ -19,7 +19,7 @@ python3 scripts/review-skills.py . --strict # warnings are errors
 
 ## Where a new skill belongs
 
-The marketplace ships four plugins. A new skill goes into exactly one:
+The marketplace ships five plugins. A new skill goes into exactly one:
 
 | Plugin | Pick this when |
 |---|---|
@@ -27,6 +27,7 @@ The marketplace ships four plugins. A new skill goes into exactly one:
 | `rudder-cli` | The skill teaches how to drive `rudder-cli` or `rudder-typer` — commands, flags, YAML authoring for CLI-managed resources. |
 | `rudder-mcp` | The skill teaches workflows for RudderStack's MCP server at `mcp.rudderstack.com` — tool catalog, auth/setup, AI-agent patterns for managing RudderStack via MCP. |
 | `rudder-terraform` | The skill teaches Terraform-provider workflows — resource/data-source usage, state management, HCL patterns specific to RudderStack. |
+| `rudder-profiles` | The skill teaches RudderStack Profiles workflows — `pb` usage, profiles-mcp discovery, project YAML authoring, project analysis, and Profiles-specific debugging. |
 
 If a new skill spans two surfaces, default to `rudder-core` and reference surface-specific material through `references/*.md` files rather than duplicating across plugins.
 
