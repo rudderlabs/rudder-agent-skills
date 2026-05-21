@@ -19,16 +19,14 @@ python3 scripts/review-skills.py . --strict # warnings are errors
 
 ## Where a new skill belongs
 
-The marketplace ships four plugins. A new skill goes into exactly one:
+The marketplace ships two plugins. A new skill goes into exactly one:
 
 | Plugin | Pick this when |
 |---|---|
-| `rudder-core` | The skill teaches a **cross-tool** RudderStack concept (data modeling, tracking plan design, instrumentation strategy, debugging). Content should apply regardless of whether the user drives via CLI, MCP, or Terraform. |
+| `rudder-core` | The skill teaches a **cross-tool** RudderStack concept (data modeling, tracking plan design, instrumentation strategy, debugging). Content should apply regardless of which tool the user drives. |
 | `rudder-cli` | The skill teaches how to drive `rudder-cli` or `rudder-typer` — commands, flags, YAML authoring for CLI-managed resources. |
-| `rudder-mcp` | The skill teaches workflows for the `rudder-mcp-server` — tool catalog, auth/setup, AI-agent patterns for managing RudderStack via MCP. |
-| `rudder-terraform` | The skill teaches Terraform-provider workflows — resource/data-source usage, state management, HCL patterns specific to RudderStack. |
 
-If a new skill spans two surfaces, default to `rudder-core` and reference surface-specific material through `references/*.md` files rather than duplicating across plugins.
+If a new skill spans both surfaces, default to `rudder-core` and reference surface-specific material through `references/*.md` files rather than duplicating across plugins.
 
 ## Authoring a skill
 
@@ -59,7 +57,7 @@ Frontmatter rules:
 ## Naming conventions
 
 - Every plugin and skill uses the **`rudder-`** prefix. Do not use `rudderstack-`.
-- Tool-plugin seed/workflow skills keep the **`-workflow`** suffix (e.g., `rudder-cli-workflow`, `rudder-mcp-workflow`, `rudder-terraform-workflow`).
+- Tool-plugin seed/workflow skills keep the **`-workflow`** suffix (e.g., `rudder-cli-workflow`).
 - Domain skills in `rudder-core` do not use a suffix (e.g., `rudder-data-catalog`, `rudder-tracking-plans`).
 
 ## Progressive disclosure
@@ -115,7 +113,7 @@ Your PR description should include:
 2. **Which plugin it belongs in** and why.
 3. **An example prompt that should trigger it** — copy-pasteable.
 4. **An example prompt that should not trigger it** — to verify you've narrowed the description.
-5. **Link to the source** — if you're documenting a CLI subcommand, MCP tool, or Terraform resource, link to its implementation or docs.
+5. **Link to the source** — if you're documenting a CLI subcommand, link to its implementation or docs.
 
 ## Versioning & release
 

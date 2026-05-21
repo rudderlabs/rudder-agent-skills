@@ -1,7 +1,7 @@
 ---
 name: rudder-environment-check
 description: Checks RudderStack tool prerequisites and reports status. Use when checking prerequisites, setup status, what tools are missing, or before running RudderStack workflows for the first time
-allowed-tools: "Bash(which, curl, rudder-cli *, terraform *), Read"
+allowed-tools: "Bash(which, rudder-cli *), Read"
 ---
 
 # RudderStack Environment Check
@@ -28,26 +28,6 @@ which rudder-cli
 rudder-cli workspace info
 ```
 
-### 2. Check Terraform (if using terraform workflows)
-
-```bash
-# Check if installed
-which terraform
-
-# If installed, check version
-terraform version
-
-# Check if provider is configured (run in project directory)
-terraform providers
-```
-
-### 3. Check MCP Server Connectivity
-
-```bash
-# Check if hosted MCP server is reachable
-curl -s -o /dev/null -w "%{http_code}" https://mcp.rudderstack.com/health
-```
-
 ## Output Format
 
 Present results as a status table:
@@ -59,9 +39,6 @@ Tool                    Status      Action
 ─────────────────────────────────────────────────────
 rudder-cli              ✓ Ready
   └─ authenticated      ✓ Ready     Workspace: <name>
-terraform               ✗ Missing   Run: /rudder-terraform-setup
-  └─ provider           ─ Skipped   (terraform required first)
-rudder-mcp-server       ✓ Reachable
 ─────────────────────────────────────────────────────
 ```
 
@@ -79,8 +56,6 @@ rudder-mcp-server       ✓ Reachable
 | Tool Missing | Action |
 |--------------|--------|
 | rudder-cli | Run `/rudder-cli-setup` or ask "help me install rudder-cli" |
-| terraform | Run `/rudder-terraform-setup` or ask "help me setup terraform for rudderstack" |
-| MCP unreachable | Run `/rudder-mcp-setup` or check network connectivity |
 
 ## Credential Security
 
