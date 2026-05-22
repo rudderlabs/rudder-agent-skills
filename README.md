@@ -17,6 +17,8 @@ Most users drive RudderStack with more than one tool. Install `rudder-core` plus
 
 ## Installation
 
+See [`docs/installation.md`](docs/installation.md) for the full guide (Skills CLI, Claude Code plugin system, manual symlinks, submodule, agent-specific paths, troubleshooting). The quick paths below cover the common cases.
+
 ### Option 1: Skills CLI (Recommended)
 
 The [Skills CLI](https://github.com/vercel-labs/skills) works with 40+ coding agents including Claude Code, Cursor, Cline, OpenCode, and more.
@@ -160,8 +162,7 @@ rudder-agent-skills/
 ├── .claude-plugin/
 │   └── marketplace.json
 ├── docs/
-│   ├── installation.md
-│   └── superpowers/specs/       # design docs for changes at this scale
+│   └── installation.md          # full install guide
 ├── examples/                    # end-to-end worked examples
 └── plugins/
     ├── rudder-core/
