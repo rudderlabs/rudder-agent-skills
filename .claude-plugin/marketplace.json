@@ -42,7 +42,7 @@
     {
       "name": "rudder-mcp",
       "source": "./plugins/rudder-mcp",
-      "description": "Workflows for the rudder-mcp-server: connect AI/LLM agents to a RudderStack workspace and drive it via MCP tool calls.",
+      "description": "Workflows for RudderStack's MCP server at mcp.rudderstack.com: connect AI/LLM agents to a RudderStack workspace and drive it via MCP tool calls.",
       "version": "0.1.0",
       "author": {
         "name": "RudderStack"
@@ -51,7 +51,7 @@
       "repository": "https://github.com/rudderlabs/rudder-agent-skills",
       "license": "MIT",
       "category": "devtools",
-      "keywords": ["rudderstack", "mcp", "rudder-mcp-server", "ai-agent"],
+      "keywords": ["rudderstack", "mcp", "mcp-server", "ai-agent"],
       "tags": ["rudderstack", "mcp"]
     }
   ]

@@ -46,7 +46,7 @@ Tool                    Status      Action
 ─────────────────────────────────────────────────────
 rudder-cli              ✓ Ready
   └─ authenticated      ✓ Ready     Workspace: <name>
-rudder-mcp-server       ✓ Reachable
+mcp.rudderstack.com     ✓ Reachable
 ─────────────────────────────────────────────────────
 ```
 

@@ -1,16 +1,16 @@
 ---
 name: rudder-mcp-workflow
-description: Connects AI agents to RudderStack via MCP tool calls for catalog, sources, destinations, transformations, and live events. Use when connecting Claude or another AI/LLM agent to rudder-mcp-server, managing RudderStack through MCP, or mentions of "rudder-mcp-server" or MCP tools for RudderStack.
+description: Connects AI agents to RudderStack via MCP tool calls for catalog, sources, destinations, transformations, and live events. Use when connecting an AI agent to RudderStack's MCP server, driving RudderStack via MCP, or mentions of mcp.rudderstack.com.
 allowed-tools: "Read, Write, Edit"
 ---
 
-# RudderStack MCP Server Workflow
+# RudderStack MCP Workflow
 
-`rudder-mcp-server` exposes a RudderStack workspace as an MCP endpoint so AI agents (Claude Desktop, Claude Code, or any MCP client) can inspect and mutate workspace resources via tool calls.
+RudderStack's hosted MCP server at `mcp.rudderstack.com` exposes a RudderStack workspace as an MCP endpoint so AI agents (Claude Desktop, Claude Code, or any MCP client) can inspect and mutate workspace resources via tool calls.
 
 ## When to use
 
-The user wants an AI agent to drive RudderStack, or mentions `rudder-mcp-server`, MCP + RudderStack, or configuring tool access for a RudderStack workspace.
+The user wants an AI agent to drive RudderStack, mentions RudderStack + MCP, asks about `mcp.rudderstack.com`, or wants to configure MCP tool access for a RudderStack workspace.
 
 ## Preflight
 
@@ -51,7 +51,7 @@ Use `/bearer-auth-mcp` or `/basic-auth-mcp` instead of `/mcp` for bearer or basi
 
 **Docs & admin (admin-gated):** `ask_docs`, `search_docs`, `admin_search_workspaces`, `admin_search_organizations`, `admin_get_plans`, `admin_query_customer_calls`, `admin_fetch_notion_page`, `admin_search_notion_pages`.
 
-Admin tools only surface when the server is started with `MCP_SERVER_ADMIN_ENABLED=true`.
+Admin tools only surface when your account has admin access. If they're not in the tool list, your account isn't admin-enabled — work with the standard tools instead.
 
 ## Common workflows
 

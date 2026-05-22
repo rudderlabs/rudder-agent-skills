@@ -176,7 +176,7 @@ Each plugin includes a setup skill that guides you through installing and config
 | Plugin | Setup Skill | What it installs |
 |--------|-------------|------------------|
 | `rudder-cli` | `/rudder-cli-setup` | Downloads `rudder-cli` binary, authenticates with RudderStack |
-| `rudder-mcp` | `/rudder-mcp-setup` | Configures Claude Code to connect to `rudder-mcp-server` |
+| `rudder-mcp` | `/rudder-mcp-setup` | Configures Claude Code to connect to RudderStack's MCP server at `mcp.rudderstack.com` |
 
 After installing a plugin, run its setup skill to get started. Use `/rudder-environment-check` to verify your full setup.
 
