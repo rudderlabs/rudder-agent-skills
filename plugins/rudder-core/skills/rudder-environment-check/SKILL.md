@@ -61,7 +61,7 @@ rudder-cli              ✓ Ready
   └─ authenticated      ✓ Ready     Workspace: <name>
 terraform               ✗ Missing   Run: /rudder-terraform-setup
   └─ provider           ─ Skipped   (terraform required first)
-rudder-mcp-server       ✓ Reachable
+mcp.rudderstack.com     ✓ Reachable
 ─────────────────────────────────────────────────────
 ```
 

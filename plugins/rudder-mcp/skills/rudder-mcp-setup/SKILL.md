@@ -1,6 +1,6 @@
 ---
 name: rudder-mcp-setup
-description: Configures Claude Code to connect to RudderStack's MCP server. Use when setting up MCP for rudderstack, connecting claude to rudderstack, or configuring rudder-mcp-server
+description: Configures Claude Code to connect to RudderStack's MCP server at mcp.rudderstack.com. Use when setting up MCP for rudderstack, connecting claude to rudderstack, or configuring the rudderstack MCP server
 allowed-tools: "Bash(which, npx), Read, Write, Edit"
 ---
 

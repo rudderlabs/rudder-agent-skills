@@ -10,7 +10,7 @@ One marketplace (`rudder-agent-skills`) bundling four plugins. Install the ones 
 |---|---|---|
 | [`rudder-core`](plugins/rudder-core/) | ✅ Available | Cross-tool domain knowledge: data catalog, tracking plans, data graphs, instrumentation planning & debugging |
 | [`rudder-cli`](plugins/rudder-cli/) | ✅ Available | Workflows for [`rudder-cli`](https://github.com/rudderlabs/rudder-iac) and [`rudder-typer`](https://www.rudderstack.com/docs/features/ruddertyper/) |
-| [`rudder-mcp`](plugins/rudder-mcp/) | ✅ Available | Workflows for [`rudder-mcp-server`](https://github.com/rudderlabs/rudder-mcp-server) |
+| [`rudder-mcp`](plugins/rudder-mcp/) | ✅ Available | Workflows for [RudderStack's hosted MCP server](https://www.rudderstack.com/docs/) at `mcp.rudderstack.com` |
 | [`rudder-terraform`](plugins/rudder-terraform/) | ✅ Available | Workflows for the [Terraform provider](https://github.com/rudderlabs/terraform-provider-rudderstack) |
 
 Most users drive RudderStack with more than one tool. Install `rudder-core` plus whichever tool plugins you use; the domain knowledge lives in `rudder-core` so it never duplicates across tool-specific plugins.
@@ -188,7 +188,7 @@ Each plugin includes a setup skill that guides you through installing and config
 | Plugin | Setup Skill | What it installs |
 |--------|-------------|------------------|
 | `rudder-cli` | `/rudder-cli-setup` | Downloads `rudder-cli` binary, authenticates with RudderStack |
-| `rudder-mcp` | `/rudder-mcp-setup` | Configures Claude Code to connect to `rudder-mcp-server` |
+| `rudder-mcp` | `/rudder-mcp-setup` | Configures Claude Code to connect to RudderStack's MCP server at `mcp.rudderstack.com` |
 | `rudder-terraform` | `/rudder-terraform-setup` | Installs Terraform, configures the RudderStack provider |
 
 After installing a plugin, run its setup skill to get started. Use `/rudder-environment-check` to verify your full setup.

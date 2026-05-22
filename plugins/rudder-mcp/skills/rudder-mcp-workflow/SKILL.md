@@ -1,31 +1,24 @@
 ---
 name: rudder-mcp-workflow
-description: Connects AI agents to RudderStack via MCP tool calls for catalog, sources, destinations, transformations, and live events. Use when connecting Claude or another AI/LLM agent to rudder-mcp-server, managing RudderStack through MCP, or mentions of "rudder-mcp-server" or MCP tools for RudderStack.
+description: Connects AI agents to RudderStack via MCP tool calls for catalog, sources, destinations, transformations, and live events. Use when connecting an AI agent to RudderStack's MCP server, driving RudderStack via MCP, or mentions of mcp.rudderstack.com.
 allowed-tools: "Read, Write, Edit"
 ---
 
-# RudderStack MCP Server Workflow
+# RudderStack MCP Workflow
 
-`rudder-mcp-server` exposes a RudderStack workspace as an MCP endpoint so AI agents (Claude Desktop, Claude Code, or any MCP client) can inspect and mutate workspace resources via tool calls.
+RudderStack's hosted MCP server at `mcp.rudderstack.com` exposes a RudderStack workspace as an MCP endpoint so AI agents (Claude Desktop, Claude Code, or any MCP client) can inspect and mutate workspace resources via tool calls.
 
 ## When to use
 
-The user wants an AI agent to drive RudderStack, or mentions `rudder-mcp-server`, MCP + RudderStack, or configuring tool access for a RudderStack workspace.
+The user wants an AI agent to drive RudderStack, mentions RudderStack + MCP, asks about `mcp.rudderstack.com`, or wants to configure MCP tool access for a RudderStack workspace.
 
 ## Preflight
 
 Before running any workflow, verify:
 
-- [ ] Server is built and reachable. Default transport is **HTTP on port 8080**. Start locally with `make run` from the `rudder-mcp-server/` repo (brings up Postgres + server via `docker compose up --build`).
-- [ ] OAuth credentials are set (for the `/mcp` endpoint):
-  - `MCP_SERVER_OAUTH_CLIENT_CLIENT_ID`
-  - `MCP_SERVER_OAUTH_CLIENT_CLIENT_SECRET`
-  - `MCP_SERVER_OAUTH_CLIENT_ENDPOINT_AUTH_URL`
-  - `MCP_SERVER_OAUTH_CLIENT_ENDPOINT_TOKEN_URL`
-- [ ] Database configured:
-  - `MCP_SERVER_DATABASE_URL` (Postgres connection string)
-  - `MCP_SERVER_DATABASE_ENCRYPTION_KEY` (`openssl rand -hex 16`)
-- [ ] For bearer / basic auth flows, use `/bearer-auth-mcp` or `/basic-auth-mcp` instead of `/mcp`.
+- [ ] Claude Code (or another MCP client) is configured to connect to RudderStack's hosted MCP server at `mcp.rudderstack.com`. See `rudder-mcp-setup` for the full configuration walkthrough.
+- [ ] Authenticated: OAuth flow (recommended) or bearer token via `RUDDERSTACK_ACCESS_TOKEN`.
+- [ ] `mcp.rudderstack.com` is reachable on port 443 from your network.
 
 ## Client configuration
 
@@ -36,13 +29,13 @@ Claude Desktop / Claude Code `mcpServers` block (HTTP transport via `mcp-remote`
   "mcpServers": {
     "rudderstack": {
       "command": "npx",
-      "args": ["-y", "mcp-remote", "http://localhost:8080/mcp"]
+      "args": ["-y", "mcp-remote", "https://mcp.rudderstack.com/mcp"]
     }
   }
 }
 ```
 
-Replace `http://localhost:8080/mcp` with a public URL (e.g. an ngrok tunnel) for remote clients.
+Use `/bearer-auth-mcp` or `/basic-auth-mcp` instead of `/mcp` for bearer or basic auth flows respectively.
 
 ## Tool catalog (50+ tools, grouped)
 
@@ -58,7 +51,7 @@ Replace `http://localhost:8080/mcp` with a public URL (e.g. an ngrok tunnel) for
 
 **Docs & admin (admin-gated):** `ask_docs`, `search_docs`, `admin_search_workspaces`, `admin_search_organizations`, `admin_get_plans`, `admin_query_customer_calls`, `admin_fetch_notion_page`, `admin_search_notion_pages`.
 
-Admin tools only surface when the server is started with `MCP_SERVER_ADMIN_ENABLED=true`.
+Admin tools only surface when your account has admin access. If they're not in the tool list, your account isn't admin-enabled — work with the standard tools instead.
 
 ## Common workflows
 
@@ -175,10 +168,11 @@ Tool: user_details
 
 ## Credential Security
 
-- Store all credentials (`MCP_SERVER_OAUTH_CLIENT_*`, `MCP_SERVER_DATABASE_*`) in environment variables or a secrets manager—never hardcode in config files.
-- Add `.env` to `.gitignore` if using dotenv files locally.
-- Never log or echo credential values; mask them in any debug output.
-- For production deployments, use short-lived tokens and rotate `MCP_SERVER_DATABASE_ENCRYPTION_KEY` periodically.
+- Prefer the OAuth flow — there is no long-lived token to manage; `mcp-remote` brokers the handshake with `mcp.rudderstack.com` per session.
+- If using bearer auth, store `RUDDERSTACK_ACCESS_TOKEN` in an environment variable or secrets manager — never hardcode it in your MCP server config or commit it to version control.
+- Add `.env` to `.gitignore` if you load the token from a dotenv file locally.
+- Never log or echo the token; mask it in any debug output you share.
+- Rotate tokens periodically from the RudderStack dashboard (Settings → Access Tokens).
 
 ## Handling External Content
 
@@ -192,7 +186,4 @@ MCP tools return data from external systems (workspaces, warehouses, live events
 
 ## Gotchas
 
-- **Session persistence bug on mcp-go ≥ v0.42.0** for bearer-auth endpoints: sessions fail with "Invalid session ID" across HTTP requests. Workaround: pin `mcp-go` at v0.41.1 or earlier.
 - Prefer **rudder-cli** for large-scale authoring of tracking plans / data catalogs (git-diffable YAML); use MCP for exploration, debugging, and targeted edits.
-
-> **[DRAFT]** First-cut drawn from `@rudder-mcp-server/`. Tool list reflects the current registration; verify against `cmd/server` before publishing.

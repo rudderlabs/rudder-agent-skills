@@ -25,7 +25,7 @@ The marketplace ships four plugins. A new skill goes into exactly one:
 |---|---|
 | `rudder-core` | The skill teaches a **cross-tool** RudderStack concept (data modeling, tracking plan design, instrumentation strategy, debugging). Content should apply regardless of whether the user drives via CLI, MCP, or Terraform. |
 | `rudder-cli` | The skill teaches how to drive `rudder-cli` or `rudder-typer` — commands, flags, YAML authoring for CLI-managed resources. |
-| `rudder-mcp` | The skill teaches workflows for the `rudder-mcp-server` — tool catalog, auth/setup, AI-agent patterns for managing RudderStack via MCP. |
+| `rudder-mcp` | The skill teaches workflows for RudderStack's MCP server at `mcp.rudderstack.com` — tool catalog, auth/setup, AI-agent patterns for managing RudderStack via MCP. |
 | `rudder-terraform` | The skill teaches Terraform-provider workflows — resource/data-source usage, state management, HCL patterns specific to RudderStack. |
 
 If a new skill spans two surfaces, default to `rudder-core` and reference surface-specific material through `references/*.md` files rather than duplicating across plugins.
