@@ -47,7 +47,7 @@
       "author": {
         "name": "RudderStack"
       },
-      "homepage": "https://www.rudderstack.com/docs/",
+      "homepage": "https://mcp.rudderstack.com/docs",
       "repository": "https://github.com/rudderlabs/rudder-agent-skills",
       "license": "MIT",
       "category": "devtools",

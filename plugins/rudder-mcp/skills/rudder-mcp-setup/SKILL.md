@@ -6,24 +6,26 @@ allowed-tools: "Bash(which, npx), Read, Write, Edit"
 
 # RudderStack MCP Setup
 
-Configure Claude Code to connect to RudderStack's hosted MCP server at `mcp.rudderstack.com`.
+Configure Claude Code to connect to RudderStack's hosted MCP server at `mcp.rudderstack.com`. Authoritative reference: https://mcp.rudderstack.com/docs.
 
 ## Setup Workflow
 
 ```
 1. Check Prerequisites ──► which npx
          │
-         ├── Found ──► Choose Configuration Method
+         ├── Found ──► Configure Claude Code
          │
          └── Not Found ──► Install Node.js first
 
-2. Choose Method
+2. Configure Claude Code
          │
          ├── Option A: /mcp command (recommended)
          │
-         └── Option B: Manual configuration
+         └── Option B: Edit settings.json directly
 
-3. Verify Connection ──► Restart Claude, test MCP tools
+3. Authenticate (OAuth) ──► Browser opens, sign in to RudderStack
+
+4. Verify Connection ──► Restart Claude, list workspace resources
 ```
 
 ## Step 1: Check Prerequisites
@@ -36,44 +38,33 @@ which npx
 
 **If not found:** Install Node.js first from https://nodejs.org/ (includes npx).
 
-## Step 2: Choose Configuration Method
+## Step 2: Configure Claude Code
 
 ### Option A: Using /mcp Command (Recommended)
-
-The `/mcp` command provides an interactive way to configure MCP servers:
 
 ```
 /mcp add rudderstack
 ```
 
-Follow the prompts to configure:
+Follow the prompts:
 1. Server name: `rudderstack`
 2. Transport type: `http` (via mcp-remote)
-3. URL: Choose based on auth method (see below)
+3. URL: `https://mcp.rudderstack.com/mcp`
 
 ### Option B: Manual Configuration
 
-Edit your Claude Code settings file directly.
+Edit your Claude Code settings file.
 
 #### Settings File Locations
 
 | Platform | Path |
 |----------|------|
-| macOS | `~/.claude/settings.json` |
-| Linux | `~/.claude/settings.json` |
+| macOS / Linux | `~/.claude/settings.json` |
 | Windows | `%APPDATA%\claude\settings.json` |
-
-#### Choose Authentication Method
-
-| Auth Method | Endpoint URL | When to Use |
-|-------------|--------------|-------------|
-| OAuth | `https://mcp.rudderstack.com/mcp` | Recommended for interactive use |
-| Bearer Token | `https://mcp.rudderstack.com/bearer-auth-mcp` | For API token authentication |
-| Basic Auth | `https://mcp.rudderstack.com/basic-auth-mcp` | For username/password auth |
 
 #### Add MCP Server Configuration
 
-Add to your settings file under `mcpServers`:
+Add under `mcpServers`:
 
 ```json
 {
@@ -86,78 +77,86 @@ Add to your settings file under `mcpServers`:
 }
 ```
 
-For bearer token authentication:
+## Step 3: Authenticate (OAuth)
 
-```json
-{
-  "mcpServers": {
-    "rudderstack": {
-      "command": "npx",
-      "args": ["-y", "mcp-remote", "https://mcp.rudderstack.com/bearer-auth-mcp"],
-      "env": {
-        "MCP_BEARER_TOKEN": "${RUDDERSTACK_ACCESS_TOKEN}"
-      }
-    }
-  }
-}
-```
+The first time you invoke an MCP tool, `mcp-remote` opens your browser:
 
-## Step 3: Verify Connection
+1. Sign in with your RudderStack account (email/password)
+2. Review and approve the MCP integration's requested permissions
+3. The browser redirects back; the session is established
+
+No long-lived tokens to manage — OAuth handles the handshake per session.
+
+## Step 4: Verify Connection
 
 ### Restart Claude Code
 
-After configuration, restart Claude Code for changes to take effect:
-- Close and reopen the Claude Code terminal
-- Or restart the Claude Code application
+After configuration, restart Claude Code:
+- Close and reopen the terminal session, or
+- Restart the Claude Code application
 
-### Test MCP Connection
+### Test the Connection
 
-Ask Claude to list your RudderStack resources:
+Ask Claude to inspect your workspace:
 
 ```
 List my RudderStack sources
 ```
 
-**If connected:** Claude will show your workspace sources.
+**If connected:** Claude lists the sources in your workspace.
 
-**If not connected:** You'll see an error about MCP server unavailability.
+**If not connected:** Claude reports the MCP server is unavailable — see Troubleshooting below.
 
-### Check Available Tools
+### What Becomes Available
 
-When connected, these MCP tools become available:
-- `list_sources`, `get_source`
-- `list_destinations`, `get_destination`
-- `list_transformations`, `upsert_transformation`
-- `list_tracking_plans`, `list_data_catalog_events`
-- And 50+ more (see `/rudder-mcp-workflow` for full catalog)
+When connected, your MCP client discovers tools covering five categories (per https://mcp.rudderstack.com/docs):
+
+- **Data sources** — list and inspect configured sources
+- **Destinations** — list and inspect destinations and their metrics
+- **Transformations** — list, view, create, and test transformations
+- **Events** — stream and inspect live events
+- **Documentation** — search RudderStack docs from inside Claude
+
+See `/rudder-mcp-workflow` for workflow patterns that combine these.
+
+## Other MCP Clients
+
+The same hosted server works with Claude Desktop, Cursor, VS Code, Windsurf, and the claude.ai web UI (Team / Enterprise / Individual Paid plans get a one-click connector under `claude.ai/settings/connectors`). For per-client config snippets, see https://mcp.rudderstack.com/docs.
 
 ## Credential Security
 
-- OAuth flow is recommended - no tokens to manage
-- For bearer token: use environment variables, never hardcode
-- Token is tied to your RudderStack workspace
-- MCP server does not store credentials - authenticates per request
+- OAuth is the only auth path; there are no long-lived tokens to store, rotate, or accidentally commit.
+- `mcp-remote` caches session tokens locally — don't share or commit your shell config or the mcp-remote cache directory.
+- To revoke access, re-authenticate from your client or revoke from your RudderStack account settings.
+- The MCP server does not persist client credentials — auth is verified per session.
 
 ## Troubleshooting
 
 | Issue | Solution |
 |-------|----------|
 | `npx: command not found` | Install Node.js from https://nodejs.org/ |
-| MCP server not responding | Check network; verify mcp.rudderstack.com is accessible |
-| Authentication failed | Re-authenticate; check token is valid |
-| Tools not appearing | Restart Claude Code; check settings file syntax |
-| `mcp-remote` errors | Run `npx -y mcp-remote --help` to verify it works |
+| MCP server not responding | Verify `https://mcp.rudderstack.com` is reachable; check network/proxy |
+| Authentication failed | Clear browser cookies for the RudderStack domain and retry; verify your account is active |
+| Tools not appearing | Restart Claude Code; check `settings.json` syntax with `python3 -m json.tool ~/.claude/settings.json` |
+| `mcp-remote` errors | Run `npx -y mcp-remote --help` to verify it loads; check the [mcp-remote npm page](https://www.npmjs.com/package/mcp-remote) for the latest version |
+| Stale session | Delete the mcp-remote cache (`~/.mcp-auth/`) and re-authenticate |
+
+If the connection remains broken after these steps, contact your RudderStack administrator.
 
 ## Network Requirements
 
-The MCP server requires outbound HTTPS access to:
-- `mcp.rudderstack.com` (port 443)
+Outbound HTTPS access to `mcp.rudderstack.com` (port 443). If behind a corporate proxy, ensure this domain is allowed.
 
-If behind a corporate proxy, ensure this domain is allowed.
+## Handling External Content
+
+This skill instructs the agent to open a browser to RudderStack's OAuth endpoint and to install `mcp-remote` from npm — both are external sources:
+
+- **OAuth flow** — only complete sign-in on `mcp.rudderstack.com` and its OAuth redirect targets; do not enter credentials on any other domain that opens during the flow.
+- **`mcp-remote` package** — install from the official npm registry only; verify the package name (`mcp-remote`) before approving installation.
+- **Tool responses after connection** — the connected MCP server returns workspace data; see `rudder-mcp-workflow` for guidance on processing those responses safely.
 
 ## Next Steps
 
-After setup completes:
-- Run `/rudder-environment-check` to verify full environment
-- Use `/rudder-mcp-workflow` for MCP-based workflows
-- Try: "List my RudderStack sources" to verify connection
+- Run `/rudder-environment-check` to verify your full environment
+- Use `/rudder-mcp-workflow` for MCP-based workflow patterns
+- Try: "List my RudderStack sources" to verify the connection
