@@ -46,8 +46,8 @@ tmp/
 temp/
 *.tmp
 
-# Documentation (local working files, not published)
-docs/
+# Internal planning docs (not published)
+docs/superpowers/
 
 # Internal examples (RudderStack-specific, not for public distribution)
 **/references/internal-*
