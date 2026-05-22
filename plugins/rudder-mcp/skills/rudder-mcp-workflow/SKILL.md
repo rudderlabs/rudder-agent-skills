@@ -168,10 +168,11 @@ Tool: user_details
 
 ## Credential Security
 
-- Store all credentials (`MCP_SERVER_OAUTH_CLIENT_*`, `MCP_SERVER_DATABASE_*`) in environment variables or a secrets manager—never hardcode in config files.
-- Add `.env` to `.gitignore` if using dotenv files locally.
-- Never log or echo credential values; mask them in any debug output.
-- For production deployments, use short-lived tokens and rotate `MCP_SERVER_DATABASE_ENCRYPTION_KEY` periodically.
+- Prefer the OAuth flow — there is no long-lived token to manage; `mcp-remote` brokers the handshake with `mcp.rudderstack.com` per session.
+- If using bearer auth, store `RUDDERSTACK_ACCESS_TOKEN` in an environment variable or secrets manager — never hardcode it in your MCP server config or commit it to version control.
+- Add `.env` to `.gitignore` if you load the token from a dotenv file locally.
+- Never log or echo the token; mask it in any debug output you share.
+- Rotate tokens periodically from the RudderStack dashboard (Settings → Access Tokens).
 
 ## Handling External Content
 
