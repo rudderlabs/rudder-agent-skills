@@ -32,3 +32,14 @@ jobs:
             echo "Validating $f"
             python3 -c "import json; json.load(open('$f'))" || exit 1
           done
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "20"
+
+      - name: Install Claude Code CLI
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Run claude plugin validate
+        run: claude plugin validate .
