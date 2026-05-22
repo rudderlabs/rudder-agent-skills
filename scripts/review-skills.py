@@ -20,6 +20,7 @@
 import argparse
 import os
 import re
+import subprocess
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -177,6 +178,29 @@ def find_skills(root: Path):
         if "SKILL.md" in filenames:
             yield Path(dirpath) / "SKILL.md"
 
+def tracked_files(root: Path) -> Optional[set[str]]:
+    """Repo-relative POSIX paths tracked by git. None if root isn't a git repo
+    or git isn't available — callers fall back to filesystem checks."""
+    try:
+        out = subprocess.check_output(
+            ["git", "-C", str(root), "ls-files"],
+            stderr=subprocess.DEVNULL, text=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+    return {line for line in out.splitlines() if line}
+
+def is_present(path: Path, root: Path, tracked: Optional[set[str]]) -> bool:
+    """A referenced file 'exists' if git tracks it (CI-equivalent), or, when
+    git data isn't available, if the working tree has it."""
+    if tracked is None:
+        return path.exists()
+    try:
+        rel = path.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError:
+        return path.exists()
+    return rel in tracked
+
 def load_skill(skill_md: Path) -> SkillCtx:
     raw = skill_md.read_text(encoding="utf-8", errors="replace")
     fm, body, top_order = parse_frontmatter(raw)
@@ -193,10 +217,13 @@ def load_skill(skill_md: Path) -> SkillCtx:
 # ───────────────────────── per-skill checks ───────────────────────────────────
 KEBAB = re.compile(r"^[a-z][a-z0-9]*(-[a-z0-9]+)*$")
 
-def check_skill(ctx: SkillCtx) -> list:
+def check_skill(ctx: SkillCtx, root: Optional[Path] = None,
+                tracked: Optional[set[str]] = None) -> list:
     findings: list = []
     fm = ctx.frontmatter
     p = ctx.skill_md
+    if root is None:
+        root = ctx.dir
 
     # E001 — frontmatter missing
     if not fm:
@@ -360,11 +387,13 @@ def check_skill(ctx: SkillCtx) -> list:
                     hint=f"known tools: {', '.join(sorted(VALID_TOOLS))}."))
 
     # W016 — broken references to references/*.md files
+    # Resolved against git's tracked files when available, so gitignored
+    # files in the working tree don't mask broken-link bugs CI will catch.
     refs_dir = ctx.dir / "references"
     for match in REFS_LINK_PATTERN.finditer(ctx.body):
         ref_file = match.group(1) or match.group(2)
         ref_path = refs_dir / ref_file
-        if not ref_path.exists():
+        if not is_present(ref_path, root, tracked):
             findings.append(Finding("W016", "warn", p,
                 f"referenced file 'references/{ref_file}' does not exist.",
                 hint="create the file or fix the reference path."))
@@ -381,7 +410,7 @@ def check_skill(ctx: SkillCtx) -> list:
         # Check if it's a relative file path
         if link_target.endswith('.md') or '/' in link_target:
             target_path = ctx.dir / link_target
-            if not target_path.exists():
+            if not is_present(target_path, root, tracked):
                 findings.append(Finding("W017", "warn", p,
                     f"broken link to '{link_target}'.",
                     hint="fix the path or create the missing file."))
@@ -526,10 +555,11 @@ def main(argv=None) -> int:
         print(f"skills review: scanning {len(skill_paths)} skill(s) under {root}")
 
     contexts = [load_skill(p) for p in skill_paths]
+    tracked = tracked_files(root)
 
     findings: list = []
     for ctx in contexts:
-        findings.extend(check_skill(ctx))
+        findings.extend(check_skill(ctx, root=root, tracked=tracked))
     findings.extend(check_repo(root, contexts))
 
     if only:

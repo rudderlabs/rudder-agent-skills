@@ -13,7 +13,9 @@ echo "Setting up rudder-agent-skills development environment..."
 
 # Enable git hooks
 git config core.hooksPath .githooks
-echo "✓ Git hooks enabled (.githooks/pre-push will run before each push)"
+echo "✓ Git hooks enabled:"
+echo "    .githooks/pre-commit  — JSON manifest + skills review + conflict markers"
+echo "    .githooks/pre-push    — strict skills review (matches CI)"
 
 # Verify Python is available for the linter
 if command -v python3 >/dev/null 2>&1; then

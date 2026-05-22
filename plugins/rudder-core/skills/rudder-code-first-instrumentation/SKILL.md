@@ -400,13 +400,6 @@ rudder-cli apply -l ./
 
 For complete end-to-end examples, see:
 - `references/real-world-examples.md` - E-Commerce and Subscription Billing examples
-- `references/internal-rudderstack-examples.md` - RudderStack-specific examples
-
----
-
-## Internal Examples
-
-For RudderStack-specific instrumentation examples (Workspaces, Audiences, Transformations), see `references/internal-rudderstack-examples.md`
 
 ---
 

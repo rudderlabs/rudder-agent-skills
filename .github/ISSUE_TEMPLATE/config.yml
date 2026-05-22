@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: RudderStack support
+    url: https://www.rudderstack.com/docs/contact-us/
+    about: For product issues unrelated to these skills
+  - name: Security report
+    url: mailto:security@rudderstack.com
+    about: Report a vulnerability privately (do not open a public issue)
