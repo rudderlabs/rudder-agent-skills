@@ -22,6 +22,7 @@ spec:
       table: "ACME_DB.ECOMMERCE.DIM_CUSTOMERS"  # 3-part: catalog.schema.table
       description: "Customer records with demographics and loyalty tier"  # Tooltip in Audience Builder.
       primary_id: "CUSTOMER_KEY"         # Required for entity. Column that uniquely identifies rows.
+      root: true                         # Entity only. Marks an audience-builder anchor. Multiple roots allowed; count is not validated.
       relationships:
         # Entity → Event relationship
         - id: "customer-has-orders"
@@ -85,6 +86,7 @@ spec:
 | `table` | String | Yes | Fully qualified: `catalog.schema.table` |
 | `description` | String | No | Tooltip in Audience Builder |
 | `primary_id` | String | Entity only | Column that uniquely identifies rows |
+| `root` | Bool | Entity only, optional | Marks an audience-builder anchor. Multiple roots allowed; the count is not validated (zero, one, or many all pass) |
 | `timestamp` | String | Event only | Event timestamp column |
 | `relationships` | List | No | Relationships to other models |
 
@@ -110,6 +112,8 @@ spec:
 - Entity↔entity can be any cardinality
 - `target` must use URN syntax `#data-graph-model:<model-id>` and resolve to a model in the same spec
 - All `display_name` values must be unique across models and relationships
+- Declare each relationship **once, on a single model** — do not also declare its inverse on the target model; the graph traverses it both ways. Double-declaration collides on `display_name` and inflates the relationship count
+- `root: true` is an optional entity-only flag; multiple roots are allowed and the count is not validated
 
 ## Worked example: Property vertical
 
@@ -131,6 +135,7 @@ spec:
       table: "PROPCO_DW.ANALYTICS.DIM_BRANCH"
       description: "Property management branches"
       primary_id: "BRANCH_ID"
+      root: true
       relationships:
         - id: "branch-has-contacts"
           display_name: "Has Contacts"
@@ -206,6 +211,8 @@ The `target` URN doesn't match any `id` in the same spec. Check for typos. Remem
 ### "Duplicate display_name"
 
 Two models or relationships have the same `display_name`. Each must be unique. This applies across ALL models and relationships in the spec.
+
+A common trigger is two relationships that naturally share a label — e.g. `sale-via-channel` and `interaction-via-channel` both wanting "Via Channel". Prefix with the source entity to disambiguate: "Sale Via Channel" and "Interaction Via Channel". The same fix applies to any pair of symmetric relationships pointing at the same target entity.
 
 ### "Invalid table reference"
 

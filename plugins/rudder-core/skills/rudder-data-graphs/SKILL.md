@@ -84,8 +84,9 @@ Every shortlisted source becomes one of:
 
 - **Composite primary key** — do not casually pick one component and do not silently concatenate unless that synthetic id is stable, documented, and actually unique. Prefer an upstream model that exposes a deliberate single-column id for the graph.
 - **No primary key** — usually an event, aggregate, or throwaway helper table. Confirm before modeling it as an entity.
+- **SCD2 / row-versioned dimensions** — if a dimension carries a surrogate row-version key (`*_KEY`), a stable business id, and effective/end-date columns, use the **surrogate `*_KEY` as `primary_id`** — that is the column fact tables join on; the business id is usually absent from facts. The graph includes every version row unless you filter to current rows (`is_current = true`) at the model layer, so unfiltered SCD2 entities over-count.
 - **Templated SQL in model sources** — render it with the current context before parsing columns; raw template text will miss projected fields.
-- **`snapshot_date` / `loaded_at` / `_etl_timestamp` columns** — *not* true event timestamps. They are warehouse metadata. Do not classify the source as an event unless a real business-time column exists.
+- **Ingestion-metadata timestamps (`snapshot_date` / `loaded_at` / `_etl_timestamp` / `created_at`)** — *not* true event timestamps. They record when the row was written, not when the business event happened. Do not classify the source as an event unless a real business-time column exists — and when one does (e.g. `event_at`, `ordered_at`), use it for the event's `timestamp`, never the ingestion column.
 - **Soft-deleted rows** — if the table has an `is_deleted` / `deleted_at` column, the Data Graph will include them unless filtered. Note this; the customer may want a filter at the model layer.
 - **Multi-tenant columns** — if the warehouse is multi-tenant (e.g., `tenant_id`), surface that column in the entity shape and call out scoping expectations.
 - **Audience wraps a model that joins multiple tables** — the model is the entity shape; the audience is just a saved filter on top. Use the model for the Data Graph node, not the base tables unless you are intentionally decomposing the model.
@@ -97,7 +98,7 @@ Every shortlisted source becomes one of:
 **One Data Graph per workspace / domain / warehouse account.** *Why:* cross-workspace joins are not supported, and mixing domains (e.g., Consumer + B2B) in one graph muddies the builder UX. Also, all models in a graph must resolve to the same warehouse account.
 
 **Entity selection:**
-- **Root entity** — the primary "who" being activated (users, branches, contacts).
+- **Root entity** — the primary "who" being activated (users, branches, contacts). Mark it in YAML with `root: true` on the entity model (entity-only field). **Multiple roots are valid** — each `root: true` entity is an independent audience-builder anchor, so a graph may have one or several. The validator does *not* enforce a count (zero, one, or many all pass), so set `root` deliberately on whichever entities the builder should start from rather than relying on a default.
 - **Related entities** — supporting objects with foreign-key relationships to the root.
 - **Events** — timestamped activity tables tied back to an entity.
 
@@ -105,6 +106,18 @@ Every shortlisted source becomes one of:
 - `source_join_key` is the column on the *current* model (the one declaring the relationship).
 - `target_join_key` is the column on the *target* model.
 - Cardinality describes how many target rows exist per source row: `branch → contacts` is `one-to-many` from the branch's perspective.
+- **Declare each relationship once, on one side only.** Do not also declare the inverse on the target model — the graph traverses it both ways. A double-declaration collides on `display_name` (which must be unique across all relationships) and inflates the relationship count.
+
+**Verify join keys before writing the YAML.** A wrong join key passes `validate` but silently returns the wrong audience population. If you have direct warehouse access (an MCP server, a CLI like `snowsql`/`bq`/`psql`, or an IDE connection), confirm every `source_join_key` and `target_join_key` exists on its table with one batched introspection query — RETL config alone does not catch typos or renamed columns:
+
+| Warehouse | One-shot query |
+|---|---|
+| Snowflake | `SELECT TABLE_NAME, COLUMN_NAME FROM <DB>.INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '<schema>' AND TABLE_NAME IN (...)` |
+| BigQuery | `SELECT table_name, column_name FROM <project>.<dataset>.INFORMATION_SCHEMA.COLUMNS WHERE table_name IN (...)` |
+| Postgres / Redshift | `SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = '<schema>' AND table_name IN (...)` |
+| Databricks | `SELECT table_name, column_name FROM system.information_schema.columns WHERE table_name IN (...)`, or `DESCRIBE TABLE <catalog>.<schema>.<table>` |
+
+If you have no warehouse access, fall back to the rule in **Validation & handoff**: flag every inferred join key and require confirmation before `apply`.
 
 **Minimal skeleton:**
 
@@ -227,6 +240,7 @@ Before handing the YAML to the customer:
 - **Soft-deleted rows** are included unless filtered at the model layer.
 - **Multi-tenant schemas** need the tenant column surfaced so Audiences can scope correctly.
 - **Device-mode destinations** bypass RudderStack servers; they will not explain warehouse-side RETL source shape.
+- **Date/time dimensions are not graph nodes.** Do not model `DIM_DATES` / `DIM_TIME` or join them at audience time. An event model's `timestamp` column already encodes the moment, and time-window filters operate on it directly.
 
 ---
 
