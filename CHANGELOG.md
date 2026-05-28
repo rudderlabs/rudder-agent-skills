@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.2] - 2026-05-28
+
+### Changed
+
+- **`rudder-core` / `rudder-data-graphs`** — documented the entity `root`
+  flag (optional, entity-only, multiple roots valid, count not enforced),
+  the relationship sidedness rule (declare once, never the inverse), and a
+  warehouse-agnostic join-key verification step (Snowflake / BigQuery /
+  Postgres / Redshift / Databricks) with a no-access fallback. Added SCD2
+  surrogate-key and ingestion-timestamp modeling edge cases, a date-dimension
+  anti-pattern, per-type `display_name` uniqueness, and a symmetric-name
+  collision fix in the YAML template.
+- **`rudder-cli` / `rudder-cli-workflow`** — documented `--confirm=false`
+  for non-interactive apply (default `--confirm=true` silently no-ops in
+  non-TTY contexts), the full-source-of-truth deletion semantics of `apply`,
+  and `-c <config>` selection for multi-environment workspaces. Fixed the
+  misleading "unexpected deletion" troubleshooting row.
+
 ## [0.0.1] - 2026-05-28
 
 Initial public release of the `rudder-agent-skills` Claude Code plugin marketplace.
