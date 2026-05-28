@@ -83,7 +83,7 @@ claude plugin install rudder-core@rudder-agent-skills
 claude plugin install rudder-cli@rudder-agent-skills
 ```
 
-Pin to a release by appending `@v1.0.0` to the marketplace slug. Update later with `/plugin marketplace update rudder-agent-skills`.
+Pin to a release by appending `@v0.0.1` to the marketplace slug. Update later with `/plugin marketplace update rudder-agent-skills`.
 
 ## Available skills
 
