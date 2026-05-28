@@ -111,8 +111,8 @@ spec:
 - Entity→event cardinality must be `one-to-many`
 - Entity↔entity can be any cardinality
 - `target` must use URN syntax `#data-graph-model:<model-id>` and resolve to a model in the same spec
-- All `display_name` values must be unique across models and relationships
-- Declare each relationship **once, on a single model** — do not also declare its inverse on the target model; the graph traverses it both ways. Double-declaration collides on `display_name` and inflates the relationship count
+- `display_name` must be unique **among models** and, separately, **among relationships** — the two are independent namespaces, so a model and a relationship may share a name, but two models (or two relationships) may not
+- Declare each relationship **once, on a single model** — do not also declare its inverse on the target model; the graph traverses it both ways. Double-declaration collides on the relationship `display_name` and inflates the relationship count
 - `root: true` is an optional entity-only flag; multiple roots are allowed and the count is not validated
 
 ## Worked example: Property vertical
@@ -210,7 +210,7 @@ The `target` URN doesn't match any `id` in the same spec. Check for typos. Remem
 
 ### "Duplicate display_name"
 
-Two models or relationships have the same `display_name`. Each must be unique. This applies across ALL models and relationships in the spec.
+Two models share a `display_name`, or two relationships share one. Names must be unique **within each type** — model names among models, relationship names among relationships. (A model and a relationship may share a name; the namespaces are separate.)
 
 A common trigger is two relationships that naturally share a label — e.g. `sale-via-channel` and `interaction-via-channel` both wanting "Via Channel". Prefix with the source entity to disambiguate: "Sale Via Channel" and "Interaction Via Channel". The same fix applies to any pair of symmetric relationships pointing at the same target entity.
 

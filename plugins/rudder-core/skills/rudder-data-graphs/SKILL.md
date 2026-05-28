@@ -115,7 +115,7 @@ Every shortlisted source becomes one of:
 | Snowflake | `SELECT TABLE_NAME, COLUMN_NAME FROM <DB>.INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '<schema>' AND TABLE_NAME IN (...)` |
 | BigQuery | `SELECT table_name, column_name FROM <project>.<dataset>.INFORMATION_SCHEMA.COLUMNS WHERE table_name IN (...)` |
 | Postgres / Redshift | `SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = '<schema>' AND table_name IN (...)` |
-| Databricks | `SELECT table_name, column_name FROM system.information_schema.columns WHERE table_name IN (...)`, or `DESCRIBE TABLE <catalog>.<schema>.<table>` |
+| Databricks | `SELECT table_name, column_name FROM system.information_schema.columns WHERE table_catalog = '<catalog>' AND table_schema = '<schema>' AND table_name IN (...)`, or `DESCRIBE TABLE <catalog>.<schema>.<table>` |
 
 If you have no warehouse access, fall back to the rule in **Validation & handoff**: flag every inferred join key and require confirmation before `apply`.
 
