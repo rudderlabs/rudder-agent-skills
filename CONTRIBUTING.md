@@ -121,7 +121,7 @@ Your PR description should include:
 
 - Plugin versions live in the **top-level `.claude-plugin/marketplace.json`**, not in individual `plugin.json` files.
 - Bump the relevant plugin's `version` field in `marketplace.json` when your change materially alters skill behavior. Minor content tweaks don't need a bump.
-- Tag releases (`git tag vX.Y.Z && git push --tags`) so users can pin with `@vX.Y.Z` when adding the marketplace.
+- Tag releases (`git tag vX.Y.Z && git push --tags`) for traceability and the GitHub releases UI. The Claude Code marketplace command installs from `main`; users who need to freeze a specific version can `git checkout` the tag manually in `~/.claude/plugins/marketplaces/rudderlabs-rudder-agent-skills`.
 
 ## Governance
 
