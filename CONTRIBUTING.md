@@ -32,10 +32,10 @@ If a new skill spans two surfaces, default to `rudder-core` and reference surfac
 
 ## Authoring a skill
 
-Each skill is a folder under `plugins/<plugin>/skills/<skill-name>/` containing one `SKILL.md` and optional `references/*.md` files:
+Each skill is a folder under `skills/<plugin>/skills/<skill-name>/` containing one `SKILL.md` and optional `references/*.md` files:
 
 ```
-plugins/rudder-cli/skills/my-new-skill/
+skills/rudder-cli/skills/my-new-skill/
 ├── SKILL.md                # required
 └── references/             # optional; loaded on demand
     └── advanced-topic.md

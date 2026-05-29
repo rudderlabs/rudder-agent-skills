@@ -11,7 +11,7 @@
   "plugins": [
     {
       "name": "rudder-core",
-      "source": "./plugins/rudder-core",
+      "source": "./skills/rudder-core",
       "description": "Cross-tool RudderStack domain knowledge: data catalog, tracking plans, data graphs, instrumentation planning and debugging.",
       "version": "0.0.1",
       "author": {
@@ -26,7 +26,7 @@
     },
     {
       "name": "rudder-cli",
-      "source": "./plugins/rudder-cli",
+      "source": "./skills/rudder-cli",
       "description": "Workflows for driving the rudder-cli and rudder-typer CLIs: validate, dry-run, apply, import, transformations.",
       "version": "0.0.1",
       "author": {
@@ -41,7 +41,7 @@
     },
     {
       "name": "rudder-mcp",
-      "source": "./plugins/rudder-mcp",
+      "source": "./skills/rudder-mcp",
       "description": "Workflows for RudderStack's MCP server at mcp.rudderstack.com: connect AI/LLM agents to a RudderStack workspace and drive it via MCP tool calls.",
       "version": "0.0.1",
       "author": {
@@ -56,7 +56,7 @@
     },
     {
       "name": "rudder-terraform",
-      "source": "./plugins/rudder-terraform",
+      "source": "./skills/rudder-terraform",
       "description": "Workflows for managing RudderStack with the Terraform provider: provider setup, resource/data-source usage, and plan/apply cycles.",
       "version": "0.0.1",
       "author": {
