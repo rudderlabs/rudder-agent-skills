@@ -102,9 +102,12 @@ digraph workflow {
 | `rudder-cli validate -l ./` | Check YAML syntax and semantic rules | After any edit |
 | `rudder-cli apply --dry-run -l ./` | Preview changes without applying | After validation passes |
 | `rudder-cli apply -l ./` | Apply changes to workspace | After dry-run review |
+| `rudder-cli apply --confirm=false -l ./` | Apply without the interactive prompt | CI, piped output, agent contexts |
 | `rudder-cli plan -l ./` | Show detailed execution plan | Alternative to dry-run |
 
 **Note:** `-l ./` specifies the project location (current directory).
+
+**`-c <path>` selects the config (workspace + token).** Pass it explicitly if you maintain per-environment configs (e.g. `~/.rudder/dev.config.json`, `~/.rudder/prod.config.json`); without it, rudder-cli uses the default config that `rudder-cli auth login` last wrote. Verify the target with `rudder-cli workspace info -c <path>` before `apply`.
 
 ## Step 1: Validate
 
@@ -150,10 +153,12 @@ Found N error(s), M warning(s)
 rudder-cli apply --dry-run -l ./
 ```
 
+> **`apply` makes the workspace match your project exactly.** Every remote resource absent from your local YAML — **of any kind** — is deleted, listed under `Removed resources:`. There is no flag to scope apply to a subset (`apply` accepts only `--location`, `--dry-run`, `--confirm`). On a **new** project pointing at an **existing** workspace, expect a large deletion set on the first dry-run; confirm those deletions are acceptable before applying. Treat the project directory as the single source of truth for the whole workspace.
+
 **Output shows:**
 - `New resources:` - Resources that will be created
 - `Updated resources:` - Resources that will be modified (shows diff)
-- `Deleted resources:` - Resources that will be removed
+- `Removed resources:` - Resources in the workspace but not in your project — these will be **deleted**
 
 ### Reading Dry Run Output
 
@@ -182,6 +187,12 @@ rudder-cli apply -l ./
 Only run after:
 1. `validate` passes
 2. `--dry-run` shows expected changes
+
+**Non-interactive runs:** the default `--confirm=true` opens an interactive confirmation prompt. In a non-interactive context (piped output, CI, agent), that prompt **auto-declines and nothing is applied — silently, no error**. Pass `--confirm=false` to apply without prompting:
+
+```bash
+rudder-cli apply --confirm=false -l ./
+```
 
 ## Workflow Examples
 
@@ -277,5 +288,6 @@ done
 | "workspace info" shows wrong workspace | Authenticated to wrong workspace | Run `rudder-cli auth login` with correct token |
 | "Project configuration is valid" but dry-run shows nothing | No changes detected | Verify files are in correct location |
 | Validation passes but dry-run fails | API/auth issue | Run `rudder-cli workspace info` to verify auth |
-| Unexpected resource deletion | State mismatch | Check metadata.import section |
+| `apply` exits without applying, no error | Default `--confirm=true` auto-declined in a non-TTY (piped/CI/agent) context | Re-run with `--confirm=false` |
+| `Removed resources:` lists resources you didn't expect | `apply` is full source of truth — anything in the workspace but not in your project is deleted | Add those resources to your project (e.g. via `rudder-cli import`), or confirm the deletions are intended |
 | Changes not appearing | Wrong project path | Verify `-l ./` points to right directory |
