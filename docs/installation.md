@@ -153,13 +153,13 @@ git clone https://github.com/rudderlabs/rudder-agent-skills.git ~/rudder-agent-s
 
 # Create symlinks for Claude Code
 mkdir -p ~/.claude/skills
-ln -s ~/rudder-agent-skills/plugins/rudder-core/skills/rudder-data-catalog ~/.claude/skills/
-ln -s ~/rudder-agent-skills/plugins/rudder-cli/skills/rudder-cli-workflow ~/.claude/skills/
+ln -s ~/rudder-agent-skills/skills/rudder-core/skills/rudder-data-catalog ~/.claude/skills/
+ln -s ~/rudder-agent-skills/skills/rudder-cli/skills/rudder-cli-workflow ~/.claude/skills/
 
 # Create symlinks for Cursor
 mkdir -p .cursor/skills
-ln -s ~/rudder-agent-skills/plugins/rudder-core/skills/rudder-data-catalog .cursor/skills/
-ln -s ~/rudder-agent-skills/plugins/rudder-cli/skills/rudder-cli-workflow .cursor/skills/
+ln -s ~/rudder-agent-skills/skills/rudder-core/skills/rudder-data-catalog .cursor/skills/
+ln -s ~/rudder-agent-skills/skills/rudder-cli/skills/rudder-cli-workflow .cursor/skills/
 ```
 
 ### Option 4: Copy
@@ -170,8 +170,8 @@ Copy skills directly into your project:
 git clone https://github.com/rudderlabs/rudder-agent-skills.git /tmp/rudder-agent-skills
 
 mkdir -p .claude/skills
-cp -r /tmp/rudder-agent-skills/plugins/rudder-core/skills/* .claude/skills/
-cp -r /tmp/rudder-agent-skills/plugins/rudder-cli/skills/* .claude/skills/
+cp -r /tmp/rudder-agent-skills/skills/rudder-core/skills/* .claude/skills/
+cp -r /tmp/rudder-agent-skills/skills/rudder-cli/skills/* .claude/skills/
 ```
 
 ### Option 5: Git Submodule
@@ -184,7 +184,7 @@ git submodule add https://github.com/rudderlabs/rudder-agent-skills.git .rudder-
 
 # Create symlinks
 mkdir -p .claude/skills
-ln -s ../.rudder-skills/plugins/rudder-cli/skills/rudder-cli-workflow .claude/skills/
+ln -s ../.rudder-skills/skills/rudder-cli/skills/rudder-cli-workflow .claude/skills/
 ```
 
 ## Verifying Installation
