@@ -153,8 +153,8 @@ Or install manually via symlinks (from this example directory):
 
 ```bash
 mkdir -p .claude/skills
-ln -s ../../plugins/rudder-cli/skills/rudder-cli-workflow .claude/skills/
-ln -s ../../plugins/rudder-cli/skills/rudder-transformations .claude/skills/
+ln -s ../../skills/rudder-cli/skills/rudder-cli-workflow .claude/skills/
+ln -s ../../skills/rudder-cli/skills/rudder-transformations .claude/skills/
 ```
 
 Then Claude Code can help you:
