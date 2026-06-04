@@ -1,6 +1,7 @@
 ---
 name: rudder-data-graphs
 description: Produces Data Graph YAML from RETL sources for Audiences. Use when designing Data Graphs, mapping RETL to entities/events, or assessing customer fit for Audiences.
+allowed-tools: "Bash(rudder-cli *), Read, Write, Edit"
 ---
 
 # RETL Connection Analysis & Data Graph Design
@@ -24,7 +25,7 @@ The end-to-end flow is: find workspaces → list RETL sources → shortlist rele
 1. `admin_search_organizations(company_name=...)` to get the `org_id`.
 2. `admin_search_workspaces(search_by=organizationId)` using that id.
 3. Keep only `status=ACTIVE` workspaces. *Why:* inactive workspaces often have stale or disconnected configs and will produce misleading source lists.
-4. Note the likely warehouse-backed workspaces, but **do not assume you already have the correct `accountId` at this stage**. *Why:* the Data Graph YAML embeds `account_id`, and that value is usually most reliable on the relevant RETL source config rather than on the workspace summary.
+4. Note the likely warehouse-backed workspaces, but **do not assume you already have the correct `accountId` at this stage**. *Why:* the Data Graph YAML embeds `account_id`, and that value is the warehouse account the graph runs against. The most authoritative source for it is `rudder-cli workspace accounts list --json` (see Step 4a); a RETL source config is a convenient secondary hint when one already exists, but it is not a prerequisite.
 
 ---
 
@@ -48,7 +49,7 @@ Run `list_sources(workspace_id=..., retl_type=all, includeConfig=false)` per wor
    - **Event candidates** — tables/models with a real business-time timestamp (`ordered_at`, `sent_at`, `opened_at`, etc.) and a clear relationship back to an entity. Pull these in; events are a major Data Graph unlock that audiences alone can't surface.
    - **FK targets** — tables/models referenced by foreign keys from anchor entities (e.g., if the anchor `contact` has a `branch_id`, pull in `branch`). Pull these in.
    - **Everything else** — keep in the Source Inventory for completeness, but do not force into the Data Graph unless it materially improves segmentation or the customer asks. Noise suppression matters on large workspaces.
-5. **Resolve `accountId` only after the shortlist exists.** Prefer the warehouse account id from the specific RETL source configs you are actually using in the graph. If shortlisted sources disagree on `accountId`, stop and flag it; one graph should not span multiple warehouse accounts.
+5. **Resolve `accountId` only after the shortlist exists.** Cross-check the warehouse account id from the specific RETL source configs you are actually using in the graph against `rudder-cli workspace accounts list` (see Step 4a). If shortlisted sources disagree on `accountId`, stop and flag it; one graph should not span multiple warehouse accounts.
 
 **What to extract, by sourceType:**
 
@@ -148,6 +149,34 @@ For vertical-specific starting shapes (Property / E-commerce / SaaS), read `refe
 
 ---
 
+## Step 4a — Resolve the warehouse `account_id`
+
+`spec.account_id` must be the id of the **warehouse account** the graph runs against. The account only needs to *exist* — it does not need to be selected in the Data Graph UI first, and you do not need a RETL source to obtain its id.
+
+**The authoritative lookup is the CLI:**
+
+```bash
+# --json is required in agent/non-interactive contexts; the plain
+# table output needs a TTY and fails when piped.
+rudder-cli workspace accounts list --category wht --json
+```
+
+Each line is an account object. Use the **`id`** field as `account_id`; use `name` and `options` (`account`, `dbname`, `warehouse`, `schema`) to pick the right one when several warehouse accounts exist. `--category wht` filters to warehouse connections; drop the filter or use `--type snowflake|databricks|...` to widen.
+
+**Why the CLI and not the MCP:** `rudder-mcp` can only locate accounts reachable through a **RETL source or a destination**. Accounts created through the **Data Graph UI** or a standalone **warehouse connection** are invisible to the MCP — but they *do* appear in `rudder-cli workspace accounts list`. When the MCP cannot surface the account, fall back to the CLI (or accept an `account_id` the user states explicitly).
+
+### Building from scratch — no RETL source yet
+
+Common for demo-environment builds (e.g. provisioning a workspace end-to-end before any audience or RETL source exists). There is no RETL source config to read the id from, and the obvious "create a dummy RETL source just to expose the account" step is unnecessary:
+
+1. Ensure the warehouse account exists (created via the dashboard, Terraform, or the Data Graph UI).
+2. `rudder-cli workspace accounts list --category wht --json` → take the matching `id`.
+3. Put that id in `spec.account_id` and proceed to validate / apply.
+
+> **Note:** creating a warehouse *destination* alone does not always surface a usable account id through every path. The reliable path in all cases is the CLI account list above.
+
+---
+
 ## Step 5 — Compile the demo warehouse spec
 
 For every model or table referenced in the Data Graph, produce:
@@ -234,7 +263,7 @@ Before handing the YAML to the customer:
 ## Common gotchas
 
 - **`includeConfig=false` is not enough** for audience extraction, SQL parsing, or `accountId` resolution. Always fetch full config for shortlisted sources.
-- **Warehouse account IDs** are most reliable on the RETL source configs you are actually using in the graph, not on a generic workspace summary.
+- **Warehouse account IDs** come from `rudder-cli workspace accounts list --category wht --json` (the `id` field). Don't require a RETL source to exist first, and don't rely on the MCP — it can't see DG-UI or warehouse-connection accounts. See Step 4a.
 - **Templated model SQL** must be rendered before column extraction.
 - **SQL parsing recovers names, not guaranteed types.** Mark unverifiable types as unknown / inferred.
 - **Soft-deleted rows** are included unless filtered at the model layer.

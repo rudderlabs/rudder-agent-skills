@@ -11,7 +11,7 @@ metadata:
   name: "acme-ecommerce-data-graph"      # Required. Human-readable name for the graph.
 spec:
   id: "acme-ecommerce-data-graph"        # Required. Unique identifier used in syncs.
-  account_id: "2abc123xyz"               # Required. Warehouse account ID from RETL source config.
+  account_id: "2abc123xyz"               # Required. Warehouse account ID. Resolve via `rudder-cli workspace accounts list --category wht --json` (the `id` field).
   models:
     # ─────────────────────────────────────────────────────────────
     # ENTITY: Root entity (the "who" being activated)
@@ -73,7 +73,7 @@ spec:
 | `kind` | String | Yes | Resource type: `"data-graph"` |
 | `metadata.name` | String | Yes | Human-readable name |
 | `spec.id` | String | Yes | Unique identifier for syncs |
-| `spec.account_id` | String | Yes | Warehouse account ID (from RETL source config) |
+| `spec.account_id` | String | Yes | Warehouse account ID — `rudder-cli workspace accounts list --category wht --json` (`id` field) |
 | `spec.models` | List | Yes | Entity and event models |
 
 ### Model fields
@@ -222,9 +222,22 @@ The `table` must be 3-part: `catalog.schema.table`. Common mistake: using 2-part
 
 Most likely cause: wrong join keys. The YAML is syntactically valid but semantically wrong. Verify join keys match actual FK relationships in the warehouse.
 
+### `apply` fails on a missing / invalid `account_id`
+
+The account only needs to *exist* — you do **not** need to select it in the Data Graph UI, and you do **not** need a RETL source. List the warehouse accounts and copy the `id`:
+
+```bash
+rudder-cli workspace accounts list --category wht --json
+```
+
+`rudder-mcp` cannot see accounts created through the DG UI or a standalone warehouse connection (it only surfaces accounts behind a RETL source or destination), so the CLI list is the authoritative lookup.
+
 ## CLI commands
 
 ```bash
+# List warehouse accounts; the `id` field is the spec.account_id value
+rudder-cli workspace accounts list --category wht --json
+
 # Validate all data-graph specs in current directory
 rudder-cli validate -l ./
 
