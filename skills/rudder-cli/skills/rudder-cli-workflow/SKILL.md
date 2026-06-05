@@ -104,8 +104,40 @@ digraph workflow {
 | `rudder-cli apply -l ./` | Apply changes to workspace | After dry-run review |
 | `rudder-cli apply --confirm=false -l ./` | Apply without the interactive prompt | CI, piped output, agent contexts |
 | `rudder-cli plan -l ./` | Show detailed execution plan | Alternative to dry-run |
+| `rudder-cli workspace accounts list --json` | List workspace accounts (warehouse/source/etc.) and their IDs | Resolving an `account_id`/`accountId` for a resource spec |
 
 **Note:** `-l ./` specifies the project location (current directory).
+
+### Looking up account IDs
+
+Many resource specs reference a workspace account by id — e.g. a Data Graph's `spec.account_id` needs the warehouse account it runs against. Resolve it from the CLI rather than guessing:
+
+```bash
+# Always use --json in agent/non-interactive contexts.
+# The plain table output requires a TTY and fails with
+# "could not open a new TTY" when piped.
+rudder-cli workspace accounts list --json
+```
+
+Each line is one account object. The fields that matter:
+
+- **`id`** — this is the value to paste into `account_id` / `accountId` in a spec.
+- **`name`** — human label (e.g. `Snowflake`).
+- **`definition.category`** — account role: `wht` = warehouse connection, `source` = source connection, `profilesStore`, etc.
+- **`definition.type`** — engine: `snowflake`, `databricks`, `git`, …
+- **`options`** — connection details (`account`, `dbname`, `warehouse`, `schema`, `role`, `user`) to disambiguate when several accounts share a name.
+
+Filter to narrow the list:
+
+```bash
+# RETL source warehouse accounts (what a Data Graph needs)
+rudder-cli workspace accounts list --category source --json
+
+# By engine
+rudder-cli workspace accounts list --type snowflake --json
+```
+
+**This is the authoritative way to discover account IDs** — including accounts created through the Data Graph UI or a warehouse connection, which are *not* discoverable via `rudder-mcp` (the MCP only surfaces accounts reachable through a rETL source or destination). When working without a rETL source yet (e.g. building a workspace from scratch), `rudder-cli workspace accounts list` is the fallback the agent must use.
 
 **`-c <path>` selects the config (workspace + token).** Pass it explicitly if you maintain per-environment configs (e.g. `~/.rudder/dev.config.json`, `~/.rudder/prod.config.json`); without it, rudder-cli uses the default config that `rudder-cli auth login` last wrote. Verify the target with `rudder-cli workspace info -c <path>` before `apply`.
 
