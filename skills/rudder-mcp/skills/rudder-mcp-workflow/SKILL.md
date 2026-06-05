@@ -133,7 +133,7 @@ Workflow:
 
 - Don't run mutating tools (transformation upserts, destination connection changes, workspace switches) without confirming the target workspace and resource with the user — these affect shared workspace state.
 - Don't assume a specific tool name; the server evolves and your client's discovered tool list is the source of truth.
-- Don't rely on the MCP to discover workspace **account IDs**. The MCP only surfaces accounts reachable through a RETL source or a destination; accounts created through the Data Graph UI or a standalone warehouse connection are invisible to it. When you need an `account_id` (e.g. for a Data Graph's `spec.account_id`), fall back to the CLI: `rudder-cli workspace accounts list --category wht --json` (the `id` field).
+- Don't rely on the MCP to discover workspace **account IDs**. The MCP only surfaces accounts reachable through a RETL source or a destination; accounts created through the Data Graph UI or a standalone warehouse connection are invisible to it. When you need an `account_id` (e.g. for a Data Graph's `spec.account_id`), fall back to the CLI: `rudder-cli workspace accounts list --category source --json` (the `id` field).
 
 ## Credential Security
 

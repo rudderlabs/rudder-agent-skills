@@ -130,8 +130,8 @@ Each line is one account object. The fields that matter:
 Filter to narrow the list:
 
 ```bash
-# Warehouse connections only (what a Data Graph needs)
-rudder-cli workspace accounts list --category wht --json
+# RETL source warehouse accounts (what a Data Graph needs)
+rudder-cli workspace accounts list --category source --json
 
 # By engine
 rudder-cli workspace accounts list --type snowflake --json

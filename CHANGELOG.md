@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   workspace account IDs. Added a "Looking up account IDs" subsection covering
   the mandatory `--json` flag in non-interactive contexts (plain output needs
   a TTY), the meaningful fields (`id` is the value for a spec's `account_id`),
-  the `--category wht` / `--type` filters, and the note that this surfaces
+  the `--category source` / `--type` filters, and the note that this surfaces
   accounts the MCP cannot (Data Graph UI / standalone warehouse connections).
 - **`rudder-core` / `rudder-data-graphs`** — reframed `account_id` resolution
   around the CLI account list instead of requiring a RETL source config. Added
@@ -27,7 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`rudder-mcp` / `rudder-mcp-workflow`** — added a "Don't do this" item:
   don't rely on the MCP to discover account IDs (it only sees accounts behind
   a RETL source or destination); fall back to
-  `rudder-cli workspace accounts list --category wht --json`.
+  `rudder-cli workspace accounts list --category source --json`.
 - **Breaking (repo layout):** renamed top-level `plugins/` directory to `skills/` so the [skills.sh](https://skills.sh) catalog indexer surfaces all 17 skills (it walks `skills/` but not `plugins/`). Each plugin still lives at `skills/<plugin>/skills/<skill>/SKILL.md`, mirroring the [`dbt-labs/dbt-agent-skills`](https://github.com/dbt-labs/dbt-agent-skills) layout. Marketplace manifest plugin `source` fields updated accordingly. The `npx skills add rudderlabs/rudder-agent-skills` install UX is unchanged.
 
 ### Updating from a previous install

@@ -11,7 +11,7 @@ metadata:
   name: "acme-ecommerce-data-graph"      # Required. Human-readable name for the graph.
 spec:
   id: "acme-ecommerce-data-graph"        # Required. Unique identifier used in syncs.
-  account_id: "2abc123xyz"               # Required. Warehouse account ID. Resolve via `rudder-cli workspace accounts list --category wht --json` (the `id` field).
+  account_id: "2abc123xyz"               # Required. Warehouse account ID. Resolve via `rudder-cli workspace accounts list --category source --json` (the `id` field).
   models:
     # ─────────────────────────────────────────────────────────────
     # ENTITY: Root entity (the "who" being activated)
@@ -73,7 +73,7 @@ spec:
 | `kind` | String | Yes | Resource type: `"data-graph"` |
 | `metadata.name` | String | Yes | Human-readable name |
 | `spec.id` | String | Yes | Unique identifier for syncs |
-| `spec.account_id` | String | Yes | Warehouse account ID — `rudder-cli workspace accounts list --category wht --json` (`id` field) |
+| `spec.account_id` | String | Yes | Warehouse account ID — `rudder-cli workspace accounts list --category source --json` (`id` field) |
 | `spec.models` | List | Yes | Entity and event models |
 
 ### Model fields
@@ -227,7 +227,7 @@ Most likely cause: wrong join keys. The YAML is syntactically valid but semantic
 The account only needs to *exist* — you do **not** need to select it in the Data Graph UI, and you do **not** need a RETL source. List the warehouse accounts and copy the `id`:
 
 ```bash
-rudder-cli workspace accounts list --category wht --json
+rudder-cli workspace accounts list --category source --json
 ```
 
 `rudder-mcp` cannot see accounts created through the DG UI or a standalone warehouse connection (it only surfaces accounts behind a RETL source or destination), so the CLI list is the authoritative lookup.
@@ -236,7 +236,7 @@ rudder-cli workspace accounts list --category wht --json
 
 ```bash
 # List warehouse accounts; the `id` field is the spec.account_id value
-rudder-cli workspace accounts list --category wht --json
+rudder-cli workspace accounts list --category source --json
 
 # Validate all data-graph specs in current directory
 rudder-cli validate -l ./

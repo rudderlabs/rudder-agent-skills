@@ -158,10 +158,10 @@ For vertical-specific starting shapes (Property / E-commerce / SaaS), read `refe
 ```bash
 # --json is required in agent/non-interactive contexts; the plain
 # table output needs a TTY and fails when piped.
-rudder-cli workspace accounts list --category wht --json
+rudder-cli workspace accounts list --category source --json
 ```
 
-Each line is an account object. Use the **`id`** field as `account_id`; use `name` and `options` (`account`, `dbname`, `warehouse`, `schema`) to pick the right one when several warehouse accounts exist. `--category wht` filters to warehouse connections; drop the filter or use `--type snowflake|databricks|...` to widen.
+Each line is an account object. Use the **`id`** field as `account_id`; use `name` and `options` (`account`, `dbname`, `warehouse`, `schema`) to pick the right one when several accounts exist. `--category source` lists exactly the RETL-source warehouse accounts that are valid for a Data Graph; drop the filter or use `--type snowflake|databricks|...` to widen.
 
 **Why the CLI and not the MCP:** `rudder-mcp` can only locate accounts reachable through a **RETL source or a destination**. Accounts created through the **Data Graph UI** or a standalone **warehouse connection** are invisible to the MCP — but they *do* appear in `rudder-cli workspace accounts list`. When the MCP cannot surface the account, fall back to the CLI (or accept an `account_id` the user states explicitly).
 
@@ -170,7 +170,7 @@ Each line is an account object. Use the **`id`** field as `account_id`; use `nam
 Common for demo-environment builds (e.g. provisioning a workspace end-to-end before any audience or RETL source exists). There is no RETL source config to read the id from, and the obvious "create a dummy RETL source just to expose the account" step is unnecessary:
 
 1. Ensure the warehouse account exists (created via the dashboard, Terraform, or the Data Graph UI).
-2. `rudder-cli workspace accounts list --category wht --json` → take the matching `id`.
+2. `rudder-cli workspace accounts list --category source --json` → take the matching `id`.
 3. Put that id in `spec.account_id` and proceed to validate / apply.
 
 > **Note:** creating a warehouse *destination* alone does not always surface a usable account id through every path. The reliable path in all cases is the CLI account list above.
@@ -263,7 +263,7 @@ Before handing the YAML to the customer:
 ## Common gotchas
 
 - **`includeConfig=false` is not enough** for audience extraction, SQL parsing, or `accountId` resolution. Always fetch full config for shortlisted sources.
-- **Warehouse account IDs** come from `rudder-cli workspace accounts list --category wht --json` (the `id` field). Don't require a RETL source to exist first, and don't rely on the MCP — it can't see DG-UI or warehouse-connection accounts. See Step 4a.
+- **Warehouse account IDs** come from `rudder-cli workspace accounts list --category source --json` (the `id` field). Don't require a RETL source to exist first, and don't rely on the MCP — it can't see DG-UI or warehouse-connection accounts. See Step 4a.
 - **Templated model SQL** must be rendered before column extraction.
 - **SQL parsing recovers names, not guaranteed types.** Mark unverifiable types as unknown / inferred.
 - **Soft-deleted rows** are included unless filtered at the model layer.
