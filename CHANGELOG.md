@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`rudder-core` / `rudder-data-graphs`** — documented the optional per-column
+  `columns:` block in the Data Graph YAML template: `display_name` (alias) and
+  `description` overrides that surface in the Audience Builder. Added a worked
+  `columns:` example to the annotated template, a `columns` row to the Model
+  fields table, a new **Column metadata fields** reference table, and validation
+  rules (sparse list; each entry needs `name` plus at least one of
+  `display_name` / `description`; alias is case-insensitive-unique per model).
+  Reframed the **Schema visibility** pitch in `capability-comparison.md` around
+  aliases/descriptions making raw warehouse columns marketer-readable.
+
 ## [0.0.3] - 2026-06-03
 
 ### Changed

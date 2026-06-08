@@ -23,6 +23,14 @@ spec:
       description: "Customer records with demographics and loyalty tier"  # Tooltip in Audience Builder.
       primary_id: "CUSTOMER_KEY"         # Required for entity. Column that uniquely identifies rows.
       root: true                         # Entity only. Marks an audience-builder anchor. Multiple roots allowed; count is not validated.
+      columns:                           # Optional. Per-column overrides surfaced in the Audience Builder. Sparse — list only what you relabel.
+        - name: "EMAIL_ADDRESS"          # Warehouse column name (must match the table).
+          display_name: "Email"          # Alias shown instead of the raw column name. ≤255 chars, unique within the model.
+          description: "Primary contact email"  # Note shown alongside the column.
+        - name: "LOYALTY_TIER"
+          display_name: "Loyalty Tier"   # Alias only — no description.
+        - name: "CUSTOMER_NOTES"
+          description: "Free-form CRM notes"     # Description only — no alias.
       relationships:
         # Entity → Event relationship
         - id: "customer-has-orders"
@@ -89,6 +97,7 @@ spec:
 | `root` | Bool | Entity only, optional | Marks an audience-builder anchor. Multiple roots allowed; the count is not validated (zero, one, or many all pass) |
 | `timestamp` | String | Event only | Event timestamp column |
 | `relationships` | List | No | Relationships to other models |
+| `columns` | List | No | Per-column metadata overrides (aliases + descriptions) surfaced in the Audience Builder. See [Column metadata fields](#column-metadata-fields) |
 
 ### Relationship fields
 
@@ -100,6 +109,18 @@ spec:
 | `target` | String | Yes | Target model: `#data-graph-model:<model-id>` |
 | `source_join_key` | String | Yes | Column on source model for join |
 | `target_join_key` | String | Yes | Column on target model for join |
+
+### Column metadata fields
+
+Optional per-column overrides under a model's `columns:` block. **Sparse** — list only the columns you want to relabel; unlisted columns keep their raw warehouse names. By default the Audience Builder shows raw warehouse column names; aliases and descriptions make them readable for marketers building audiences and expressions.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | String | Yes | Warehouse column name (must match the model's `table`) |
+| `display_name` | String | Conditional | Alias shown in the Audience Builder instead of the raw column name. ≤255 chars, case-insensitive-unique within the model |
+| `description` | String | Conditional | Note shown alongside the column. ≤255 chars; no uniqueness constraint |
+
+Each `columns` entry must set **at least one** of `display_name` or `description` (an entry with only `name` is invalid). `apply` is declarative — drop a column's entry to clear its metadata.
 
 ## Validation rules
 
@@ -114,6 +135,9 @@ spec:
 - `display_name` must be unique **among models** and, separately, **among relationships** — the two are independent namespaces, so a model and a relationship may share a name, but two models (or two relationships) may not
 - Declare each relationship **once, on a single model** — do not also declare its inverse on the target model; the graph traverses it both ways. Double-declaration collides on the relationship `display_name` and inflates the relationship count
 - `root: true` is an optional entity-only flag; multiple roots are allowed and the count is not validated
+- `columns` is optional and **sparse** — list only the columns you want to relabel; unlisted columns keep their raw warehouse names
+- each `columns[]` entry needs `name` plus at least one of `display_name` / `description` (an entry with only `name` is invalid)
+- `columns[].display_name` is **case-insensitive-unique within a model** — a separate namespace from model and relationship `display_name` uniqueness; `description` has no uniqueness constraint
 
 ## Worked example: Property vertical
 
