@@ -1,4 +1,4 @@
 {
   "name": "rudder-core",
-  "description": "Cross-tool RudderStack domain knowledge: data catalog, data graphs, tracking plans, instrumentation planning and debugging."
+  "description": "Cross-tool RudderStack domain knowledge: data catalog, data graphs, tracking plans, instrumentation planning, instrumentation debugging, and destination delivery debugging."
 }
