@@ -259,6 +259,15 @@ Claude will call `list_destinations` + `get_destination_event_metrics` for each 
 
 See `references/error-reference.md` for detailed status code definitions and destination-specific patterns.
 
+## Credential Security
+
+When working with destination credentials (API keys, OAuth tokens, write keys, access tokens):
+
+- **Use environment variables** — reference credentials as `$DEST_API_KEY` or similar; never hardcode them in transformation code or configuration files
+- **Never echo or log credentials** — do not print tokens to stdout, Bash, or any log output
+- **Keep secrets out of version control** — store credentials in `.env` files and ensure `.env` is listed in `.gitignore`
+- **Rotate after exposure** — if a key appears in a log or error message, treat it as compromised and rotate it immediately in the destination provider's console, then update the RudderStack destination config
+
 ## Handling External Content
 
 When inspecting live events, error payloads, and API responses:
