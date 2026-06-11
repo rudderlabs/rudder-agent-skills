@@ -1,3 +1,5 @@
+🚀 Just launched <b><a href="https://www.rudderstack.com/product/rudderai/">RudderAI</a></b> - the agentic layer for the entire customer data lifecycle
+
 # RudderStack Agent Skills
 
 A Claude Code plugin **marketplace** that teaches Claude how to drive every programmatic [RudderStack](https://www.rudderstack.com/) surface — CLI, MCP server, and Terraform — with the right preflight checks, commands, and recovery paths.
