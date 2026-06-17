@@ -42,8 +42,8 @@ Before writing any change:
 
 - Verify every new table or column with `describe_table()` before using it.
 - If an entity var has a `from` key, its `select` MUST use an aggregation: `count`, `sum`, `max`, `min`, `avg`, `first_value`, or `last_value` (order-dependent ones need a `window:` with `order_by`).
-- Entity var reference syntax: `'{{<entity_name>.Var("var_name")}}'` — e.g. `'{{user.Var("order_count")}}'` (outer single quotes, inner double; the first segment is the entity's name, not the literal word `entity`).
-- Model paths in `from:` are `inputs/<name>` or `models/<name>` — pb has no dbt-style `ref('...')`.
+- Entity var reference syntax: dot form `'{{<entity_name>.var_name}}'` — e.g. `'{{user.order_count}}'` (the first segment is the entity's name, not the literal word `entity`; the `.Var("...")` function form also works but dot is preferred).
+- Model paths in `from:` are a path to a model — `inputs/<name>`, `models/<name>`, or `packages/<pkg>/...` — pb has no dbt-style `ref('...')`.
 - For removals or renames, scan all files for downstream references first and warn the user explicitly before proceeding.
 
 ## Propensity Models
@@ -102,7 +102,7 @@ Before adding either, confirm with the user:
 1. **Feature view** — which id should the destination join on? It must already be an id_type on the entity.
 2. **Cohort** — what filter defines the subset, and are the filter features already defined in the parent (`entity_key`) var_group? They must be.
 
-Key rules: cohort filter `value`s are SQL booleans over `{{ <entity>.Var("...") }}`; cohort-scoped var_groups use `entity_cohort:` instead of `entity_key:`; activation itself is wired in the RudderStack dashboard, not in `pb`. See `references/cohorts-and-feature-views.md`.
+Key rules: cohort filter `value`s are SQL booleans over `{{ <entity>.<var_name> }}`; cohort-scoped var_groups use `entity_cohort:` instead of `entity_key:`; activation itself is wired in the RudderStack dashboard, not in `pb`. See `references/cohorts-and-feature-views.md`.
 
 ## Incremental Migration
 

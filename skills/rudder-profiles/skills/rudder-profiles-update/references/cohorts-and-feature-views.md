@@ -37,11 +37,11 @@ models:
         output_type: table               # or view
       filter_pipeline:
         - type: exclude                   # include | exclude, applied in order
-          value: "{{ users.Var('id_type_email_count_daily') }} = 0"
+          value: "{{users.id_type_email_count_daily}} = 0"
 ```
 
 - `extends:` is `<entity>/all` for a top-level cohort, or another cohort's path to nest.
-- `filter_pipeline` is an ordered list of `{type: include|exclude, value: "<sql boolean>"}`. Each `value` is a SQL predicate that may reference a parent feature via `{{ <entity>.Var("var_name") }}`.
+- `filter_pipeline` is an ordered list of `{type: include|exclude, value: "<sql boolean>"}`. Each `value` is a SQL predicate that may reference a parent feature via `{{ <entity>.<var_name> }}`.
 - **The features used in filters must exist in the parent's var_group** (`entity_key: <entity>`), not only in the cohort's own group — otherwise the reference won't resolve.
 
 ### Computing features on a cohort
@@ -89,6 +89,6 @@ Cohorts and feature views are consumed in the RudderStack **dashboard**: a cohor
 
 - Confirm with the user: which subset (cohort filter), and which id the destination joins on (feature view key).
 - Every filter feature is defined in the parent `entity_key` var_group.
-- Filter `value` expressions are SQL booleans referencing `{{ <entity>.Var("...") }}`.
+- Filter `value` expressions are SQL booleans referencing `{{ <entity>.<var_name> }}`.
 - `using_ids[].id` is an id_type actually declared on the entity.
 - Adding/removing a cohort or feature view does not invalidate entity-var checkpoints, but a re-run is needed to materialize the new objects.

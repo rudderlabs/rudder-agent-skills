@@ -114,7 +114,7 @@ Common signals:
 - `warehouse not initialized` / `no connection` from `run_query()`
 - The first `run_query()` of a session fails
 
-First action: call `initialize_warehouse_connection(<connection_name>)` once per session before any `run_query()` / `describe_table()`. This is a hard requirement documented in the MCP tool's own docstring; the agent must call it explicitly.
+First action: call the profiles-mcp tool `initialize_warehouse_connection(<connection_name>)` once per session before any `run_query()` / `describe_table()`. These are **profiles-mcp tools the agent invokes** (not `pb` CLI commands); the precondition is a hard requirement documented in the MCP tool's own docstring (`run_query` may execute via `pb query` under the hood, but the agent calls the MCP tool).
 
 ## Python or RPC
 

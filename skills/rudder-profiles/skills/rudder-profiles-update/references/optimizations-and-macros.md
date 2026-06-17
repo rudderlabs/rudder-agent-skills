@@ -32,7 +32,7 @@ macros:
     value: "{{a}} - {{b}}"
 ```
 
-Call it anywhere a `select:`/`merge:`/SQL template is allowed: `select: '{{subtract_range(user.Var("x"), user.Var("y"))}}'`.
+Call it anywhere a `select:`/`merge:`/SQL template is allowed: `select: '{{subtract_range(user.x, user.y)}}'`.
 
 ### Warehouse-aware macros
 

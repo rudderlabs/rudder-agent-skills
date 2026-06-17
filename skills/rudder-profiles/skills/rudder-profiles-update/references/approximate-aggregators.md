@@ -27,7 +27,7 @@ Three vars: a per-window var emitting the state, a `merge:` that unions states o
     is_feature: false
 - entity_var:
     name: distinct_pages
-    select: 'HLL_ESTIMATE({{user.Var("distinct_pages_state")}})'
+    select: 'HLL_ESTIMATE({{user.distinct_pages_state}})'
     # derived from merged state — no from:, no merge:, recomputed each run
 ```
 

@@ -54,9 +54,9 @@ See `references/incremental-debugging.md` for the full checkpoint/baseline triag
 
 ## Output-Quality Debugging
 
-When the run succeeds but the data looks wrong:
+When the run succeeds but the data looks wrong (these are **profiles-mcp tools the agent calls**, not `pb` CLI commands):
 
-1. Call `initialize_warehouse_connection(<connection_name>)` **once** this session before any `run_query()` — required, or `run_query()` fails with "warehouse not initialized".
+1. Call the profiles-mcp tool `initialize_warehouse_connection(<connection_name>)` **once** this session before any `run_query()` — required, or `run_query()` fails with "warehouse not initialized".
 2. Call `get_profiles_output_details()` for output metadata.
 3. Run targeted SQL for health metrics (see `references/post-run-sql-queries.md`):
    - Stitching ratio: raw IDs vs stitched entities.
@@ -83,8 +83,8 @@ These cause the majority of compile failures:
 |---------|---------|-----|
 | Invented field names | `contracts:` instead of `contract:` | Check the actual schema; do not guess field names |
 | Missing aggregation | `select: column_name` with `from:` present | Add aggregation: `select: count(column_name)` |
-| Wrong var reference | `'{{entity.Var("name")}}'` (literal `entity`) or split quoting | Use the entity's real name, outer single, inner double: `'{{user.Var("name")}}'` |
-| dbt syntax | `from: ref('orders')` | Model paths: `from: inputs/orders` or `from: models/<name>` |
+| Wrong var reference | `'{{entity.order_count}}'` (literal `entity`) | Use the entity's real name in dot form: `'{{user.order_count}}'` |
+| dbt syntax | `from: ref('orders')` | A path to a model: `from: inputs/orders`, `from: models/<name>` |
 | Wrong merge shape | `merge: { type: sum }` | `merge:` is a SQL expression: `merge: sum({{rowset.var}})`; COUNT merges as `sum(...)` |
 | Wrong indentation | Misaligned YAML keys | Verify indentation matches the expected structure |
 | Singular/plural confusion | Using field names from memory | Always verify against working examples or the schema |

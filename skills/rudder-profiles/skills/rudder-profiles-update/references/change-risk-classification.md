@@ -18,7 +18,7 @@ Changes that affect identity resolution, downstream references, or introduce ML 
 | Change | Guard |
 |--------|-------|
 | Add a new id_type | Will change the identity graph; may merge or split entities |
-| Modify an existing entity_var | Downstream entity_var refs like `'{{user.Var("name")}}'` may break; invalidates incremental checkpoints |
+| Modify an existing entity_var | Downstream entity_var refs like `'{{user.name}}'` may break; invalidates incremental checkpoints |
 | Add a propensity model | Date handling rules change completely; must use macros for all time-based features |
 | Migrate an entity_var to incremental | Adds a `merge:` clause; only mergeable aggregations are safe; window/ranking functions compile but silently corrupt — validate with a discrete-vs-incremental diff |
 

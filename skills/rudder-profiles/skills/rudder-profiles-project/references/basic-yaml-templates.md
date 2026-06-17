@@ -122,8 +122,8 @@ models:
 
 Notes:
 - There is no `model_type: profiles`. Features live in `var_groups:`, each var wrapped under an `entity_var:` (or `input_var:`) key — note the extra nesting level.
-- `from:` takes a model path: `inputs/<input_name>` or `models/<model_name>`. There is no dbt-style `ref('...')` in pb.
-- Reference another entity_var inside a `select:` as `{{[entity_name].Var("other_var")}}` (e.g., `{{user.Var("order_count")}}`) — quote the whole `select` with outer single quotes. The shorthand `{{user.other_var}}` also works. The first segment is the **entity name**, not the literal word "entity".
+- `from:` takes a path to a model: `inputs/<input_name>`, `models/<model_name>`, or `packages/<pkg>/...`. There is no dbt-style `ref('...')` in pb.
+- Reference another entity_var inside a `select:` with the dot form `{{<entity_name>.<other_var>}}` (e.g., `{{user.order_count}}`) — quote the whole `select` with single quotes. The first segment is the **entity name**, not the literal word "entity". (The `{{user.Var("other_var")}}` function form also works but the dot form is preferred.)
 - A derived entity_var (computed only from other vars) has NO `from:` key.
 - Order-dependent aggregations (`first_value`/`last_value`) need a `window:` with `order_by`.
 

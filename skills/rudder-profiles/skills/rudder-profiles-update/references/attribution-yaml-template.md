@@ -40,9 +40,9 @@ models:
       conversion:                          # required: touchpoints + conversion_vars
         touchpoints:                        # the user-journey events
           - from: models/[marketing_sql_model]
-            where: date(timestamp) > {{user.Var('[first_touch_date_var]')}}
+            where: date(timestamp) > {{user.[first_touch_date_var]}}
           - from: inputs/[marketing_pages]
-            where: date(timestamp) > {{user.Var('[first_touch_date_var]')}}
+            where: date(timestamp) > {{user.[first_touch_date_var]}}
         conversion_vars:                    # one per outcome; required: name + timestamp
           - name: [conversion_1]            # e.g. sf_order
             timestamp: user.Var('[conversion_time_var]')

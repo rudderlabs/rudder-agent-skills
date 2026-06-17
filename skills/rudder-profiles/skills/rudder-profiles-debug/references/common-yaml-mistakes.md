@@ -71,26 +71,26 @@ merge: sum({{rowset.event_count}})
 
 ## Broken Entity Var References
 
-The first segment is the **entity's name** from `pb_project.yaml` (e.g. `user`), not the literal word `entity`. Quote the whole `select:` with outer single quotes and use inner double quotes inside `Var(...)`.
+Use the dot form `{{<entity>.<var>}}`. The first segment is the **entity's name** from `pb_project.yaml` (e.g. `user`), not the literal word `entity`. Quote the whole `select:` with single quotes.
 
 ```yaml
 # WRONG — literal "entity" instead of the entity's name
 - entity_var:
     name: avg_order_value
-    select: '{{entity.Var("total_value")}} / nullif({{entity.Var("order_count")}}, 0)'
+    select: '{{entity.total_value}} / nullif({{entity.order_count}}, 0)'
 
 # WRONG — quoting each template fragment separately breaks YAML parsing
 - entity_var:
     name: avg_order_value
-    select: "{{user.Var(\"total_value\")}}" / nullif("{{user.Var(\"order_count\")}}", 0)
+    select: "{{user.total_value}}" / nullif("{{user.order_count}}", 0)
 
-# CORRECT — entity name, whole select single-quoted, inner double quotes
+# CORRECT — entity name in dot form, whole select single-quoted
 - entity_var:
     name: avg_order_value
-    select: '{{user.Var("total_value")}} / nullif({{user.Var("order_count")}}, 0)'
+    select: '{{user.total_value}} / nullif({{user.order_count}}, 0)'
 ```
 
-The shorthand `{{user.total_value}}` is also valid. A derived var like this (computed only from other entity_vars) takes no `from:` key.
+The `{{user.Var("total_value")}}` function form also works but the dot form is preferred. A derived var like this (computed only from other entity_vars) takes no `from:` key.
 
 ## Indentation and Structure
 

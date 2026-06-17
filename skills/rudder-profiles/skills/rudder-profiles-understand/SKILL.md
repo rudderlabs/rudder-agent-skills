@@ -18,8 +18,8 @@ Read an existing Profiles project and summarize what it builds, how it resolves 
    - `models/profiles-ml.yaml` / `models/attribution.yaml` (if present) — propensity / attribution models
    - `models/optimizations.yaml` / `models/macros.yaml` (if present) — performance flags and reusable macros
 2. **Run `pb show models`** to get the model dependency structure.
-3. **Check outputs** (if the project has been run):
-   - Call `initialize_warehouse_connection(<connection_name>)` **once** before any `run_query()` — it is a hard precondition documented in the MCP tool; skipping it produces "warehouse not initialized".
+3. **Check outputs** (if the project has been run; these are **profiles-mcp tools the agent calls**, not `pb` CLI commands):
+   - Call the profiles-mcp tool `initialize_warehouse_connection(<connection_name>)` **once** before any `run_query()` — a hard precondition documented in the MCP tool; skipping it produces "warehouse not initialized".
    - Call `get_profiles_output_details()` for output metadata (output schema, entity/id-graph materials, latest `seq_no`).
    - Run targeted SQL for health metrics (see references).
    - Identify the latest `seq_no` and output tables. Materials are named `Material_<model>_<hash>_<seq_no>`; pb also maintains stable views (e.g., `<entity>_var_table`) repointed at the latest material each run — prefer the view.

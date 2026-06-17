@@ -21,8 +21,8 @@ Run this review before `pb compile`:
 
 - `models/inputs.yaml` uses the `inputs:` top-level key with `app_defaults: { table, occurred_at_col, ids }` — not `models:`/`model_type: inputs`/`timestamp:`.
 - `models/profiles.yaml` puts features in `var_groups:` with each var nested under `entity_var:` — there is no `model_type: profiles`.
-- Every `from`-based entity var aggregates in `select`, and `from:` is a model path (`inputs/<name>` or `models/<name>`), never `ref('...')`.
-- Entity var references use `'{{<entity_name>.Var("name")}}'` (e.g., `user.Var(...)`), not the literal word `entity`.
+- Every `from`-based entity var aggregates in `select`, and `from:` is a path to a model (`inputs/<name>`, `models/<name>`, `packages/<pkg>/...`), never `ref('...')`.
+- Entity var references use the dot form `'{{<entity_name>.name}}'` (e.g., `user.order_count`), not the literal word `entity`.
 - Date windows are not hard-coded into YAML when runtime flags should control them.
 - Every event-stream input has `contract: { is_event_stream: true, is_append_only: true }` AND `occurred_at_col` set. Dimensions/state tables do NOT set `is_append_only`.
 - `python_requirements:` is set only if the project includes ML models (propensity, attribution).

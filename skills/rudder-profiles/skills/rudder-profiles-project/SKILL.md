@@ -38,8 +38,8 @@ These are the most common sources of broken projects. Violating any of them will
 
 - **No placeholders.** Never use names like `my_database`, `example_table`, `my_connection`, or `sample_schema`. Every resource name must come from MCP discovery or the user.
 - **Aggregation requirement.** If an entity var has a `from` key, its `select` MUST use an aggregation function: `count`, `sum`, `max`, `min`, `avg`, `first_value`, or `last_value` (order-dependent ones need a `window:` with `order_by`). A bare column reference in `select` with `from` will fail.
-- **Var reference syntax.** Reference another entity_var as `{{<entity_name>.Var("var_name")}}` — e.g., `'{{user.Var("order_count")}}'` for an entity named `user`. The first segment is the **entity's name from pb_project.yaml**, not the literal word `entity`. Quote the whole `select:` with outer single quotes and use inner double quotes inside `Var(...)`; the shorthand `{{user.var_name}}` also works.
-- **Model paths, not ref().** `from:` takes `inputs/<input_name>` or `models/<model_name>`. pb has no dbt-style `ref('...')` function.
+- **Var reference syntax.** Reference another entity_var with the dot form `{{<entity_name>.<var_name>}}` — e.g., `'{{user.order_count}}'` for an entity named `user`. The first segment is the **entity's name from pb_project.yaml**, not the literal word `entity`. Quote the whole `select:` with single quotes. (The `{{user.Var("order_count")}}` function form also works but the dot form is preferred.)
+- **Model paths, not ref().** `from:` takes a path to a model — `inputs/<input_name>`, `models/<model_name>`, or `packages/<pkg>/...`. pb has no dbt-style `ref('...')` function.
 - **No date filters in YAML.** Never add `WHERE` clauses with date filters in input or profile definitions. Use `pb run --begin_time` at runtime instead.
 - **Verify before using.** Always confirm table and column existence with `describe_table()` before writing them into YAML. Do not trust user-provided names without verification.
 

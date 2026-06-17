@@ -22,7 +22,7 @@ You cannot merge an average directly. Keep a running `sum` and a running `count`
     merge: sum({{rowset.count_amount}})   # COUNT MERGES AS SUM
 - entity_var:
     name: avg_amount            # derived: no from:, no merge:
-    select: '{{user.Var("sum_amount")}} / nullif({{user.Var("count_amount")}}, 0)'
+    select: '{{user.sum_amount}} / nullif({{user.count_amount}}, 0)'
 ```
 
 > **Classic mistake:** merging the count with `count({{rowset.count_amount}})`. A count must merge as `sum(...)` — otherwise the incremental value collapses to 1.
@@ -61,7 +61,7 @@ The `merge:` is an aggregate over the combined rowset that unions the per-checkp
     is_feature: false
 - entity_var:
     name: distinct_skus_count           # derived length, no from:/merge:
-    select: 'array_size({{user.Var("distinct_skus_set")}})'
+    select: 'array_size({{user.distinct_skus_set}})'
 ```
 
 > **Warning:** the stored array grows unbounded on high-cardinality columns — checkpoint size and merge cost balloon. For large domains prefer an **approximate (HLL) distinct count** — see `approximate-aggregators.md`. Use exact array-union only for small, bounded domains.
@@ -97,7 +97,7 @@ Decompose numerator and denominator into mergeable helpers, then derive the rati
     is_feature: false
 - entity_var:
     name: click_through_rate
-    select: '{{user.Var("clicks")}} / nullif({{user.Var("impressions")}}, 0)'
+    select: '{{user.clicks}} / nullif({{user.impressions}}, 0)'
 ```
 
 ## 6. merge_where — recency optimization
