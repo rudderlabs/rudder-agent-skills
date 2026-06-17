@@ -26,10 +26,20 @@ Common signals:
 First action: verify exact names and paths across all three files:
 
 - `pb_project.yaml` — `id_types[].name` and `entities[].name`
-- `models/inputs.yaml` — `ids[].name` must match `id_types` in `pb_project.yaml`
-- `models/profiles.yaml` — `from: ref('model_name')` must match an input model name; `entity_key` must match an entity name
+- `models/inputs.yaml` — `ids[].type` must match an `id_types` entry in `pb_project.yaml`, and `ids[].entity` must match an entity name
+- `models/profiles.yaml` — `from: inputs/<name>` / `from: models/<name>` must match a defined model (never `ref('...')`); `entity_key` must match an entity name
 
 Run `pb show models` to see the resolved dependency graph.
+
+Known exact error strings in this class:
+
+| Error contains | Cause | Fix |
+|----------------|-------|-----|
+| `Duplicate model name '<x>' found at` | Two models share a name (or a reserved keyword was used) | Rename one |
+| `A wrong path is used to refer to a model` | Bad `from:`/`edge_sources` path — wrong folder, misspelling, or package model | Check spelling; package models need the package path |
+| `is_append_only` requires `occurred_at_col` | Contract set without a timestamp column | Add `app_defaults.occurred_at_col` |
+| `Default time grain is not set` | A model uses a timegrain but the project has no default | Set `default_time_grain` in `pb_project.yaml` |
+| `field <x> not found in type` | pb binary older than the project's schema | Upgrade pb (or `pb migrate auto --inplace` if the project is the older side) |
 
 ## SQL or Warehouse
 
@@ -67,6 +77,15 @@ Common signals:
 - `schema_version not supported`
 
 First action: run `pb version` to check the installed pb CLI version. Then check the `schema_version` in `pb_project.yaml`. Update the schema version to match what the installed pb supports.
+
+## MCP Precondition (Warehouse Connection)
+
+Common signals:
+
+- `warehouse not initialized` / `no connection` from `run_query()`
+- The first `run_query()` of a session fails
+
+First action: call `initialize_warehouse_connection(<connection_name>)` once per session before any `run_query()` / `describe_table()`. This is a hard requirement documented in the MCP tool's own docstring; the agent must call it explicitly.
 
 ## Python or RPC
 

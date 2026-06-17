@@ -28,7 +28,8 @@ Debug Profiles errors with a structured loop: classify, fix, validate, and stop 
 | `model X not found` | Model Dependency | Run `pb show models`; check `from:` paths and model names |
 | `invalid identifier`, `column not found` | SQL/Warehouse | Call `describe_table()` to verify the column exists |
 | `does not match time regex` | CLI Usage | Use ISO 8601 format: `YYYY-MM-DDTHH:MM:SSZ` |
-| `schema_version not supported` | Version Mismatch | Run `pb version`; update `schema_version` in `pb_project.yaml` |
+| `schema_version not supported` | Version Mismatch | Run `pb version`; align `schema_version` with the binary, or `pb migrate auto --inplace` |
+| `warehouse not initialized` / `no connection` from `run_query()` | MCP Precondition | Call `initialize_warehouse_connection(<connection_name>)` **once** before any `run_query()` — a hard requirement documented in the MCP tool |
 | `rpc error`, `ModuleNotFoundError` | Python/RPC | **STOP** — surface the exact error to the user immediately |
 
 Python/RPC errors are OUT OF SCOPE. Do not run `pip install`, modify venvs, or edit Python paths. Surface the exact error and escalate.
@@ -43,14 +44,24 @@ Python/RPC errors are OUT OF SCOPE. Do not run `pip install`, modify venvs, or e
 
 When the run succeeds but the data looks wrong:
 
-1. Call `get_profiles_output_details()` for output metadata.
-2. Run targeted SQL for health metrics (see `references/post-run-sql-queries.md`):
+1. Call `initialize_warehouse_connection(<connection_name>)` **once** this session before any `run_query()` — required, or `run_query()` fails with "warehouse not initialized".
+2. Call `get_profiles_output_details()` for output metadata.
+3. Run targeted SQL for health metrics (see `references/post-run-sql-queries.md`):
    - Stitching ratio: raw IDs vs stitched entities.
    - Over-stitching: entities absorbing too many IDs.
    - Feature NULL rates: data completeness per feature.
    - Run-over-run comparison: entity count drift between seq_nos.
-3. Compare against prior runs when available.
-4. Recommend `pb audit id_stitcher` for deeper manual inspection of the identity graph.
+4. Compare against prior runs when available.
+5. Recommend `pb audit id_stitcher` and `pb show idstitcher-report` for deeper inspection of the identity graph.
+
+### Over-stitching remediation
+
+When one entity absorbs an abnormal number of IDs:
+
+- **First line of defense:** `filters:` on the offending id_type in `pb_project.yaml` (`type: exclude` with `value:` or `regex:`) to drop junk values — empty strings, `"unknown"`, `"NaN"`, default UUIDs, internal test IDs.
+- **Shared identifiers** (one email/device across many users): add cardinality limits via `maximum_edges` on the id_type, defined in both directions.
+- **Surgical exceptions:** an `id_stitcher_rules` rules.csv (entity, id1, id1_type, action) takes highest precedence over all filters.
+- After any graph-shaping change: a full re-run is required — the identity graph rebuilds and checkpoints are invalidated.
 
 ## Common YAML Mistakes (quick reference)
 
@@ -60,7 +71,9 @@ These cause the majority of compile failures:
 |---------|---------|-----|
 | Invented field names | `contracts:` instead of `contract:` | Check the actual schema; do not guess field names |
 | Missing aggregation | `select: column_name` with `from:` present | Add aggregation: `select: count(column_name)` |
-| Wrong var reference quoting | `"{{entity.Var('name')}}"` | Use `'{{entity.Var("name")}}'` (outer single, inner double) |
+| Wrong var reference | `'{{entity.Var("name")}}'` (literal `entity`) or split quoting | Use the entity's real name, outer single, inner double: `'{{user.Var("name")}}'` |
+| dbt syntax | `from: ref('orders')` | Model paths: `from: inputs/orders` or `from: models/<name>` |
+| Wrong merge shape | `merge: { type: sum }` | `merge:` is a SQL expression: `merge: sum({{rowset.var}})`; COUNT merges as `sum(...)` |
 | Wrong indentation | Misaligned YAML keys | Verify indentation matches the expected structure |
 | Singular/plural confusion | Using field names from memory | Always verify against working examples or the schema |
 

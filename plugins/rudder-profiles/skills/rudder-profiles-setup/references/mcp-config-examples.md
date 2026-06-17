@@ -7,8 +7,10 @@ Use these examples only as shape references. Prefer the current `profiles-mcp` R
 Typical flow:
 
 ```bash
-claude mcp add profiles --command /absolute/path/to/profiles-mcp/.venv/bin/python --arg /absolute/path/to/profiles-mcp/server.py
+claude mcp add profiles -- /absolute/path/to/profiles-mcp/.venv/bin/python /absolute/path/to/profiles-mcp/server.py
 ```
+
+(`claude mcp add <name> -- <command> [args...]` — there are no `--command`/`--arg` flags; everything after `--` is the launch command.)
 
 If the local environment uses a wrapper script, register that instead of hard-coding Python paths.
 

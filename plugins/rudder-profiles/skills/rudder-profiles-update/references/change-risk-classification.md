@@ -18,7 +18,7 @@ Changes that affect identity resolution, downstream references, or introduce ML 
 | Change | Guard |
 |--------|-------|
 | Add a new id_type | Will change the identity graph; may merge or split entities |
-| Modify an existing entity_var | Downstream entity_var refs like `'{{entity.Var("name")}}'` may break; invalidates incremental checkpoints |
+| Modify an existing entity_var | Downstream entity_var refs like `'{{user.Var("name")}}'` may break; invalidates incremental checkpoints |
 | Add a propensity model | Date handling rules change completely; must use macros for all time-based features |
 
 Primary concern: identity-resolution behavior changes, broken cross-references, and point-in-time ML correctness.
@@ -30,7 +30,7 @@ Changes that require a full re-run or may break downstream consumers.
 | Change | Guard |
 |--------|-------|
 | Remove an entity_var | Scan all files for `Var("name")` references first; warn about warehouse consumers |
-| Remove an input model | Scan for `ref('model_name')` references first |
+| Remove an input model | Scan for `from: inputs/<name>`, `edge_sources` entries, and `{{<name>.column}}` references first |
 | Rename heavily referenced models | Treat as remove + add; all refs must update |
 | Change entity design | Full re-run required; all checkpoints invalidated |
 | Change id_stitcher logic | Full re-run required; identity graph is rebuilt from scratch |

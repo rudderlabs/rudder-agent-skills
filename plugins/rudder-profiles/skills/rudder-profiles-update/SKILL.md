@@ -36,8 +36,9 @@ Before writing any change:
 ## Standard Update Rules
 
 - Verify every new table or column with `describe_table()` before using it.
-- If an entity var has a `from` key, its `select` MUST use an aggregation: `count`, `sum`, `max`, `min`, `avg`, `first_value`, or `last_value`.
-- Entity var reference syntax: `'{{entity.Var("var_name")}}'` (outer single quotes, inner double quotes).
+- If an entity var has a `from` key, its `select` MUST use an aggregation: `count`, `sum`, `max`, `min`, `avg`, `first_value`, or `last_value` (order-dependent ones need a `window:` with `order_by`).
+- Entity var reference syntax: `'{{<entity_name>.Var("var_name")}}'` — e.g. `'{{user.Var("order_count")}}'` (outer single quotes, inner double; the first segment is the entity's name, not the literal word `entity`).
+- Model paths in `from:` are `inputs/<name>` or `models/<name>` — pb has no dbt-style `ref('...')`.
 - For removals or renames, scan all files for downstream references first and warn the user explicitly before proceeding.
 
 ## Propensity Models
@@ -62,12 +63,12 @@ Never use these in entity vars that feed propensity models:
 
 - `current_date()`, `current_timestamp()`, `datediff()`, `sysdate`, `getdate()`, `now()`
 
-Always use macros instead:
+Always use the conventional project-defined macros instead (confirm they exist in `models/macros.yaml` — they are NOT pb built-ins):
 
-- `{{macro_datediff('column')}}` — days between column and reference date
-- `{{macro_datediff_n('column', 'days')}}` — configurable unit
+- `{{macro_datediff('column')}}` — days between `column` and the project's `end_time`
+- `{{macro_datediff_n('column', N)}}` — boolean predicate "within N days"; the second arg is an **integer day count**, not a unit string like `'months'`
 
-Why: macros preserve point-in-time accuracy during ML training snapshots. Direct date functions evaluate at query time and corrupt historical training data.
+Why: macros expand to use the project's `end_time` so they stay anchored to each training snapshot's reference date. Direct date functions evaluate at query time and corrupt historical training data (label leak).
 
 See `references/propensity-yaml-template.md`.
 

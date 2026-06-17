@@ -17,17 +17,18 @@ Read an existing Profiles project and summarize what it builds, how it resolves 
    - `models/profiles-ml.yaml` (if present) — propensity models
 2. **Run `pb show models`** to get the model dependency structure.
 3. **Check outputs** (if the project has been run):
-   - Call `get_profiles_output_details()` for output metadata.
+   - Call `initialize_warehouse_connection(<connection_name>)` **once** before any `run_query()` — it is a hard precondition documented in the MCP tool; skipping it produces "warehouse not initialized".
+   - Call `get_profiles_output_details()` for output metadata (output schema, entity/id-graph materials, latest `seq_no`).
    - Run targeted SQL for health metrics (see references).
-   - Identify the latest `seq_no` and output tables.
+   - Identify the latest `seq_no` and output tables. Materials are named `Material_<model>_<hash>_<seq_no>`; pb also maintains stable views (e.g., `<entity>_var_table`) repointed at the latest material each run — prefer the view.
 4. **Present a summary** covering:
    - What entity the project resolves and which id_types it uses.
-   - Which input tables feed data and how IDs map.
+   - Which input tables feed data, how IDs map, and which are event streams vs dimensions.
    - Which features (entity_vars) are computed, with descriptions.
    - Model dependency structure from `pb show models`.
    - Latest run details: seq_no, output schema, output tables.
    - Identity resolution health: stitching ratio, over-stitching candidates.
-   - Recommendation to run `pb audit id_stitcher` for deeper interactive graph analysis.
+   - Read-only graph lenses to offer: `pb audit id_stitcher` (interactive viewer), `pb show idstitcher-report` (pre/post-stitch counts, convergence, largest cluster), and `pb show entity-lookup -v <id_value>` (one entity's stitched IDs and features by any known ID).
 
 ## Output Style
 
