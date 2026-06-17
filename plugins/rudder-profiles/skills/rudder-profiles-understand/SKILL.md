@@ -25,10 +25,19 @@ Read an existing Profiles project and summarize what it builds, how it resolves 
    - What entity the project resolves and which id_types it uses.
    - Which input tables feed data, how IDs map, and which are event streams vs dimensions.
    - Which features (entity_vars) are computed, with descriptions.
+   - Whether the project is **discrete** or **incremental**: any entity_var with a `merge:` clause (or an id_stitcher / sql_template with `run_type: incremental`) makes the project incremental. Call this out — users who don't know their project is incremental are surprised by checkpoint behavior.
    - Model dependency structure from `pb show models`.
    - Latest run details: seq_no, output schema, output tables.
    - Identity resolution health: stitching ratio, over-stitching candidates.
    - Read-only graph lenses to offer: `pb audit id_stitcher` (interactive viewer), `pb show idstitcher-report` (pre/post-stitch counts, convergence, largest cluster), and `pb show entity-lookup -v <id_value>` (one entity's stitched IDs and features by any known ID).
+
+## Incremental vs Discrete
+
+A project becomes incremental the moment any entity_var declares `merge:`. Consequences worth surfacing:
+
+- **Each run produces a new checkpoint** identified by `seq_no`; the previous checkpoint is the baseline, and a run computes the delta (rows since the baseline's `end_time`) and merges it in.
+- **Entity counts across seq_nos show growth, not run-over-run rebuild deltas** — the latest seq_no's table is the cumulative view.
+- For incremental projects, recommend a periodic discrete-vs-incremental side-by-side (a full `--rebase_incremental` run vs the incremental output) to catch silent drift. Migration and merge-correctness details live in `rudder-profiles-update` and `rudder-profiles-debug`.
 
 ## Output Style
 

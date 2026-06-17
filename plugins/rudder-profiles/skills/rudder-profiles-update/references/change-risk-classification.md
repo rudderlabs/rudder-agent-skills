@@ -20,8 +20,9 @@ Changes that affect identity resolution, downstream references, or introduce ML 
 | Add a new id_type | Will change the identity graph; may merge or split entities |
 | Modify an existing entity_var | Downstream entity_var refs like `'{{user.Var("name")}}'` may break; invalidates incremental checkpoints |
 | Add a propensity model | Date handling rules change completely; must use macros for all time-based features |
+| Migrate an entity_var to incremental | Adds a `merge:` clause; only mergeable aggregations are safe; window/ranking functions compile but silently corrupt — validate with a discrete-vs-incremental diff |
 
-Primary concern: identity-resolution behavior changes, broken cross-references, and point-in-time ML correctness.
+Primary concern: identity-resolution behavior changes, broken cross-references, point-in-time ML correctness, and silent incremental drift.
 
 ## Breaking
 
@@ -34,6 +35,7 @@ Changes that require a full re-run or may break downstream consumers.
 | Rename heavily referenced models | Treat as remove + add; all refs must update |
 | Change entity design | Full re-run required; all checkpoints invalidated |
 | Change id_stitcher logic | Full re-run required; identity graph is rebuilt from scratch |
+| Change an input contract (toggle `is_append_only`) | May trigger a schema bump and invalidates existing checkpoints; verify the source really is append-only first |
 
 Primary concern: downstream breakage, checkpoint invalidation, and data pipeline disruption.
 

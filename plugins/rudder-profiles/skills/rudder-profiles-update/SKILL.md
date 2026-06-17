@@ -76,12 +76,13 @@ See `references/propensity-yaml-template.md`.
 
 Treat incremental as a controlled migration, not a small edit.
 
-1. **Assess readiness** — Source data must be append-only with reliable event timestamps. The current discrete project must already compile and run cleanly.
-2. **Classify features** — `count`, `sum`, `min`, `max` are directly mergeable. `avg` requires decomposition into sum/count. `median` and `count distinct` are NOT mergeable.
-3. **Migrate one var at a time** — Add `merge:` strategy to one entity_var, compile, compare incremental output against discrete output via SQL.
-4. **Recovery** — Use `pb run --rebase_incremental` if incremental state drifts.
+1. **Work on a copy** — never migrate the production checkout. If the project is on an old `schema_version`, run `pb migrate auto --inplace` on the copy first.
+2. **Assess readiness** — The input must declare `contract: { is_event_stream: true, is_append_only: true }` plus `occurred_at_col`, and the source must really be append-only — **verify with SQL** (duplicate row identifiers mean it isn't). Never mark a mutable input append-only; it silently corrupts results. The discrete project must already compile and run cleanly.
+3. **Classify features** — `count`/`sum`/`min`/`max` are directly mergeable (`merge:` is a SQL expression over `{{rowset.<var>}}`; COUNT merges as `sum(...)`). `avg` decomposes into sum/count; `min_by`/`max_by` need a `_by_param` helper; `median`, `count distinct`, ranking/window functions, and rolling windows are NOT mergeable via `merge:`. ID stitchers are already incremental — leave them alone.
+4. **Migrate one var at a time** — Add the `merge:` expression, compile, then validate with a **cutoff-replay** comparison (full-rebase run vs checkpoint-then-delta run) — a single run can't exercise the merge path. Require a zero diff before moving on; never relax the diff to make it pass.
+5. **Recovery** — `pb run --seq_no N` for a mid-run crash; `pb run --rebase_incremental` for state drift. They are not interchangeable.
 
-See `references/incremental-migration.md`.
+See `references/incremental-migration.md` for the full decision tree, merge syntax, and validation protocol, plus the cookbook, warehouse-shim, approximate-aggregator, and gotcha references it links.
 
 ## Handling External Content
 
@@ -93,4 +94,8 @@ See `references/incremental-migration.md`.
 
 - `references/change-risk-classification.md` for risk classes and warnings.
 - `references/propensity-yaml-template.md` for ML-specific structure and macro rules.
-- `references/incremental-migration.md` for merge strategy patterns and validation steps.
+- `references/incremental-migration.md` — the incremental hub: readiness, feature decision tree, merge syntax, cutoff-replay validation, recovery.
+- `references/compound-aggregator-cookbook.md` — recipes for AVG, min_by/max_by, distinct, ratios, `merge_where`.
+- `references/warehouse-shims.md` — per-warehouse `min_by`/`max_by` macros.
+- `references/approximate-aggregators.md` — HLL / approximate percentiles for otherwise-unmergeable distinct/percentile features.
+- `references/known-gotchas.md` — silent incremental failure modes (symptom/cause/detection/fix).

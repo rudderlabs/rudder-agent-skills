@@ -30,15 +30,27 @@ Debug Profiles errors with a structured loop: classify, fix, validate, and stop 
 | `does not match time regex` | CLI Usage | Use ISO 8601 format: `YYYY-MM-DDTHH:MM:SSZ` |
 | `schema_version not supported` | Version Mismatch | Run `pb version`; align `schema_version` with the binary, or `pb migrate auto --inplace` |
 | `warehouse not initialized` / `no connection` from `run_query()` | MCP Precondition | Call `initialize_warehouse_connection(<connection_name>)` **once** before any `run_query()` — a hard requirement documented in the MCP tool |
+| `baseline not found`, `checkpoint not found`, `material X (seq_no Y) not found` on an incremental run | Incremental State | `references/incremental-debugging.md` § Checkpoint & Baseline — distinguish mid-run crash (`--seq_no N`) from state drift (`--rebase_incremental`) |
+| Incremental run completes but values are subtly wrong; a `merge:` var uses a window function | Silent Incremental Corruption | `references/incremental-debugging.md` § Window Functions — the most likely cause is an unsupported window function under `merge:` |
+| nil-pointer / segfault during compile/run, `DeRef` in the trace | DeRef Crash | `references/incremental-debugging.md` § DeRef Crashes — usually a bad `pre_existing=true` with no baseline |
 | `rpc error`, `ModuleNotFoundError` | Python/RPC | **STOP** — surface the exact error to the user immediately |
 
 Python/RPC errors are OUT OF SCOPE. Do not run `pip install`, modify venvs, or edit Python paths. Surface the exact error and escalate.
 
-## Recovery Rules
+## Run Recovery — `--seq_no N` vs `--rebase_incremental`
 
-- After a failed `pb run`, **NEVER** resume with plain `pb run`. Always extract the failed sequence number and resume with `pb run --seq_no N`.
-- Use `pb run --rebase_incremental` only for incremental-state recovery, not for general run failures.
-- Use `pb compile` as the primary validation loop — it is fast and catches most errors before a run.
+Two failure modes, two different flags. Picking wrong keeps you failing:
+
+| Symptom | Cause | Recovery |
+|---------|-------|----------|
+| `pb run` crashed/aborted mid-sequence; a seq_no is partial | Interrupted run (network, timeout, kill) | `pb run --seq_no N` resumes from the failed sequence using the existing baseline |
+| Incremental output diverges from discrete; `baseline not found`; stale materials | State drifted (baseline from a stale seq_no, or a non-mergeable change snuck in) | `pb run --rebase_incremental` discards the checkpoint and rebuilds the baseline from scratch |
+
+- Never resume a crashed run with plain `pb run` — extract the failed seq_no and use `--seq_no N`.
+- Never use `--rebase_incremental` for a plain mid-run failure — you'll throw away good incremental progress.
+- Use `pb compile` as the primary validation loop — fast, and catches most errors before a run.
+
+See `references/incremental-debugging.md` for the full checkpoint/baseline triage.
 
 ## Output-Quality Debugging
 
@@ -89,4 +101,5 @@ See `references/common-yaml-mistakes.md` for the full list.
 
 - `references/error-classification.md` for first-action triage by error category.
 - `references/common-yaml-mistakes.md` for recurring authoring errors.
+- `references/incremental-debugging.md` for checkpoint/baseline failures, silent window-function corruption, the diff-pattern triage table, and DeRef crashes.
 - `references/post-run-sql-queries.md` for output-quality checks.

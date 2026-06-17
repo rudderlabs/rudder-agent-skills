@@ -78,6 +78,35 @@ Common signals:
 
 First action: run `pb version` to check the installed pb CLI version. Then check the `schema_version` in `pb_project.yaml`. Update the schema version to match what the installed pb supports.
 
+## Incremental State (Baseline / Checkpoint)
+
+Common signals:
+
+- `baseline not found`, `checkpoint not found`
+- `material <name> (seq_no N) not found` during an incremental run
+- Incremental output diverges from discrete output with no error
+
+First action: see `incremental-debugging.md` § Checkpoint & Baseline Failures. Distinguish a mid-run crash (`pb run --seq_no N`) from state drift (`pb run --rebase_incremental`) — picking wrong wastes work or keeps thrashing.
+
+## Silent Incremental Corruption (Window Functions)
+
+Common signals:
+
+- Run completes successfully; values are subtly wrong
+- The affected entity_var has `merge:` AND a window function in `select:`
+- A discrete-vs-incremental diff shows divergence on specific vars
+
+First action: see `incremental-debugging.md` § Window Functions. `ROW_NUMBER`/`RANK`/`DENSE_RANK`/`PERCENT_RANK`/`CUME_DIST`/`NTILE` are banned with `merge:`; `FIRST_VALUE`/`LAST_VALUE`/`LAG`/`LEAD` are risky — prefer `min_by`/`max_by`.
+
+## DeRef Crash
+
+Common signals:
+
+- nil-pointer / segfault during compile or run (not a YAML parse error)
+- stack trace mentions `DeRef`, `BuildSpec`, or `WhtMaterial`
+
+First action: see `incremental-debugging.md` § DeRef Crashes. Typical cause: a `DeRef(..., pre_existing=true)` against a baseline that doesn't exist; the safe pattern is conditional `prereqs=[lastThis]`.
+
 ## MCP Precondition (Warehouse Connection)
 
 Common signals:
