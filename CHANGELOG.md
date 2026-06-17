@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`rudder-core` / `rudder-data-graphs`** — documented the optional per-column
+  `pii_mask` flag in the Data Graph YAML template: `pii_mask: true` marks a
+  warehouse column as PII so its values are masked (`***`) in the Data Graph
+  preview (enterprise-only; server rejects it on other plans). Added it to the
+  annotated `columns:` example (including a PII-only entry with no alias), the
+  **Column metadata fields** table, and the validation rules (a column entry now
+  needs `name` plus at least one of `display_name` / `description` / `pii_mask`).
+  Extended the **Schema visibility** pitch in `capability-comparison.md` to note
+  PII columns stay masked in the preview.
+- **`rudder-core` / `rudder-data-graphs`** — documented the optional per-column
+  `columns:` block in the Data Graph YAML template: `display_name` (alias) and
+  `description` overrides that surface in the Audience Builder. Added a worked
+  `columns:` example to the annotated template, a `columns` row to the Model
+  fields table, a new **Column metadata fields** reference table, and validation
+  rules (sparse list; each entry needs `name` plus at least one of
+  `display_name` / `description`; alias is case-insensitive-unique per model).
+  Reframed the **Schema visibility** pitch in `capability-comparison.md` around
+  aliases/descriptions making raw warehouse columns marketer-readable.
+
+## [0.0.3] - 2026-06-03
+
+### Changed
+
+- **`rudder-cli` / `rudder-cli-workflow`** — documented
+  `rudder-cli workspace accounts list` as the authoritative way to discover
+  workspace account IDs. Added a "Looking up account IDs" subsection covering
+  the mandatory `--json` flag in non-interactive contexts (plain output needs
+  a TTY), the meaningful fields (`id` is the value for a spec's `account_id`),
+  the `--category source` / `--type` filters, and the note that this surfaces
+  accounts the MCP cannot (Data Graph UI / standalone warehouse connections).
+- **`rudder-core` / `rudder-data-graphs`** — reframed `account_id` resolution
+  around the CLI account list instead of requiring a RETL source config. Added
+  **Step 4a — Resolve the warehouse `account_id`** with a "building from
+  scratch / no RETL source yet" branch, a why-not-MCP note, and a
+  failed-apply-on-missing-`account_id` troubleshooting entry in the YAML
+  template.
+- **`rudder-mcp` / `rudder-mcp-workflow`** — added a "Don't do this" item:
+  don't rely on the MCP to discover account IDs (it only sees accounts behind
+  a RETL source or destination); fall back to
+  `rudder-cli workspace accounts list --category source --json`.
+- **Breaking (repo layout):** renamed top-level `plugins/` directory to `skills/` so the [skills.sh](https://skills.sh) catalog indexer surfaces all 17 skills (it walks `skills/` but not `plugins/`). Each plugin still lives at `skills/<plugin>/skills/<skill>/SKILL.md`, mirroring the [`dbt-labs/dbt-agent-skills`](https://github.com/dbt-labs/dbt-agent-skills) layout. Marketplace manifest plugin `source` fields updated accordingly. The `npx skills add rudderlabs/rudder-agent-skills` install UX is unchanged.
+
+### Updating from a previous install
+
+Already installed `0.0.2` (or earlier)? Pull the new skill content:
+
+- **Vercel Skills CLI:** `npx skills update` (or `npx skills update rudder-cli-workflow rudder-data-graphs rudder-mcp-workflow` to update only the changed skills).
+- **Claude Code marketplace:** `/plugin marketplace update rudder-agent-skills`, then the updated `rudder-core`, `rudder-cli`, and `rudder-mcp` plugins are picked up automatically.
+- **Manual git clone:** `cd ~/.claude/plugins/marketplaces/rudder-agent-skills && git pull`.
+
 ## [0.0.2] - 2026-05-28
 
 ### Changed

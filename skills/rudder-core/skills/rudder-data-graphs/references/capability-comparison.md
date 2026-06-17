@@ -81,11 +81,11 @@ Use this to frame the upgrade conversation with customers.
 
 ### Schema visibility
 
-**Today:** Marketers see a list of columns. Relationships are invisible.
+**Today:** Marketers see a list of raw warehouse columns (`EMAIL_ADDRESS`, `CREATED_TS`). Relationships are invisible and column names are cryptic.
 
-**Upgrade:** Visual entity map shows how entities connect. Marketers understand the data model.
+**Upgrade:** Visual entity map shows how entities connect, and per-column **aliases** (`display_name`) and **descriptions** replace cryptic warehouse names with marketer-friendly labels right in the builder — and sensitive columns can be flagged **PII** (`pii_mask`) so their values are masked in the Data Graph preview. Marketers understand the data model, and PII stays protected.
 
-**Example pitch:** "Less 'what column do I use?' tickets. The graph is self-documenting."
+**Example pitch:** "Less 'what column do I use?' tickets. The graph is self-documenting — `EMAIL_ADDRESS` shows up as 'Email' with a description, no warehouse spelunking."
 
 ---
 

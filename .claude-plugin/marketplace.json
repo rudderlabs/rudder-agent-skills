@@ -6,14 +6,14 @@
   },
   "metadata": {
     "description": "Skills for working with RudderStack via CLI, MCP server, Terraform, and Profiles workflows.",
-    "version": "0.0.3"
+    "version": "0.0.5"
   },
   "plugins": [
     {
       "name": "rudder-core",
-      "source": "./plugins/rudder-core",
+      "source": "./skills/rudder-core",
       "description": "Cross-tool RudderStack domain knowledge: data catalog, tracking plans, data graphs, instrumentation planning and debugging.",
-      "version": "0.0.2",
+      "version": "0.0.5",
       "author": {
         "name": "RudderStack"
       },
@@ -26,9 +26,9 @@
     },
     {
       "name": "rudder-cli",
-      "source": "./plugins/rudder-cli",
+      "source": "./skills/rudder-cli",
       "description": "Workflows for driving the rudder-cli and rudder-typer CLIs: validate, dry-run, apply, import, transformations.",
-      "version": "0.0.2",
+      "version": "0.0.3",
       "author": {
         "name": "RudderStack"
       },
@@ -41,9 +41,9 @@
     },
     {
       "name": "rudder-mcp",
-      "source": "./plugins/rudder-mcp",
+      "source": "./skills/rudder-mcp",
       "description": "Workflows for RudderStack's MCP server at mcp.rudderstack.com: connect AI/LLM agents to a RudderStack workspace and drive it via MCP tool calls.",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "author": {
         "name": "RudderStack"
       },
@@ -56,7 +56,7 @@
     },
     {
       "name": "rudder-terraform",
-      "source": "./plugins/rudder-terraform",
+      "source": "./skills/rudder-terraform",
       "description": "Workflows for managing RudderStack with the Terraform provider: provider setup, resource/data-source usage, and plan/apply cycles.",
       "version": "0.0.1",
       "author": {
@@ -71,7 +71,7 @@
     },
     {
       "name": "rudder-profiles",
-      "source": "./plugins/rudder-profiles",
+      "source": "./skills/rudder-profiles",
       "description": "Workflows for building RudderStack Profiles projects: setup, project creation, project analysis, controlled updates, and debugging.",
       "version": "0.1.0",
       "author": {

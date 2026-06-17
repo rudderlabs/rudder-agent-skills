@@ -11,7 +11,7 @@ metadata:
   name: "acme-ecommerce-data-graph"      # Required. Human-readable name for the graph.
 spec:
   id: "acme-ecommerce-data-graph"        # Required. Unique identifier used in syncs.
-  account_id: "2abc123xyz"               # Required. Warehouse account ID from RETL source config.
+  account_id: "2abc123xyz"               # Required. Warehouse account ID. Resolve via `rudder-cli workspace accounts list --category source --json` (the `id` field).
   models:
     # ─────────────────────────────────────────────────────────────
     # ENTITY: Root entity (the "who" being activated)
@@ -23,6 +23,17 @@ spec:
       description: "Customer records with demographics and loyalty tier"  # Tooltip in Audience Builder.
       primary_id: "CUSTOMER_KEY"         # Required for entity. Column that uniquely identifies rows.
       root: true                         # Entity only. Marks an audience-builder anchor. Multiple roots allowed; count is not validated.
+      columns:                           # Optional. Per-column overrides surfaced in the Audience Builder. Sparse — list only what you relabel or flag.
+        - name: "EMAIL_ADDRESS"          # Warehouse column name (must match the table).
+          display_name: "Email"          # Alias shown instead of the raw column name. ≤255 chars, unique within the model.
+          description: "Primary contact email"  # Note shown alongside the column.
+          pii_mask: true                 # Optional. Masks this column's values in the Data Graph preview. Enterprise only.
+        - name: "LOYALTY_TIER"
+          display_name: "Loyalty Tier"   # Alias only — no description.
+        - name: "CUSTOMER_NOTES"
+          description: "Free-form CRM notes"     # Description only — no alias.
+        - name: "SSN"
+          pii_mask: true                 # PII only — no alias or description needed.
       relationships:
         # Entity → Event relationship
         - id: "customer-has-orders"
@@ -73,7 +84,7 @@ spec:
 | `kind` | String | Yes | Resource type: `"data-graph"` |
 | `metadata.name` | String | Yes | Human-readable name |
 | `spec.id` | String | Yes | Unique identifier for syncs |
-| `spec.account_id` | String | Yes | Warehouse account ID (from RETL source config) |
+| `spec.account_id` | String | Yes | Warehouse account ID — `rudder-cli workspace accounts list --category source --json` (`id` field) |
 | `spec.models` | List | Yes | Entity and event models |
 
 ### Model fields
@@ -89,6 +100,7 @@ spec:
 | `root` | Bool | Entity only, optional | Marks an audience-builder anchor. Multiple roots allowed; the count is not validated (zero, one, or many all pass) |
 | `timestamp` | String | Event only | Event timestamp column |
 | `relationships` | List | No | Relationships to other models |
+| `columns` | List | No | Per-column metadata overrides (aliases, descriptions, PII masking) surfaced in the Audience Builder. See [Column metadata fields](#column-metadata-fields) |
 
 ### Relationship fields
 
@@ -100,6 +112,19 @@ spec:
 | `target` | String | Yes | Target model: `#data-graph-model:<model-id>` |
 | `source_join_key` | String | Yes | Column on source model for join |
 | `target_join_key` | String | Yes | Column on target model for join |
+
+### Column metadata fields
+
+Optional per-column overrides under a model's `columns:` block. **Sparse** — list only the columns you want to relabel or flag; unlisted columns keep their raw warehouse names. By default the Audience Builder shows raw warehouse column names; aliases and descriptions make them readable for marketers building audiences and expressions, and `pii_mask` flags sensitive columns so their values are masked in the Data Graph preview.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | String | Yes | Warehouse column name (must match the model's `table`) |
+| `display_name` | String | Conditional | Alias shown in the Audience Builder instead of the raw column name. ≤255 chars, case-insensitive-unique within the model |
+| `description` | String | Conditional | Note shown alongside the column. ≤255 chars; no uniqueness constraint |
+| `pii_mask` | Bool | No | When `true`, masks the column's values (`***`) in the Data Graph preview. Defaults to `false`. **Enterprise only** — the server rejects `pii_mask: true` on other plans |
+
+Each `columns` entry must set **at least one** of `display_name`, `description`, or `pii_mask` (an entry with only `name` is invalid). `apply` is declarative — drop a column's entry to clear its metadata. In the preview, masked values show as `***`; users with the **PII rETL Data Access** permission (or enterprise admins) can reveal the clear text.
 
 ## Validation rules
 
@@ -114,6 +139,10 @@ spec:
 - `display_name` must be unique **among models** and, separately, **among relationships** — the two are independent namespaces, so a model and a relationship may share a name, but two models (or two relationships) may not
 - Declare each relationship **once, on a single model** — do not also declare its inverse on the target model; the graph traverses it both ways. Double-declaration collides on the relationship `display_name` and inflates the relationship count
 - `root: true` is an optional entity-only flag; multiple roots are allowed and the count is not validated
+- `columns` is optional and **sparse** — list only the columns you want to relabel or flag; unlisted columns keep their raw warehouse names
+- each `columns[]` entry needs `name` plus at least one of `display_name` / `description` / `pii_mask` (an entry with only `name` is invalid)
+- `columns[].display_name` is **case-insensitive-unique within a model** — a separate namespace from model and relationship `display_name` uniqueness; `description` has no uniqueness constraint
+- `columns[].pii_mask` is an optional boolean (default `false`); marking a column `pii_mask: true` is **enterprise-only** and the server rejects it on other plans
 
 ## Worked example: Property vertical
 
@@ -222,9 +251,22 @@ The `table` must be 3-part: `catalog.schema.table`. Common mistake: using 2-part
 
 Most likely cause: wrong join keys. The YAML is syntactically valid but semantically wrong. Verify join keys match actual FK relationships in the warehouse.
 
+### `apply` fails on a missing / invalid `account_id`
+
+The account only needs to *exist* — you do **not** need to select it in the Data Graph UI, and you do **not** need a RETL source. List the warehouse accounts and copy the `id`:
+
+```bash
+rudder-cli workspace accounts list --category source --json
+```
+
+`rudder-mcp` cannot see accounts created through the DG UI or a standalone warehouse connection (it only surfaces accounts behind a RETL source or destination), so the CLI list is the authoritative lookup.
+
 ## CLI commands
 
 ```bash
+# List warehouse accounts; the `id` field is the spec.account_id value
+rudder-cli workspace accounts list --category source --json
+
 # Validate all data-graph specs in current directory
 rudder-cli validate -l ./
 
