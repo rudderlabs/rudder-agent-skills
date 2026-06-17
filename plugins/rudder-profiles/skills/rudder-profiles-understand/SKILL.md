@@ -11,10 +11,12 @@ Read an existing Profiles project and summarize what it builds, how it resolves 
 ## Workflow
 
 1. **Read project files:**
-   - `pb_project.yaml` — entities, id_types, connection, schema_version
+   - `pb_project.yaml` — entities, id_types, connection, schema_version, and any `feature_views` (`using_ids` re-keys output for activation)
    - `models/inputs.yaml` — input tables, event streams, ID mappings
-   - `models/profiles.yaml` — entity_vars, id_stitcher config
-   - `models/profiles-ml.yaml` (if present) — propensity models
+   - `models/profiles.yaml` — entity_vars, id_stitcher config, any `entity_cohort` models (filtered audiences) and `feature_table_model` selections; var_groups scoped with `entity_cohort:` compute over a cohort
+   - `models/sql_models.yaml` (if present) — `sql_template` intermediate models
+   - `models/profiles-ml.yaml` / `models/attribution.yaml` (if present) — propensity / attribution models
+   - `models/optimizations.yaml` / `models/macros.yaml` (if present) — performance flags and reusable macros
 2. **Run `pb show models`** to get the model dependency structure.
 3. **Check outputs** (if the project has been run):
    - Call `initialize_warehouse_connection(<connection_name>)` **once** before any `run_query()` — it is a hard precondition documented in the MCP tool; skipping it produces "warehouse not initialized".

@@ -29,6 +29,12 @@ entities:
       - user_id
       - anonymous_id
       - email
+    # Optional — extra feature views keyed on another id_type, for activation by
+    # a destination that joins on (say) email. A default view on the main id always exists.
+    # feature_views:
+    #   using_ids:
+    #     - id: email
+    #       name: [entity]_email_features
 id_types:
   - name: main_id
   - name: user_id

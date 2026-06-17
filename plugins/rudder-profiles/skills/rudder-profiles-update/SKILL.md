@@ -23,6 +23,8 @@ Modify an existing Profiles project carefully. Always understand the current sta
 | Add new entity_var | Safe | Must aggregate if has `from` |
 | Add new input source | Safe | Verify table/columns exist via `describe_table()` |
 | Add new id_type | Moderate | Affects identity resolution graph |
+| Add feature view (`using_ids`) | Safe | Re-keys existing output; needs an id_type already on the entity |
+| Add entity cohort | Moderate | Filter features must exist in the parent var_group; re-run to materialize |
 | Modify existing entity_var | Moderate | Downstream refs may break; invalidates incremental checkpoints |
 | Add propensity model | Moderate | Date handling rules change completely (see below) |
 | Remove entity_var or input | Breaking | Must scan all refs first; warn about downstream consumers |
@@ -72,6 +74,16 @@ Why: macros expand to use the project's `end_time` so they stay anchored to each
 
 See `references/propensity-yaml-template.md`.
 
+## Cohorts & Feature Views (activation)
+
+These are how features reach destinations. A **feature view** re-keys the entity output on another id_type (e.g. email) so a destination can join on the id it knows; an **entity cohort** is a filtered subset of the entity that the dashboard syncs as an audience.
+
+Before adding either, confirm with the user:
+1. **Feature view** — which id should the destination join on? It must already be an id_type on the entity.
+2. **Cohort** — what filter defines the subset, and are the filter features already defined in the parent (`entity_key`) var_group? They must be.
+
+Key rules: cohort filter `value`s are SQL booleans over `{{ <entity>.Var("...") }}`; cohort-scoped var_groups use `entity_cohort:` instead of `entity_key:`; activation itself is wired in the RudderStack dashboard, not in `pb`. See `references/cohorts-and-feature-views.md`.
+
 ## Incremental Migration
 
 Treat incremental as a controlled migration, not a small edit.
@@ -93,6 +105,7 @@ See `references/incremental-migration.md` for the full decision tree, merge synt
 ## References
 
 - `references/change-risk-classification.md` for risk classes and warnings.
+- `references/cohorts-and-feature-views.md` for cohorts, feature views, and cohort-scoped var_groups (the activation path).
 - `references/propensity-yaml-template.md` for ML-specific structure and macro rules.
 - `references/incremental-migration.md` — the incremental hub: readiness, feature decision tree, merge syntax, cutoff-replay validation, recovery.
 - `references/compound-aggregator-cookbook.md` — recipes for AVG, min_by/max_by, distinct, ratios, `merge_where`.
