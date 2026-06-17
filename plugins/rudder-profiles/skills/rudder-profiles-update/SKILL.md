@@ -1,6 +1,6 @@
 ---
 name: rudder-profiles-update
-description: Modifies an existing RudderStack Profiles project with controlled risk: new features, inputs, id_types, propensity models, or incremental migration. Use when updating Profiles YAML, adding features, creating propensity models, or changing incremental behavior.
+description: Modifies an existing RudderStack Profiles project: features, inputs, id_types, cohorts, feature views, SQL models, optimizations, macros, propensity/attribution, or incremental migration. Use when updating Profiles YAML, adding features/audiences/models or changing incremental behavior.
 allowed-tools: "Bash(pb *), Read, Write, Edit"
 ---
 
@@ -29,6 +29,7 @@ Modify an existing Profiles project carefully. Always understand the current sta
 | Add optimizations.yaml flag | Safe | Enable one at a time and confirm output is unchanged |
 | Modify existing entity_var | Moderate | Downstream refs may break; invalidates incremental checkpoints |
 | Add propensity model | Moderate | Date handling rules change completely (see below) |
+| Add attribution model | Moderate | Needs a separate campaign entity + campaign id_stitcher first (see below) |
 | Remove entity_var or input | Breaking | Must scan all refs first; warn about downstream consumers |
 | Change entity or id_stitcher | Breaking | Full re-run required; all checkpoints invalidated |
 
@@ -76,6 +77,17 @@ Why: macros expand to use the project's `end_time` so they stay anchored to each
 
 See `references/propensity-yaml-template.md`.
 
+## Attribution Models
+
+Attribution computes first-touch and last-touch credit for conversions across user→campaign journeys (`model_type: attribution`, a PyNative model in `profiles_mlcorelib`). It has real prerequisites — do not start the model until they exist:
+
+- a separate **campaign** entity in `pb_project.yaml` with its own id_types,
+- a **`campaign_id_graph`** id_stitcher for that entity,
+- campaign entity_vars for start/end dates,
+- `python_requirements: - profiles_mlcorelib>=0.8.1`.
+
+Confirm conversions, conversion timing/value, attribution window, touchpoints, and campaign data with the user first. Note the schema is `additionalProperties: False`; `conversion_vars[*].timestamp` is a `user.Var('...')` reference (not a column); `campaign_start_date`/`campaign_end_date` are campaign entity_var names (not literals); `conversion_window` is a string like `"30d"`. See `references/attribution-yaml-template.md`.
+
 ## SQL Template Models & Performance
 
 When a transform can't be an entity_var (multi-step SQL, joins, a filtered/reshaped source), add a `sql_template` model (`single_sql`/`multi_sql`, `this.DeRef(...)`, materialization, optional `ids`/`contract`/`features`). Reference it from entity_vars with `from: models/<name>`. Keep it `run_type: discrete` unless it's a real bottleneck. See `references/sql-template-models.md`.
@@ -117,6 +129,7 @@ See `references/incremental-migration.md` for the full decision tree, merge synt
 - `references/sql-template-models.md` for authoring sql_template models (single_sql/multi_sql, DeRef, materialization, contract).
 - `references/optimizations-and-macros.md` for optimizations.yaml flags and macros.yaml authoring.
 - `references/propensity-yaml-template.md` for ML-specific structure and macro rules.
+- `references/attribution-yaml-template.md` for attribution models, the campaign-entity prerequisites, and the conversion/campaign schema.
 - `references/incremental-migration.md` — the incremental hub: readiness, feature decision tree, merge syntax, cutoff-replay validation, recovery.
 - `references/compound-aggregator-cookbook.md` — recipes for AVG, min_by/max_by, distinct, ratios, `merge_where`.
 - `references/warehouse-shims.md` — per-warehouse `min_by`/`max_by` macros.
