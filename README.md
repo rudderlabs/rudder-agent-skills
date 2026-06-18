@@ -176,19 +176,7 @@ rudder-agent-skills/
 │   └── installation.md          # full install guide
 ├── examples/                    # end-to-end worked examples
 └── skills/
-    ├── rudder-core/
-    │   ├── .claude-plugin/plugin.json
-    │   └── skills/<skill>/SKILL.md
-    ├── rudder-cli/
-    │   ├── .claude-plugin/plugin.json
-    │   └── skills/<skill>/SKILL.md
-    ├── rudder-mcp/
-    │   ├── .claude-plugin/plugin.json
-    │   └── skills/<skill>/SKILL.md
-    ├── rudder-terraform/
-    │   ├── .claude-plugin/plugin.json
-    │   └── skills/<skill>/SKILL.md
-    └── rudder-profiles/
+    └── <plugin>/                     # rudder-core, rudder-cli, rudder-mcp, rudder-terraform, rudder-profiles
         ├── .claude-plugin/plugin.json
         └── skills/<skill>/SKILL.md
 ```
