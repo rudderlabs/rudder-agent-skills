@@ -1,10 +1,10 @@
 # RudderStack Agent Skills
 
-A Claude Code plugin **marketplace** that teaches Claude how to drive every programmatic [RudderStack](https://www.rudderstack.com/) surface — CLI, MCP server, and Terraform — with the right preflight checks, commands, and recovery paths.
+A Claude Code plugin **marketplace** that teaches Claude how to drive every programmatic [RudderStack](https://www.rudderstack.com/) surface — CLI, MCP server, Terraform, and Profiles — with the right preflight checks, commands, and recovery paths.
 
 ## What's inside
 
-One marketplace (`rudder-agent-skills`) bundling four plugins. Install the ones you use.
+One marketplace (`rudder-agent-skills`) bundling five plugins. Install the ones you use.
 
 | Plugin | Status | Scope |
 |---|---|---|
@@ -12,6 +12,7 @@ One marketplace (`rudder-agent-skills`) bundling four plugins. Install the ones 
 | [`rudder-cli`](skills/rudder-cli/) | ✅ Available | Workflows for [`rudder-cli`](https://github.com/rudderlabs/rudder-iac) and [`rudder-typer`](https://www.rudderstack.com/docs/features/ruddertyper/) |
 | [`rudder-mcp`](skills/rudder-mcp/) | ✅ Available | Workflows for [RudderStack's hosted MCP server](https://mcp.rudderstack.com/docs) at `mcp.rudderstack.com` |
 | [`rudder-terraform`](skills/rudder-terraform/) | ✅ Available | Workflows for the [Terraform provider](https://github.com/rudderlabs/terraform-provider-rudderstack) |
+| [`rudder-profiles`](skills/rudder-profiles/) | ✅ Available | Workflows for [RudderStack Profiles](https://github.com/rudderlabs/profiles-mcp): setup, project creation, analysis, updates, and debugging |
 
 Most users drive RudderStack with more than one tool. Install `rudder-core` plus whichever tool plugins you use; the domain knowledge lives in `rudder-core` so it never duplicates across tool-specific plugins.
 
@@ -122,6 +123,16 @@ Update to the latest release with `/plugin marketplace update rudder-agent-skill
 | `rudder-terraform-workflow` | Managing RudderStack resources via Terraform provider |
 | `rudder-terraform-setup` | Installing Terraform and the RudderStack provider |
 
+### `rudder-profiles`
+
+| Skill | When to use |
+|---|---|
+| `rudder-profiles-setup` | Installing and wiring the Profiles toolchain and Profiles MCP |
+| `rudder-profiles-project` | Bootstrapping a new Profiles project from discovered warehouse resources |
+| `rudder-profiles-understand` | Explaining an existing Profiles project, its features, and latest outputs |
+| `rudder-profiles-update` | Updating a Profiles project with features, inputs, propensity, or incremental changes |
+| `rudder-profiles-debug` | Diagnosing compile failures, run failures, and output-quality issues |
+
 ## How skills work together
 
 ```
@@ -165,16 +176,7 @@ rudder-agent-skills/
 │   └── installation.md          # full install guide
 ├── examples/                    # end-to-end worked examples
 └── skills/
-    ├── rudder-core/
-    │   ├── .claude-plugin/plugin.json
-    │   └── skills/<skill>/SKILL.md
-    ├── rudder-cli/
-    │   ├── .claude-plugin/plugin.json
-    │   └── skills/<skill>/SKILL.md
-    ├── rudder-mcp/
-    │   ├── .claude-plugin/plugin.json
-    │   └── skills/<skill>/SKILL.md
-    └── rudder-terraform/
+    └── <plugin>/                     # rudder-core, rudder-cli, rudder-mcp, rudder-terraform, rudder-profiles
         ├── .claude-plugin/plugin.json
         └── skills/<skill>/SKILL.md
 ```
@@ -190,6 +192,7 @@ Each plugin includes a setup skill that guides you through installing and config
 | `rudder-cli` | `/rudder-cli-setup` | Downloads `rudder-cli` binary, authenticates with RudderStack |
 | `rudder-mcp` | `/rudder-mcp-setup` | Configures Claude Code to connect to RudderStack's MCP server at `mcp.rudderstack.com` |
 | `rudder-terraform` | `/rudder-terraform-setup` | Installs Terraform, configures the RudderStack provider |
+| `rudder-profiles` | `/rudder-profiles-setup` | Installs `pb`, configures `profiles-mcp`, and wires editor MCP settings |
 
 After installing a plugin, run its setup skill to get started. Use `/rudder-environment-check` to verify your full setup.
 
