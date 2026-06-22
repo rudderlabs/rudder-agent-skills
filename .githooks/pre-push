@@ -43,3 +43,14 @@ pre-push: skills review failed.
 EOF
     exit 1
 fi
+
+# Replay cursor.directory's discovery. It only ingests the default branch, so a
+# broken marketplace layout is otherwise invisible until a live submission on main.
+PREVIEW="${REPO_ROOT}/scripts/cursor-directory-preview.py"
+if [[ -f "$PREVIEW" ]]; then
+    echo "pre-push: previewing cursor.directory discovery…"
+    if ! python3 "$PREVIEW" "$REPO_ROOT"; then
+        echo "pre-push: cursor.directory would find no components — fix marketplace.json/layout." >&2
+        exit 1
+    fi
+fi

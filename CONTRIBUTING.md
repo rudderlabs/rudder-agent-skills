@@ -121,11 +121,12 @@ Your PR description should include:
 ## Versioning & release
 
 - **Each plugin's version is single-sourced in its own `skills/<plugin>/.claude-plugin/plugin.json`.** Bump it there when your change materially alters skill behavior; minor content tweaks don't need a bump. (Both the Open Plugin standard and Claude Code read the version from `plugin.json` — for Claude it silently overrides any marketplace entry, so the marketplace files deliberately carry no per-plugin `version`.)
-- **The marketplace manifest has one canonical copy: `marketplace.json` at the repo root** (the vendor-neutral Open Plugins location). Two byte-for-byte derived copies exist because each tool reads a different path and *only* that path — **never edit them by hand:**
-  - `.claude-plugin/marketplace.json` — Claude Code (`/plugin marketplace add`).
-  - `.cursor-plugin/marketplace.json` — cursor.directory submission (its parser checks only this path).
+- **The marketplace manifest has one canonical copy: `marketplace.json` at the repo root** (the vendor-neutral Open Plugins location; plugin `source` paths start with `./`). Two derived copies exist because each tool reads a different path and *only* that path — **never edit them by hand:**
+  - `.claude-plugin/marketplace.json` — Claude Code (`/plugin marketplace add`). Exact copy; Claude requires `./` sources.
+  - `.cursor-plugin/marketplace.json` — cursor.directory submission (its parser checks only this path). Identical **except** plugin `source` paths have the leading `./` stripped (`./skills/x` → `skills/x`): cursor.directory's parser strips slashes but not `./`, so a `./` source makes discovery find nothing.
 
   The pre-commit hook regenerates and stages both from the root file; CI fails if either drifts (`cmp`). The repo-root file's top-level `metadata.version` is the marketplace catalog's own version.
+- **Before pushing marketplace/layout changes, replay cursor.directory's discovery locally:** `python3 scripts/cursor-directory-preview.py`. It reproduces the live parser (`cursor/community-plugins` → `parse.ts`) against your working tree and prints exactly what cursor.directory would find — or the exact error it would throw. cursor.directory only ingests the **default branch**, so this is the only way to validate without merging to `main`. It also runs in pre-push and CI.
 - Tag releases (`git tag vX.Y.Z && git push --tags`) for traceability and the GitHub releases UI. The Claude Code marketplace command installs from `main`; users who need to freeze a specific version can `git checkout` the tag manually in `~/.claude/plugins/marketplaces/rudderlabs-rudder-agent-skills`.
 
 ## Governance
