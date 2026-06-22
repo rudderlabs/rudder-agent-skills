@@ -1,4 +1,12 @@
 {
   "name": "rudder-terraform",
-  "description": "Workflows for managing RudderStack workspaces with the Terraform provider: provider setup, resource and data-source usage, init/plan/apply cycles, module structure, and state management."
+  "description": "Workflows for managing RudderStack workspaces with the Terraform provider: provider setup, resource and data-source usage, init/plan/apply cycles, module structure, and state management.",
+  "version": "0.0.1",
+  "author": {
+    "name": "RudderStack"
+  },
+  "homepage": "https://github.com/rudderlabs/terraform-provider-rudderstack",
+  "repository": "https://github.com/rudderlabs/rudder-agent-skills",
+  "license": "MIT",
+  "keywords": ["rudderstack", "terraform", "iac", "hcl"]
 }
