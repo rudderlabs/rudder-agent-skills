@@ -206,9 +206,9 @@ Or install manually via symlinks:
 
 ```bash
 mkdir -p .claude/skills
-ln -s ../../skills/rudder-core/skills/rudder-data-catalog .claude/skills/
-ln -s ../../skills/rudder-core/skills/rudder-tracking-plans .claude/skills/
-ln -s ../../skills/rudder-cli/skills/rudder-cli-workflow .claude/skills/
+ln -s ../../plugins/rudder-core/skills/rudder-data-catalog .claude/skills/
+ln -s ../../plugins/rudder-core/skills/rudder-tracking-plans .claude/skills/
+ln -s ../../plugins/rudder-cli/skills/rudder-cli-workflow .claude/skills/
 ```
 
 ## Next Steps

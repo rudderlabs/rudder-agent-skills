@@ -7,7 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking (repo layout):** renamed the top-level `skills/` directory back to
+  `plugins/` (reverting the earlier `plugins/` → `skills/` rename). Each plugin
+  lives at `plugins/<plugin>/skills/<skill>/SKILL.md`; marketplace `source` fields
+  were updated to match. The rename to `skills/` was unnecessary — skills.sh
+  discovery is manifest-driven and name-agnostic — and it broke cursor.directory,
+  whose parser derives a skill's name from the first `skills/` path segment and so
+  collapsed every plugin's skills into a single mis-named entry. `npx skills add`
+  and Claude Code install UX are unchanged.
+
+### Fixed
+
+- **`rudder-profiles` / `rudder-profiles-setup`, `rudder-profiles-update`** —
+  quoted the `description` frontmatter. An unquoted `: ` (colon-space) made the
+  skills.sh CLI's YAML parser read it as a nested mapping and reject the
+  frontmatter, silently dropping both skills from skills.sh (21/23 → 23/23 now).
+
 ### Added
+
+- **CI / dev tooling** — both directory crawlers now run as gates against the
+  working tree: cursor.directory's real `parse.ts` (vendored, pinned) via
+  `scripts/cursor-preview/preview.mts`, and skills.sh's real `skills` CLI (pinned)
+  via `scripts/skills-sh-check.py`. Each asserts all manifest-declared skills are
+  discovered, so a layout/frontmatter regression fails CI instead of a live submission.
 
 - **`rudder-core` / `rudder-data-graphs`** — documented the optional per-column
   `pii_mask` flag in the Data Graph YAML template: `pii_mask: true` marks a

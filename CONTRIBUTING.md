@@ -33,10 +33,10 @@ If a new skill spans two surfaces, default to `rudder-core` and reference surfac
 
 ## Authoring a skill
 
-Each skill is a folder under `skills/<plugin>/skills/<skill-name>/` containing one `SKILL.md` and optional `references/*.md` files:
+Each skill is a folder under `plugins/<plugin>/skills/<skill-name>/` containing one `SKILL.md` and optional `references/*.md` files:
 
 ```
-skills/rudder-cli/skills/my-new-skill/
+plugins/rudder-cli/skills/my-new-skill/
 ├── SKILL.md                # required
 └── references/             # optional; loaded on demand
     └── advanced-topic.md
@@ -120,10 +120,10 @@ Your PR description should include:
 
 ## Versioning & release
 
-- **Each plugin's version is single-sourced in its own `skills/<plugin>/.claude-plugin/plugin.json`.** Bump it there when your change materially alters skill behavior; minor content tweaks don't need a bump. (Both the Open Plugin standard and Claude Code read the version from `plugin.json` — for Claude it silently overrides any marketplace entry, so the marketplace files deliberately carry no per-plugin `version`.)
+- **Each plugin's version is single-sourced in its own `plugins/<plugin>/.claude-plugin/plugin.json`.** Bump it there when your change materially alters skill behavior; minor content tweaks don't need a bump. (Both the Open Plugin standard and Claude Code read the version from `plugin.json` — for Claude it silently overrides any marketplace entry, so the marketplace files deliberately carry no per-plugin `version`.)
 - **The marketplace manifest has one canonical copy: `marketplace.json` at the repo root** (the vendor-neutral Open Plugins location; plugin `source` paths start with `./`). Two derived copies exist because each tool reads a different path and *only* that path — **never edit them by hand:**
   - `.claude-plugin/marketplace.json` — Claude Code (`/plugin marketplace add`). Exact copy; Claude requires `./` sources.
-  - `.cursor-plugin/marketplace.json` — cursor.directory submission (its parser checks only this path). Identical **except** plugin `source` paths have the leading `./` stripped (`./skills/x` → `skills/x`): cursor.directory's parser strips slashes but not `./`, so a `./` source makes discovery find nothing.
+  - `.cursor-plugin/marketplace.json` — cursor.directory submission (its parser checks only this path). Identical **except** plugin `source` paths have the leading `./` stripped (`./plugins/x` → `plugins/x`): cursor.directory's parser strips slashes but not `./`, so a `./` source makes discovery find nothing.
 
   The pre-commit hook regenerates and stages both from the root file; CI fails if either drifts (`cmp`). The repo-root file's top-level `metadata.version` is the marketplace catalog's own version.
 - **Before pushing marketplace/layout/skill changes, replay both directories' REAL discovery locally** (both also run in pre-push and CI). Both consume manifest paths, so a layout that lists on one can be invisible on the other — these gates catch that without a live submission.

@@ -71,8 +71,8 @@ fi
 #      .claude-plugin/marketplace.json — exact copy. Claude Code reads only this path and
 #        requires sources to start with "./".
 #      .cursor-plugin/marketplace.json — sources stripped of leading "./". cursor.directory
-#        reads only this path and its parser strips slashes but NOT "./", so "./skills/x"
-#        must become "skills/x" or discovery finds nothing.
+#        reads only this path and its parser strips slashes but NOT "./", so "./plugins/x"
+#        must become "plugins/x" or discovery finds nothing.
 CANON="${REPO_ROOT}/marketplace.json"
 if [[ -f "$CANON" ]]; then
     claude_shim="${REPO_ROOT}/.claude-plugin/marketplace.json"
