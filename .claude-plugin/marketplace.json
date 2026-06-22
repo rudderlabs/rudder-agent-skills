@@ -12,8 +12,8 @@
     {
       "name": "rudder-core",
       "source": "./skills/rudder-core",
-      "description": "Cross-tool RudderStack domain knowledge: data catalog, tracking plans, data graphs, instrumentation planning and debugging.",
-      "version": "0.0.5",
+      "description": "Cross-tool RudderStack domain knowledge: data catalog, tracking plans, data graphs, instrumentation planning, instrumentation debugging, and destination delivery debugging.",
+      "version": "0.0.6",
       "author": {
         "name": "RudderStack"
       },
@@ -21,7 +21,7 @@
       "repository": "https://github.com/rudderlabs/rudder-agent-skills",
       "license": "MIT",
       "category": "devtools",
-      "keywords": ["rudderstack", "instrumentation", "tracking-plan", "data-catalog", "data-graph"],
+      "keywords": ["rudderstack", "instrumentation", "tracking-plan", "data-catalog", "data-graph", "destination-debugging"],
       "tags": ["rudderstack", "domain"]
     },
     {
