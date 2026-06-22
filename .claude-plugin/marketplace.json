@@ -5,15 +5,15 @@
     "email": "no-reply@rudderstack.com"
   },
   "metadata": {
-    "description": "Skills for working with RudderStack via CLI, MCP server, and Terraform.",
-    "version": "0.0.4"
+    "description": "Skills for working with RudderStack via CLI, MCP server, Terraform, and Profiles workflows.",
+    "version": "0.0.5"
   },
   "plugins": [
     {
       "name": "rudder-core",
       "source": "./skills/rudder-core",
       "description": "Cross-tool RudderStack domain knowledge: data catalog, tracking plans, data graphs, instrumentation planning, instrumentation debugging, and destination delivery debugging.",
-      "version": "0.0.4",
+      "version": "0.0.6",
       "author": {
         "name": "RudderStack"
       },
@@ -68,6 +68,21 @@
       "category": "devtools",
       "keywords": ["rudderstack", "terraform", "iac", "hcl"],
       "tags": ["rudderstack", "terraform"]
+    },
+    {
+      "name": "rudder-profiles",
+      "source": "./skills/rudder-profiles",
+      "description": "Workflows for building RudderStack Profiles projects: setup, project creation, project analysis, controlled updates, and debugging.",
+      "version": "0.1.0",
+      "author": {
+        "name": "RudderStack"
+      },
+      "homepage": "https://github.com/rudderlabs/profiles-mcp",
+      "repository": "https://github.com/rudderlabs/rudder-agent-skills",
+      "license": "MIT",
+      "category": "devtools",
+      "keywords": ["rudderstack", "profiles", "profile-builder", "identity-resolution", "feature-engineering"],
+      "tags": ["rudderstack", "profiles"]
     }
   ]
 }

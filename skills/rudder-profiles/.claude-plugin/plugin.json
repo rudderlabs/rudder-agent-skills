@@ -1,0 +1,4 @@
+{
+  "name": "rudder-profiles",
+  "description": "Workflows for building and maintaining RudderStack Profiles projects: setup, project creation, analysis, updates, and debugging."
+}

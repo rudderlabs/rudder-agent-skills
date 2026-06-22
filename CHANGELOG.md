@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **`rudder-core` / `rudder-data-graphs`** — documented the optional per-column
+  `pii_mask` flag in the Data Graph YAML template: `pii_mask: true` marks a
+  warehouse column as PII so its values are masked (`***`) in the Data Graph
+  preview (enterprise-only; server rejects it on other plans). Added it to the
+  annotated `columns:` example (including a PII-only entry with no alias), the
+  **Column metadata fields** table, and the validation rules (a column entry now
+  needs `name` plus at least one of `display_name` / `description` / `pii_mask`).
+  Extended the **Schema visibility** pitch in `capability-comparison.md` to note
+  PII columns stay masked in the preview.
+- **`rudder-core` / `rudder-data-graphs`** — documented the optional per-column
   `columns:` block in the Data Graph YAML template: `display_name` (alias) and
   `description` overrides that surface in the Audience Builder. Added a worked
   `columns:` example to the annotated template, a `columns` row to the Model
