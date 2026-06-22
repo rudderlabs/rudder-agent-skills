@@ -44,13 +44,19 @@ EOF
     exit 1
 fi
 
-# Replay cursor.directory's discovery. It only ingests the default branch, so a
-# broken marketplace layout is otherwise invisible until a live submission on main.
-PREVIEW="${REPO_ROOT}/scripts/cursor-directory-preview.py"
-if [[ -f "$PREVIEW" ]]; then
-    echo "pre-push: previewing cursor.directory discovery…"
-    if ! python3 "$PREVIEW" "$REPO_ROOT"; then
-        echo "pre-push: cursor.directory would find no components — fix marketplace.json/layout." >&2
-        exit 1
+# Replay cursor.directory's REAL parser (vendored scripts/cursor-preview/) against the
+# working tree. cursor.directory only ingests the default branch, so a broken layout is
+# otherwise invisible until a live submission on main. Needs Node >= 22.6 for TypeScript
+# support; skipped with a note on older Node (CI runs it authoritatively on Node 24).
+PREVIEW="${REPO_ROOT}/scripts/cursor-preview/preview.mts"
+if [[ -f "$PREVIEW" ]] && command -v node >/dev/null 2>&1; then
+    if node -e 'const [a,b]=process.versions.node.split(".").map(Number);process.exit(a>22||(a===22&&b>=6)?0:1)' 2>/dev/null; then
+        echo "pre-push: previewing cursor.directory discovery…"
+        if ! node --experimental-transform-types "$PREVIEW" "$REPO_ROOT"; then
+            echo "pre-push: cursor.directory would find no components — fix marketplace.json/layout." >&2
+            exit 1
+        fi
+    else
+        echo "pre-push: skipping cursor.directory preview (needs Node >= 22.6; CI runs it)." >&2
     fi
 fi

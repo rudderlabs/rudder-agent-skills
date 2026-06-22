@@ -48,11 +48,17 @@ jobs:
           cmp -s <(sed 's#"source": "\./#"source": "#g' marketplace.json) .cursor-plugin/marketplace.json \
             || { echo "::error::.cursor-plugin/marketplace.json is stale — regenerate via .githooks/pre-commit"; exit 1; }
 
+      - name: Set up Node.js (cursor.directory preview)
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24"
+
       - name: cursor.directory discovery preview
         run: |
-          # Replays cursor.directory's parser (cursor/community-plugins parse.ts) so a
-          # broken marketplace layout fails CI instead of a live submission on main.
-          python3 scripts/cursor-directory-preview.py
+          # Runs cursor.directory's REAL parser (vendored scripts/cursor-preview/, pinned to
+          # an upstream commit) against the working tree, so a broken layout fails CI instead
+          # of a live submission on main.
+          node --experimental-transform-types scripts/cursor-preview/preview.mts .
 
       - name: Set up Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
