@@ -60,6 +60,13 @@ jobs:
           # of a live submission on main.
           node --experimental-transform-types scripts/cursor-preview/preview.mts .
 
+      - name: skills.sh discovery check
+        run: |
+          # Runs skills.sh's REAL checker — the pinned `skills` CLI (github.com/vercel-labs/skills,
+          # what powers the skills.sh leaderboard) — and asserts every manifest-declared skill is
+          # discovered, catching silent drops (e.g. a YAML-hostile colon in a description).
+          python3 scripts/skills-sh-check.py .
+
       - name: Set up Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:

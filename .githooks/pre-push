@@ -60,3 +60,19 @@ if [[ -f "$PREVIEW" ]] && command -v node >/dev/null 2>&1; then
         echo "pre-push: skipping cursor.directory preview (needs Node >= 22.6; CI runs it)." >&2
     fi
 fi
+
+# Run skills.sh's REAL checker (pinned `skills` CLI) and assert every manifest-declared
+# skill is discoverable. Needs Node >= 18 and network (npx fetches the pinned package);
+# skipped with a note otherwise (CI runs it authoritatively).
+SKILLS_CHECK="${REPO_ROOT}/scripts/skills-sh-check.py"
+if [[ -f "$SKILLS_CHECK" ]] && command -v node >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
+    if node -e 'process.exit(Number(process.versions.node.split(".")[0])>=18?0:1)' 2>/dev/null; then
+        echo "pre-push: checking skills.sh discovery…"
+        if ! python3 "$SKILLS_CHECK" "$REPO_ROOT"; then
+            echo "pre-push: skills.sh would silently drop skills — see above." >&2
+            exit 1
+        fi
+    else
+        echo "pre-push: skipping skills.sh check (needs Node >= 18; CI runs it)." >&2
+    fi
+fi

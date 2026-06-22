@@ -1,6 +1,6 @@
 ---
 name: rudder-profiles-setup
-description: Installs and configures the RudderStack Profiles toolchain: profiles-mcp, Profile Builder CLI, and editor MCP wiring. Use when setting up Profiles, installing pb, configuring profiles-mcp, or checking first-time Profiles prerequisites.
+description: "Installs and configures the RudderStack Profiles toolchain: profiles-mcp, Profile Builder CLI, and editor MCP wiring. Use when setting up Profiles, installing pb, configuring profiles-mcp, or checking first-time Profiles prerequisites."
 allowed-tools: "Bash(which, python3, uv, git, curl, chmod, pb *, ./setup.sh, cat, claude *), Read, Write, Edit"
 ---
 
