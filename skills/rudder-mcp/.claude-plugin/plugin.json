@@ -1,4 +1,12 @@
 {
   "name": "rudder-mcp",
-  "description": "Workflows for RudderStack's MCP server at mcp.rudderstack.com: connect AI/LLM agents to a RudderStack workspace and drive catalog, sources, destinations, transformations, RETL, tracking plans, and live events via MCP tool calls."
+  "description": "Workflows for RudderStack's MCP server at mcp.rudderstack.com: connect AI/LLM agents to a RudderStack workspace and drive catalog, sources, destinations, transformations, RETL, tracking plans, and live events via MCP tool calls.",
+  "version": "0.0.2",
+  "author": {
+    "name": "RudderStack"
+  },
+  "homepage": "https://mcp.rudderstack.com/docs",
+  "repository": "https://github.com/rudderlabs/rudder-agent-skills",
+  "license": "MIT",
+  "keywords": ["rudderstack", "mcp", "mcp-server", "ai-agent"]
 }

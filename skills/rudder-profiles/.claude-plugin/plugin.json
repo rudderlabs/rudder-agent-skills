@@ -1,4 +1,12 @@
 {
   "name": "rudder-profiles",
-  "description": "Workflows for building and maintaining RudderStack Profiles projects: setup, project creation, analysis, updates, and debugging."
+  "description": "Workflows for building and maintaining RudderStack Profiles projects: setup, project creation, analysis, updates, and debugging.",
+  "version": "0.1.0",
+  "author": {
+    "name": "RudderStack"
+  },
+  "homepage": "https://github.com/rudderlabs/profiles-mcp",
+  "repository": "https://github.com/rudderlabs/rudder-agent-skills",
+  "license": "MIT",
+  "keywords": ["rudderstack", "profiles", "profile-builder", "identity-resolution", "feature-engineering"]
 }

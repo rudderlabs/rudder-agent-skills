@@ -65,7 +65,19 @@ EOF
     fi
 fi
 
-# 3. Merge conflict markers in staged content.
+# 3. Keep the Claude Code marketplace shim derived from the canonical manifest.
+#    Canonical: marketplace.json (Open Plugins / Cursor, repo root).
+#    Derived:   .claude-plugin/marketplace.json (Claude Code reads only this path).
+#    Edit the canonical file only — this regenerates and stages the shim.
+CANON="${REPO_ROOT}/marketplace.json"
+SHIM="${REPO_ROOT}/.claude-plugin/marketplace.json"
+if [[ -f "$CANON" ]] && ! cmp -s "$CANON" "$SHIM"; then
+    cp "$CANON" "$SHIM"
+    git add "$SHIM"
+    echo "pre-commit: regenerated .claude-plugin/marketplace.json from marketplace.json (staged)." >&2
+fi
+
+# 4. Merge conflict markers in staged content.
 if git diff --cached --check >/dev/null 2>&1; then
     :
 else
