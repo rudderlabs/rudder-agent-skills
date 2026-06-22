@@ -38,12 +38,15 @@ jobs:
             python3 -c "import json; json.load(open('$f'))" || exit 1
           done
 
-      - name: Marketplace shim in sync
+      - name: Marketplace shims in sync
         run: |
-          # .claude-plugin/marketplace.json (Claude Code) is derived from the canonical
-          # root marketplace.json (Open Plugins / Cursor). The pre-commit hook regenerates it.
-          cmp -s marketplace.json .claude-plugin/marketplace.json \
-            || { echo "::error::.claude-plugin/marketplace.json is stale — run: cp marketplace.json .claude-plugin/marketplace.json"; exit 1; }
+          # The per-tool shims are derived from the canonical root marketplace.json
+          # (Open Plugins standard). Claude Code reads .claude-plugin/, cursor.directory
+          # reads .cursor-plugin/. The pre-commit hook regenerates both.
+          for shim in .claude-plugin/marketplace.json .cursor-plugin/marketplace.json; do
+            cmp -s marketplace.json "$shim" \
+              || { echo "::error::$shim is stale — run: cp marketplace.json $shim"; exit 1; }
+          done
 
       - name: Set up Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0

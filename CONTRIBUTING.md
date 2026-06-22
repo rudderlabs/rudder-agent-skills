@@ -121,7 +121,11 @@ Your PR description should include:
 ## Versioning & release
 
 - **Each plugin's version is single-sourced in its own `skills/<plugin>/.claude-plugin/plugin.json`.** Bump it there when your change materially alters skill behavior; minor content tweaks don't need a bump. (Both the Open Plugin standard and Claude Code read the version from `plugin.json` — for Claude it silently overrides any marketplace entry, so the marketplace files deliberately carry no per-plugin `version`.)
-- **The marketplace manifest has one canonical copy: `marketplace.json` at the repo root** (the vendor-neutral Open Plugins / Cursor location). `.claude-plugin/marketplace.json` is a byte-for-byte derived copy that only Claude Code reads — **never edit it by hand.** The pre-commit hook regenerates and stages it from the root file; CI fails if they drift (`cmp`). The repo-root file's top-level `metadata.version` is the marketplace catalog's own version.
+- **The marketplace manifest has one canonical copy: `marketplace.json` at the repo root** (the vendor-neutral Open Plugins location). Two byte-for-byte derived copies exist because each tool reads a different path and *only* that path — **never edit them by hand:**
+  - `.claude-plugin/marketplace.json` — Claude Code (`/plugin marketplace add`).
+  - `.cursor-plugin/marketplace.json` — cursor.directory submission (its parser checks only this path).
+
+  The pre-commit hook regenerates and stages both from the root file; CI fails if either drifts (`cmp`). The repo-root file's top-level `metadata.version` is the marketplace catalog's own version.
 - Tag releases (`git tag vX.Y.Z && git push --tags`) for traceability and the GitHub releases UI. The Claude Code marketplace command installs from `main`; users who need to freeze a specific version can `git checkout` the tag manually in `~/.claude/plugins/marketplaces/rudderlabs-rudder-agent-skills`.
 
 ## Governance

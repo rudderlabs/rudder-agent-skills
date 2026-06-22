@@ -1,0 +1,83 @@
+{
+  "name": "rudder-agent-skills",
+  "owner": {
+    "name": "RudderStack",
+    "email": "no-reply@rudderstack.com"
+  },
+  "metadata": {
+    "description": "Skills for working with RudderStack via CLI, MCP server, Terraform, and Profiles workflows.",
+    "version": "0.0.5"
+  },
+  "plugins": [
+    {
+      "name": "rudder-core",
+      "source": "./skills/rudder-core",
+      "description": "Cross-tool RudderStack domain knowledge: data catalog, tracking plans, data graphs, instrumentation planning, instrumentation debugging, and destination delivery debugging.",
+      "author": {
+        "name": "RudderStack"
+      },
+      "homepage": "https://www.rudderstack.com/",
+      "repository": "https://github.com/rudderlabs/rudder-agent-skills",
+      "license": "MIT",
+      "category": "devtools",
+      "keywords": ["rudderstack", "instrumentation", "tracking-plan", "data-catalog", "data-graph", "destination-debugging"],
+      "tags": ["rudderstack", "domain"]
+    },
+    {
+      "name": "rudder-cli",
+      "source": "./skills/rudder-cli",
+      "description": "Workflows for driving the rudder-cli and rudder-typer CLIs: validate, dry-run, apply, import, transformations.",
+      "author": {
+        "name": "RudderStack"
+      },
+      "homepage": "https://github.com/rudderlabs/rudder-iac",
+      "repository": "https://github.com/rudderlabs/rudder-agent-skills",
+      "license": "MIT",
+      "category": "devtools",
+      "keywords": ["rudderstack", "rudder-cli", "rudder-typer", "cli", "devtools"],
+      "tags": ["rudderstack", "cli"]
+    },
+    {
+      "name": "rudder-mcp",
+      "source": "./skills/rudder-mcp",
+      "description": "Workflows for RudderStack's MCP server at mcp.rudderstack.com: connect AI/LLM agents to a RudderStack workspace and drive it via MCP tool calls.",
+      "author": {
+        "name": "RudderStack"
+      },
+      "homepage": "https://mcp.rudderstack.com/docs",
+      "repository": "https://github.com/rudderlabs/rudder-agent-skills",
+      "license": "MIT",
+      "category": "devtools",
+      "keywords": ["rudderstack", "mcp", "mcp-server", "ai-agent"],
+      "tags": ["rudderstack", "mcp"]
+    },
+    {
+      "name": "rudder-terraform",
+      "source": "./skills/rudder-terraform",
+      "description": "Workflows for managing RudderStack with the Terraform provider: provider setup, resource/data-source usage, and plan/apply cycles.",
+      "author": {
+        "name": "RudderStack"
+      },
+      "homepage": "https://github.com/rudderlabs/terraform-provider-rudderstack",
+      "repository": "https://github.com/rudderlabs/rudder-agent-skills",
+      "license": "MIT",
+      "category": "devtools",
+      "keywords": ["rudderstack", "terraform", "iac", "hcl"],
+      "tags": ["rudderstack", "terraform"]
+    },
+    {
+      "name": "rudder-profiles",
+      "source": "./skills/rudder-profiles",
+      "description": "Workflows for building RudderStack Profiles projects: setup, project creation, project analysis, controlled updates, and debugging.",
+      "author": {
+        "name": "RudderStack"
+      },
+      "homepage": "https://github.com/rudderlabs/profiles-mcp",
+      "repository": "https://github.com/rudderlabs/rudder-agent-skills",
+      "license": "MIT",
+      "category": "devtools",
+      "keywords": ["rudderstack", "profiles", "profile-builder", "identity-resolution", "feature-engineering"],
+      "tags": ["rudderstack", "profiles"]
+    }
+  ]
+}
