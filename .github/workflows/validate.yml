@@ -40,13 +40,32 @@ jobs:
 
       - name: Marketplace shims in sync
         run: |
-          # The per-tool shims are derived from the canonical root marketplace.json
-          # (Open Plugins standard). Claude Code reads .claude-plugin/, cursor.directory
-          # reads .cursor-plugin/. The pre-commit hook regenerates both.
-          for shim in .claude-plugin/marketplace.json .cursor-plugin/marketplace.json; do
-            cmp -s marketplace.json "$shim" \
-              || { echo "::error::$shim is stale — run: cp marketplace.json $shim"; exit 1; }
-          done
+          # Per-tool shims derived from the canonical root marketplace.json. Claude Code
+          # reads .claude-plugin/ (exact copy); cursor.directory reads .cursor-plugin/
+          # (sources stripped of leading "./"). The pre-commit hook regenerates both.
+          cmp -s marketplace.json .claude-plugin/marketplace.json \
+            || { echo "::error::.claude-plugin/marketplace.json is stale — run: cp marketplace.json .claude-plugin/marketplace.json"; exit 1; }
+          cmp -s <(sed 's#"source": "\./#"source": "#g' marketplace.json) .cursor-plugin/marketplace.json \
+            || { echo "::error::.cursor-plugin/marketplace.json is stale — regenerate via .githooks/pre-commit"; exit 1; }
+
+      - name: Set up Node.js (cursor.directory preview)
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24"
+
+      - name: cursor.directory discovery preview
+        run: |
+          # Runs cursor.directory's REAL parser (vendored scripts/cursor-preview/, pinned to
+          # an upstream commit) against the working tree, so a broken layout fails CI instead
+          # of a live submission on main.
+          node --experimental-transform-types scripts/cursor-preview/preview.mts .
+
+      - name: skills.sh discovery check
+        run: |
+          # Runs skills.sh's REAL checker — the pinned `skills` CLI (github.com/vercel-labs/skills,
+          # what powers the skills.sh leaderboard) — and asserts every manifest-declared skill is
+          # discovered, catching silent drops (e.g. a YAML-hostile colon in a description).
+          python3 scripts/skills-sh-check.py .
 
       - name: Set up Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0

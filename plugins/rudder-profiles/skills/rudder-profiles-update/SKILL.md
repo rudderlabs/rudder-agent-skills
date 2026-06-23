@@ -1,6 +1,6 @@
 ---
 name: rudder-profiles-update
-description: Modifies an existing RudderStack Profiles project: features, inputs, id_types, cohorts, feature views, SQL models, optimizations, macros, propensity/attribution, or incremental migration. Use when updating Profiles YAML, adding features/audiences/models or changing incremental behavior.
+description: "Modifies an existing RudderStack Profiles project: features, inputs, id_types, cohorts, feature views, SQL models, optimizations, macros, propensity/attribution, or incremental migration. Use when updating Profiles YAML, adding features/audiences/models or changing incremental behavior."
 allowed-tools: "Bash(pb *), Read, Write, Edit"
 ---
 

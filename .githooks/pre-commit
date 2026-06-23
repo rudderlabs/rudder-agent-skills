@@ -66,21 +66,33 @@ EOF
 fi
 
 # 3. Keep the per-tool marketplace shims derived from the canonical manifest.
-#    Canonical: marketplace.json (Open Plugins standard, repo root).
-#    Derived:   .claude-plugin/marketplace.json (Claude Code reads only this path),
-#               .cursor-plugin/marketplace.json (cursor.directory reads only this path).
-#    Edit the canonical file only — this regenerates and stages the shims.
+#    Canonical: marketplace.json (Open Plugins standard, repo root; sources start with "./").
+#    Derived (edit the canonical file only — this regenerates and stages both):
+#      .claude-plugin/marketplace.json — exact copy. Claude Code reads only this path and
+#        requires sources to start with "./".
+#      .cursor-plugin/marketplace.json — sources stripped of leading "./". cursor.directory
+#        reads only this path and its parser strips slashes but NOT "./", so "./plugins/x"
+#        must become "plugins/x" or discovery finds nothing.
 CANON="${REPO_ROOT}/marketplace.json"
 if [[ -f "$CANON" ]]; then
-    for SHIM in "${REPO_ROOT}/.claude-plugin/marketplace.json" \
-                "${REPO_ROOT}/.cursor-plugin/marketplace.json"; do
-        if ! cmp -s "$CANON" "$SHIM" 2>/dev/null; then
-            mkdir -p "$(dirname "$SHIM")"
-            cp "$CANON" "$SHIM"
-            git add "$SHIM"
-            echo "pre-commit: regenerated ${SHIM#"$REPO_ROOT"/} from marketplace.json (staged)." >&2
-        fi
-    done
+    claude_shim="${REPO_ROOT}/.claude-plugin/marketplace.json"
+    if ! cmp -s "$CANON" "$claude_shim" 2>/dev/null; then
+        mkdir -p "$(dirname "$claude_shim")"
+        cp "$CANON" "$claude_shim"
+        git add "$claude_shim"
+        echo "pre-commit: regenerated .claude-plugin/marketplace.json (staged)." >&2
+    fi
+
+    cursor_shim="${REPO_ROOT}/.cursor-plugin/marketplace.json"
+    cursor_tmp="$(mktemp)"
+    sed 's#"source": "\./#"source": "#g' "$CANON" > "$cursor_tmp"
+    if ! cmp -s "$cursor_tmp" "$cursor_shim" 2>/dev/null; then
+        mkdir -p "$(dirname "$cursor_shim")"
+        cp "$cursor_tmp" "$cursor_shim"
+        git add "$cursor_shim"
+        echo "pre-commit: regenerated .cursor-plugin/marketplace.json (staged)." >&2
+    fi
+    rm -f "$cursor_tmp"
 fi
 
 # 4. Merge conflict markers in staged content.
