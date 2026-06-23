@@ -133,19 +133,22 @@ flowchart TD
 
 ## Directory structure
 
-```mermaid
-graph TD
-    root["rudder-agent-skills/"]
-    root --> readme["README.md"]
-    root --> contributing["CONTRIBUTING.md"]
-    root --> license["LICENSE"]
-    root --> marketplace[".claude-plugin/marketplace.json"]
-    root --> docs["docs/installation.md"]
-    root --> examples["examples/"]
-    root --> plugins["plugins/"]
-    plugins --> plugin["one dir per plugin<br/>rudder-core &middot; rudder-cli &middot; rudder-mcp<br/>rudder-terraform &middot; rudder-profiles"]
-    plugin --> manifest[".claude-plugin/plugin.json"]
-    plugin --> skills["skills/&lt;skill&gt;/SKILL.md"]
+```
+rudder-agent-skills/
+├── README.md                  # this file
+├── CONTRIBUTING.md            # authoring + PR guidelines
+├── LICENSE
+├── .claude-plugin/
+│   └── marketplace.json       # the marketplace catalog
+├── docs/
+│   └── installation.md        # full install guide
+├── examples/                  # end-to-end worked examples
+└── plugins/
+    └── <plugin>/              # rudder-core, rudder-cli, rudder-mcp, rudder-terraform, rudder-profiles
+        ├── .claude-plugin/plugin.json
+        └── skills/
+            └── <skill>/
+                └── SKILL.md
 ```
 
 ## Prerequisites
