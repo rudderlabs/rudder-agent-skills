@@ -60,11 +60,11 @@ Non-interactive equivalent: `claude plugin marketplace add rudderlabs/rudder-age
 
 ### Cursor
 
+Add it straight from the [cursor.directory listing](https://cursor.directory/plugins/rudder-agent-skills) with **Add to Cursor**, or use the Skills CLI:
+
 ```bash
 npx skills add rudderlabs/rudder-agent-skills -a cursor
 ```
-
-Once it's listed on [cursor.directory](https://cursor.directory/plugins/rudder-agent-skills), you'll also be able to add it straight from the listing with **Add to Cursor**.
 
 > Manual symlink, git submodule, agent-specific paths, and troubleshooting live in [`docs/installation.md`](docs/installation.md).
 
