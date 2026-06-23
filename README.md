@@ -58,7 +58,15 @@ npx skills update
 
 Non-interactive equivalent: `claude plugin marketplace add rudderlabs/rudder-agent-skills` then `claude plugin install <plugin>@rudder-agent-skills`. Update with `/plugin marketplace update rudder-agent-skills`.
 
-> Cursor, manual symlink, git submodule, agent-specific paths, and troubleshooting live in [`docs/installation.md`](docs/installation.md).
+### Cursor
+
+```bash
+npx skills add rudderlabs/rudder-agent-skills -a cursor
+```
+
+Once it's listed on [cursor.directory](https://cursor.directory/plugins/rudder-agent-skills), you'll also be able to add it straight from the listing with **Add to Cursor**.
+
+> Manual symlink, git submodule, agent-specific paths, and troubleshooting live in [`docs/installation.md`](docs/installation.md).
 
 ## Available skills
 
