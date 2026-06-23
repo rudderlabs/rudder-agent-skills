@@ -2,7 +2,17 @@
 
 # RudderStack Agent Skills
 
-A Claude Code plugin **marketplace** that teaches Claude how to drive every programmatic [RudderStack](https://www.rudderstack.com/) surface — CLI, MCP server, Terraform, and Profiles — with the right preflight checks, commands, and recovery paths.
+[![skills.sh](https://skills.sh/b/rudderlabs/rudder-agent-skills)](https://skills.sh/rudderlabs/rudder-agent-skills)
+[![Agent Skills](https://img.shields.io/badge/Agent_Skills-open_format-5436DA)](https://agentskills.io)
+[![Claude Code](https://img.shields.io/badge/Claude_Code-plugin_marketplace-D97757)](https://code.claude.com/docs/en/plugins)
+[![Cursor](https://img.shields.io/badge/Cursor-directory-000000)](https://cursor.directory/plugins/rudder-agent-skills)
+[![MCP](https://img.shields.io/badge/MCP-server_included-1F6FEB)](https://mcp.rudderstack.com/docs)
+[![CLI](https://img.shields.io/badge/CLI-included-0E7490)](https://github.com/rudderlabs/rudder-iac)
+[![works with 40+ agents](https://img.shields.io/badge/works_with-40%2B_agents-2EA44F)](https://github.com/vercel-labs/skills#supported-agents)
+[![License: MIT](https://img.shields.io/github/license/rudderlabs/rudder-agent-skills)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/rudderlabs/rudder-agent-skills?style=flat)](https://github.com/rudderlabs/rudder-agent-skills/stargazers)
+
+A Claude Code plugin **marketplace** and [Agent Skills](https://agentskills.io) collection that teaches your AI coding agent how to drive every programmatic [RudderStack](https://www.rudderstack.com/) surface — CLI, MCP server, Terraform, and Profiles — with the right preflight checks, commands, and recovery paths. Works with Claude Code, Cursor, and 40+ agents.
 
 ## What's inside
 
@@ -20,73 +30,43 @@ Most users drive RudderStack with more than one tool. Install `rudder-core` plus
 
 ## Installation
 
-See [`docs/installation.md`](docs/installation.md) for the full guide (Skills CLI, Claude Code plugin system, manual symlinks, submodule, agent-specific paths, troubleshooting). The quick paths below cover the common cases.
+One command, any agent — no cloning, no local setup.
 
-### Option 1: Skills CLI (Recommended)
+### Any agent — Skills CLI (recommended)
 
-The [Skills CLI](https://github.com/vercel-labs/skills) works with 40+ coding agents including Claude Code, Cursor, Cline, OpenCode, and more.
+The [Skills CLI](https://github.com/vercel-labs/skills) installs these skills into Claude Code, Cursor, Cline, OpenCode, and [40+ agents](https://github.com/vercel-labs/skills#supported-agents):
 
 ```bash
-# List available skills first
-npx skills add rudderlabs/rudder-agent-skills --list
-
-# Install specific skills interactively
+# Interactive — pick skills and your agent
 npx skills add rudderlabs/rudder-agent-skills
 
-# Install specific skills to Claude Code
-npx skills add rudderlabs/rudder-agent-skills -a claude-code --skill rudder-cli-workflow --skill rudder-data-catalog
-
-# Install all skills globally
+# Or: list first · install everything globally · target one agent
+npx skills add rudderlabs/rudder-agent-skills --list
 npx skills add rudderlabs/rudder-agent-skills -g --all
-```
+npx skills add rudderlabs/rudder-agent-skills -a claude-code --skill rudder-cli-workflow
 
-To update:
-
-```bash
+# Update anytime
 npx skills update
 ```
 
-### Option 2: Claude Code Plugin System
-
-#### Pre-release / Manual Installation
-
-Until this marketplace is published, install manually by cloning to the Claude Code plugins directory:
-
-```bash
-# Clone to the marketplaces directory (directory name must be "rudder-agent-skills")
-git clone https://github.com/rudderlabs/rudder-agent-skills.git \
-  ~/.claude/plugins/marketplaces/rudder-agent-skills
-
-# Then in Claude Code, install the plugins:
-/plugin install rudder-core@rudder-agent-skills
-/plugin install rudder-cli@rudder-agent-skills
-```
-
-To update, pull the latest changes:
-
-```bash
-cd ~/.claude/plugins/marketplaces/rudder-agent-skills && git pull
-```
-
-#### After Release
-
-Once published to GitHub under `rudderlabs/rudder-agent-skills`:
+### Claude Code — plugin marketplace
 
 ```bash
 /plugin marketplace add rudderlabs/rudder-agent-skills
-/plugin install rudder-core@rudder-agent-skills
-/plugin install rudder-cli@rudder-agent-skills
+/plugin install rudder-core@rudder-agent-skills      # then add whichever tool plugins you use
 ```
 
-Or non-interactively:
+Non-interactive equivalent: `claude plugin marketplace add rudderlabs/rudder-agent-skills` then `claude plugin install <plugin>@rudder-agent-skills`. Update with `/plugin marketplace update rudder-agent-skills`.
+
+### Cursor
+
+Add it straight from the [cursor.directory listing](https://cursor.directory/plugins/rudder-agent-skills) with **Add to Cursor**, or use the Skills CLI:
 
 ```bash
-claude plugin marketplace add rudderlabs/rudder-agent-skills
-claude plugin install rudder-core@rudder-agent-skills
-claude plugin install rudder-cli@rudder-agent-skills
+npx skills add rudderlabs/rudder-agent-skills -a cursor
 ```
 
-Update to the latest release with `/plugin marketplace update rudder-agent-skills`.
+> Manual symlink, git submodule, agent-specific paths, and troubleshooting live in [`docs/installation.md`](docs/installation.md).
 
 ## Available skills
 
@@ -137,50 +117,38 @@ Update to the latest release with `/plugin marketplace update rudder-agent-skill
 
 ## How skills work together
 
-```
-                       ┌───────────────────────────────┐
-                       │ instrumentation-planning      │
-                       │ (design the taxonomy)         │
-                       └──────────────┬────────────────┘
-                                      │
-               ┌──────────────────────┼──────────────────────┐
-               │                      │                      │
-               ▼                      ▼                      ▼
-        ┌─────────────┐        ┌──────────────┐        ┌─────────────┐
-        │data-catalog │        │  import-and  │        │  tracking   │
-        │(build vocab)│        │    evolve    │        │   plans     │
-        └──────┬──────┘        └──────┬───────┘        └──────┬──────┘
-               └──────────────────────┼───────────────────────┘
-                                      ▼
-                          ┌───────────────────────┐
-                          │   cli-workflow        │
-                          │  (validate / apply)   │
-                          └───────────┬───────────┘
-                                      │
-             ┌────────────────────────┼────────────────────────┐
-             ▼                        ▼                        ▼
-     ┌───────────────┐      ┌────────────────┐       ┌──────────────────┐
-     │ typer-workflow│      │ transformations│       │    debugging     │
-     │(generate code)│      │ (data transform│       │  (fix issues)    │
-     └───────────────┘      └────────────────┘       └──────────────────┘
+```mermaid
+flowchart TD
+    plan["rudder-instrumentation-planning<br/>design the taxonomy"]
+    plan --> catalog["rudder-data-catalog<br/>build the vocabulary"]
+    plan --> evolve["rudder-import-and-evolve<br/>adopt existing resources"]
+    plan --> plans["rudder-tracking-plans<br/>group events per source"]
+    catalog --> cli["rudder-cli-workflow<br/>validate &rarr; dry-run &rarr; apply"]
+    evolve --> cli
+    plans --> cli
+    cli --> typer["rudder-typer-workflow<br/>generate typed SDKs"]
+    cli --> transform["rudder-transformations<br/>transform events"]
+    cli --> debug["rudder-instrumentation-debugging<br/>fix validation issues"]
 ```
 
 ## Directory structure
 
 ```
 rudder-agent-skills/
-├── README.md                    # this file
-├── CONTRIBUTING.md              # authoring + PR guidelines
+├── README.md                  # this file
+├── CONTRIBUTING.md            # authoring + PR guidelines
 ├── LICENSE
 ├── .claude-plugin/
-│   └── marketplace.json
+│   └── marketplace.json       # the marketplace catalog
 ├── docs/
-│   └── installation.md          # full install guide
-├── examples/                    # end-to-end worked examples
+│   └── installation.md        # full install guide
+├── examples/                  # end-to-end worked examples
 └── plugins/
-    └── <plugin>/                     # rudder-core, rudder-cli, rudder-mcp, rudder-terraform, rudder-profiles
+    └── <plugin>/              # rudder-core, rudder-cli, rudder-mcp, rudder-terraform, rudder-profiles
         ├── .claude-plugin/plugin.json
-        └── skills/<skill>/SKILL.md
+        └── skills/
+            └── <skill>/
+                └── SKILL.md
 ```
 
 ## Prerequisites
