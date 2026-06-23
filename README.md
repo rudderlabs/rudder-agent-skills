@@ -117,50 +117,35 @@ Once it's listed on [cursor.directory](https://cursor.directory/plugins/rudder-a
 
 ## How skills work together
 
-```
-                       ┌───────────────────────────────┐
-                       │ instrumentation-planning      │
-                       │ (design the taxonomy)         │
-                       └──────────────┬────────────────┘
-                                      │
-               ┌──────────────────────┼──────────────────────┐
-               │                      │                      │
-               ▼                      ▼                      ▼
-        ┌─────────────┐        ┌──────────────┐        ┌─────────────┐
-        │data-catalog │        │  import-and  │        │  tracking   │
-        │(build vocab)│        │    evolve    │        │   plans     │
-        └──────┬──────┘        └──────┬───────┘        └──────┬──────┘
-               └──────────────────────┼───────────────────────┘
-                                      ▼
-                          ┌───────────────────────┐
-                          │   cli-workflow        │
-                          │  (validate / apply)   │
-                          └───────────┬───────────┘
-                                      │
-             ┌────────────────────────┼────────────────────────┐
-             ▼                        ▼                        ▼
-     ┌───────────────┐      ┌────────────────┐       ┌──────────────────┐
-     │ typer-workflow│      │ transformations│       │    debugging     │
-     │(generate code)│      │ (data transform│       │  (fix issues)    │
-     └───────────────┘      └────────────────┘       └──────────────────┘
+```mermaid
+flowchart TD
+    plan["rudder-instrumentation-planning<br/>design the taxonomy"]
+    plan --> catalog["rudder-data-catalog<br/>build the vocabulary"]
+    plan --> evolve["rudder-import-and-evolve<br/>adopt existing resources"]
+    plan --> plans["rudder-tracking-plans<br/>group events per source"]
+    catalog --> cli["rudder-cli-workflow<br/>validate &rarr; dry-run &rarr; apply"]
+    evolve --> cli
+    plans --> cli
+    cli --> typer["rudder-typer-workflow<br/>generate typed SDKs"]
+    cli --> transform["rudder-transformations<br/>transform events"]
+    cli --> debug["rudder-instrumentation-debugging<br/>fix validation issues"]
 ```
 
 ## Directory structure
 
-```
-rudder-agent-skills/
-├── README.md                    # this file
-├── CONTRIBUTING.md              # authoring + PR guidelines
-├── LICENSE
-├── .claude-plugin/
-│   └── marketplace.json
-├── docs/
-│   └── installation.md          # full install guide
-├── examples/                    # end-to-end worked examples
-└── plugins/
-    └── <plugin>/                     # rudder-core, rudder-cli, rudder-mcp, rudder-terraform, rudder-profiles
-        ├── .claude-plugin/plugin.json
-        └── skills/<skill>/SKILL.md
+```mermaid
+graph TD
+    root["rudder-agent-skills/"]
+    root --> readme["README.md"]
+    root --> contributing["CONTRIBUTING.md"]
+    root --> license["LICENSE"]
+    root --> marketplace[".claude-plugin/marketplace.json"]
+    root --> docs["docs/installation.md"]
+    root --> examples["examples/"]
+    root --> plugins["plugins/"]
+    plugins --> plugin["one dir per plugin<br/>rudder-core &middot; rudder-cli &middot; rudder-mcp<br/>rudder-terraform &middot; rudder-profiles"]
+    plugin --> manifest[".claude-plugin/plugin.json"]
+    plugin --> skills["skills/&lt;skill&gt;/SKILL.md"]
 ```
 
 ## Prerequisites
