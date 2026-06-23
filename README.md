@@ -5,7 +5,7 @@
 [![skills.sh](https://skills.sh/b/rudderlabs/rudder-agent-skills)](https://skills.sh/rudderlabs/rudder-agent-skills)
 [![Agent Skills](https://img.shields.io/badge/Agent_Skills-open_format-5436DA)](https://agentskills.io)
 [![Claude Code](https://img.shields.io/badge/Claude_Code-plugin_marketplace-D97757)](https://code.claude.com/docs/en/plugins)
-[![Cursor](https://img.shields.io/badge/Cursor-compatible-000000)](https://cursor.com/docs/context/skills)
+[![Cursor](https://img.shields.io/badge/Cursor-directory-000000)](https://cursor.directory/plugins/rudder-agent-skills)
 [![MCP](https://img.shields.io/badge/MCP-server_included-1F6FEB)](https://mcp.rudderstack.com/docs)
 [![works with 40+ agents](https://img.shields.io/badge/works_with-40%2B_agents-2EA44F)](https://github.com/vercel-labs/skills#supported-agents)
 [![License: MIT](https://img.shields.io/github/license/rudderlabs/rudder-agent-skills)](LICENSE)
