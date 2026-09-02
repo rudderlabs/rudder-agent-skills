@@ -1,562 +1,224 @@
 ---
 name: rudder-typer-workflow
-description: Generates type-safe SDKs (Swift/Kotlin) from tracking plans with compile-time validation. Use when generating type-safe event tracking code from tracking plans using RudderTyper
+description: Generates a type-safe analytics client (TypeScript, Kotlin, Swift) from a RudderStack tracking plan with `rudder-cli typer generate`, including the offline `--local` flow that reads specs off a checkout with no workspace, apply or auth. Use when generating typed event tracking code, wiring a generated client into an app, or setting up the catalog-to-code loop.
 allowed-tools: "Bash(rudder-cli *), Read, Write, Edit"
 ---
 
-# RudderTyper Workflow
+# RudderTyper workflow
 
-This skill teaches how to use **RudderTyper** to generate type-safe SDKs from your tracking plan, enabling compile-time validation of analytics calls.
+Generate a type-safe analytics client from a tracking plan, so event names and
+payload shapes are enforced by the compiler instead of by review.
 
-## What is RudderTyper?
+**A complete, runnable example lives at `examples/instrumentation-e2e/`** in this
+repo — a storefront app with a catalog, a sync script, a drift check and tests.
+Read it when you need working code rather than instructions.
 
-RudderTyper generates native code from your tracking plan so developers:
-- Get **compile-time validation** of event names and properties
-- Have **autocomplete** for events and properties in their IDE
-- Catch **instrumentation errors before runtime**
-- See **documentation** from your tracking plan inline
+## Two ways to generate
 
-```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│  Tracking Plan  │────▶│   RudderTyper   │────▶│  Generated SDK  │
-│     (YAML)      │     │   (Generator)   │     │ (Swift/Kotlin)  │
-└─────────────────┘     └─────────────────┘     └─────────────────┘
-                                                        │
-                                                        ▼
-                                               ┌─────────────────┐
-                                               │   Mobile App    │
-                                               │  (Type-safe!)   │
-                                               └─────────────────┘
-```
+| | Reads from | Needs auth/network | Use for |
+| --- | --- | --- | --- |
+| `--local` | tracking plan YAML on disk | no | the design loop, CI, monorepos with the catalog in-repo or a sibling checkout |
+| default | the tracking plan in your workspace | yes | generating against a plan you did not author, or one that only exists remotely |
 
-## Supported Platforms
+`--local` is what makes the loop short. Generation publishes nothing, so reshaping an
+event and regenerating costs a second and mutates no shared state. The remote flow
+needs a workspace, a plan ID, an `apply` and an authenticated round-trip before you
+can see a single type.
 
-| Platform | Language | Status | Use Case |
-|----------|----------|--------|----------|
-| iOS | Swift | Available | iOS, macOS, tvOS, watchOS apps |
-| Android | Kotlin | Available | Android apps, JVM applications |
-| Web | TypeScript | Manual | Web apps, Node.js (see [TypeScript Type Alignment](#typescript-type-alignment-manual)) |
+**Do not put `rudder-cli apply` in the iteration loop.** Applying is how a catalog
+change reaches a workspace, which is a merge-time concern. It is not a prerequisite
+for generating code.
 
-## Quick Start
+## Enabling `--local`
 
-### Step 1: Initialize RudderTyper
+Experimental, behind **two** gates. Both must be on; each can be an environment
+variable or a persisted setting in `~/.rudder/config.json`:
 
-```bash
-rudder-cli typer init
-```
+| Gate | Environment variable | `~/.rudder/config.json` |
+| --- | --- | --- |
+| Umbrella experimental switch | `RUDDERSTACK_CLI_EXPERIMENTAL=true` | `"experimental": true` |
+| The `localTyper` flag | `RUDDERSTACK_X_LOCAL_TYPER=true` | `"flags": { "localTyper": true }` |
 
-Creates `ruddertyper.yml`:
+The umbrella gate zeroes *every* experimental flag when off, so setting only
+`RUDDERSTACK_X_LOCAL_TYPER` on a fresh install does nothing. If the user already has
+`"experimental": true` persisted, the env var alone works — which is why the same
+command can succeed on one machine and fail on another. When it fails, check both.
 
-```yaml
-version: "1.0.0"
-trackingPlan:
-  id: "tp_abc123"              # Your tracking plan ID
-  workspace: "ws_xyz789"       # Your workspace ID
-language: kotlin               # or "swift"
-output:
-  path: ./generated            # Where to generate code
-```
+Requires **rudder-cli >= 0.22.0**. Check with `rudder-cli --version` before anything
+else; older versions generate a client with a different constructor (see
+[The event-drop footgun](#the-event-drop-footgun)).
 
-### Step 2: Generate Code
+## Commands
+
+There are exactly two subcommands.
 
 ```bash
-rudder-cli typer generate
+rudder-cli typer generate --platform <typescript|kotlin|swift> [flags]
+rudder-cli typer options  --platform <typescript|kotlin|swift>
 ```
 
-### Step 3: Integrate
+There is **no `typer init`**, no `ruddertyper.yml`, no `--config` and no `--verbose`.
+If you are reaching for a config file, you are thinking of the retired npm
+`rudder-typer` v1. Everything is flags.
 
-Add the generated directory to your project and import the Analytics class.
-
-## Real-World Example: E-Commerce App
-
-### Your Tracking Plan
-
-```yaml
-# tracking-plan.yaml
-version: "rudder/v1"
-kind: "tracking-plan"
-metadata:
-  name: "tracking-plans"
-spec:
-  name: "Mobile App Tracking Plan"
-  events:
-    - event: "urn:rudder:event/product-viewed"
-    - event: "urn:rudder:event/product-added-to-cart"
-    - event: "urn:rudder:event/order-completed"
-```
-
-### Generated Kotlin Code
-
-RudderTyper generates:
-
-```kotlin
-// generated/Analytics.kt
-
-/**
- * User viewed a product detail page
- */
-fun productViewed(
-    product: ProductType,
-    pageUrl: String? = null,
-    referrerUrl: String? = null
-) {
-    track("Product Viewed", mapOf(
-        "product" to product.toMap(),
-        "page_url" to pageUrl,
-        "referrer_url" to referrerUrl
-    ))
-}
-
-/**
- * User added a product to their cart
- */
-fun productAddedToCart(
-    product: ProductType,
-    quantity: Int,
-    cartTotal: Double? = null,
-    productCount: Int? = null
-) {
-    track("Product Added to Cart", mapOf(
-        "product" to product.toMap(),
-        "quantity" to quantity,
-        "cart_total" to cartTotal,
-        "product_count" to productCount
-    ))
-}
-
-/**
- * Customer completed a purchase
- */
-fun orderCompleted(
-    orderId: String,
-    orderTotal: Double,
-    customerEmail: String,
-    products: List<ProductType>,
-    shippingAddress: AddressType,
-    billingAddress: AddressType
-) {
-    track("Order Completed", mapOf(
-        "order_id" to orderId,
-        "order_total" to orderTotal,
-        "customer_email" to customerEmail,
-        "products" to products.map { it.toMap() },
-        "shipping_address" to shippingAddress.toMap(),
-        "billing_address" to billingAddress.toMap()
-    ))
-}
-
-// Custom type classes
-data class ProductType(
-    val productId: String,
-    val productSku: String,
-    val productName: String,
-    val productCategory: ProductCategory,
-    val productPrice: Double,
-    val productMsrp: Double? = null
-)
-
-enum class ProductCategory {
-    FOOTWEAR,
-    CLOTHING,
-    ACCESSORIES
-}
-
-data class AddressType(
-    val address: String,
-    val city: String,
-    val state: String,
-    val zipcode: String
-)
-```
-
-### Using Generated Code
-
-**Before RudderTyper** (error-prone):
-
-```kotlin
-// Typos won't be caught until runtime
-analytics.track("Product Viewd", mapOf(   // Typo in event name!
-    "product_id" to "shoes-001",
-    "proudct_name" to "Running Shoes",    // Typo in property!
-    "price" to "89.99"                    // Wrong type (string vs number)!
-))
-```
-
-**After RudderTyper** (type-safe):
-
-```kotlin
-// IDE autocomplete, compile-time validation
-analytics.productViewed(
-    product = ProductType(
-        productId = "shoes-001",
-        productSku = "RUN-001",
-        productName = "Running Shoes",
-        productCategory = ProductCategory.FOOTWEAR,
-        productPrice = 89.99
-    )
-)
-```
-
-Compile errors catch:
-- ✓ Wrong event name (method doesn't exist)
-- ✓ Wrong property name (parameter doesn't exist)
-- ✓ Wrong type (compiler type mismatch)
-- ✓ Missing required property (non-optional parameter)
-
-### Swift Example
-
-```swift
-// generated/Analytics.swift
-
-/// User viewed a product detail page
-func productViewed(
-    product: ProductType,
-    pageUrl: String? = nil,
-    referrerUrl: String? = nil
-) {
-    track("Product Viewed", properties: [
-        "product": product.toDictionary(),
-        "page_url": pageUrl,
-        "referrer_url": referrerUrl
-    ])
-}
-
-struct ProductType {
-    let productId: String
-    let productSku: String
-    let productName: String
-    let productCategory: ProductCategory
-    let productPrice: Double
-    let productMsrp: Double?
-}
-
-enum ProductCategory: String {
-    case footwear = "Footwear"
-    case clothing = "Clothing"
-    case accessories = "Accessories"
-}
-```
-
-## Configuration Options
-
-### ruddertyper.yml
-
-```yaml
-version: "1.0.0"
-
-trackingPlan:
-  id: "tp_abc123"
-  workspace: "ws_xyz789"
-
-language: kotlin                    # "kotlin" or "swift"
-
-output:
-  path: ./app/src/main/java/analytics   # Output directory
-
-# Optional: customize naming
-naming:
-  eventPrefix: ""                   # Prefix for event methods
-  eventSuffix: ""                   # Suffix for event methods
-
-# Optional: include/exclude events
-events:
-  include:
-    - "Product Viewed"
-    - "Product Added to Cart"
-  # OR
-  exclude:
-    - "Internal Debug Event"
-```
-
-## Iteration Workflow
-
-When your tracking plan changes:
-
-```
-┌──────────────────┐
-│ 1. Update YAML   │ ← Add/modify events, properties, custom types
-└────────┬─────────┘
-         ▼
-┌──────────────────┐
-│ 2. Validate      │ ← rudder-cli validate -l ./
-└────────┬─────────┘
-         ▼
-┌──────────────────┐
-│ 3. Apply         │ ← rudder-cli apply -l ./
-└────────┬─────────┘
-         ▼
-┌──────────────────┐
-│ 4. Regenerate    │ ← rudder-cli typer generate
-└────────┬─────────┘
-         ▼
-┌──────────────────┐
-│ 5. Fix Compile   │ ← Update app code to match new schema
-│    Errors        │
-└────────┬─────────┘
-         ▼
-┌──────────────────┐
-│ 6. Commit Both   │ ← Spec changes + generated code together
-└──────────────────┘
-```
-
-### Commands
+| Flag | Notes |
+| --- | --- |
+| `--platform` | **required** — `typescript`, `kotlin` or `swift` |
+| `--local` | read specs from disk instead of the workspace |
+| `-l`, `--location` | project directory or spec file for `--local` (default `.`) |
+| `--tracking-plan-id` | the workspace plan ID; with `--local`, the plan's `spec.id`. Optional when the project has exactly one plan — with more, the CLI lists the available IDs |
+| `-o`, `--output` | output directory (default `.`) |
+| `--option k=v` | platform option, repeatable — run `typer options` for the list |
 
 ```bash
-# 1. Validate tracking plan
-rudder-cli validate -l ./
-
-# 2. Apply changes to workspace
-rudder-cli apply -l ./
-
-# 3. Regenerate code
-rudder-cli typer generate
-
-# 4. Build app to check for errors
-./gradlew build          # Android
-xcodebuild               # iOS
+# offline, from a catalog checked out beside the app
+RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_LOCAL_TYPER=true \
+  rudder-cli typer generate \
+    --local --location ../rudder-data-gov \
+    --tracking-plan-id webapp \
+    --platform typescript \
+    --output src/analytics/generated \
+    --option outputFileName=index.ts
 ```
 
-## CI/CD Integration
+Platform options are few and real: `outputFileName` on all three, plus `packageName`
+and `composeImmutable` on Kotlin. See `references/platforms.md` for output shapes and
+SDK wiring per platform.
 
-See `references/ci-cd-integration.md` for GitHub Actions workflows, pre-commit hooks, multi-platform project patterns, and monorepo configurations.
+## The loop
+
+```
+edit the catalog  ──▶  regenerate  ──▶  typecheck / build  ──▶  fix call sites
+      ▲                                                              │
+      └──────────  types awkward? the catalog is wrong  ◀────────────┘
+```
+
+1. **Edit the catalog** — event, properties, and the tracking-plan rule binding them.
+2. **Regenerate** — `typer generate --local`. Nothing is published.
+3. **Compile.** The generated types are now the contract; the compiler lists every
+   call site that no longer complies.
+4. **If the types fight you, fix the YAML.** Go back to 1.
+
+Only when the call sites need no adapters do you open PRs.
+
+### Never cast to satisfy a generated type
+
+An `as` cast, a `?? ''`, or a sentinel like `'none'` to make a payload fit is not a
+workaround — it is a finding about the catalog being suppressed.
+
+In the rudder-webapp dogfooding this exact failure mode was a real bug: two `identify`
+traits were `required: true` in the plan but absent on ~40% of production calls,
+because the app fired `identify` before its billing store had hydrated. The previous
+generator leaked `| undefined` into required fields, so it compiled and shipped that
+way for years. The fix was to correct the contract, not the call site.
+
+If a property is genuinely not always available, mark it `required: false` and let it
+be optional in the generated type.
+
+## Reading the generated client
+
+Track events are **`track`-prefixed** — `trackCheckoutStarted`, not `checkoutStarted`.
+`identify`, `group`, `page` and `screen` keep their plain names. The prefix is what
+keeps an event named `page` from colliding with the SDK's own `page` method, and it is
+consistent across all three platforms.
+
+Custom types become named unions/enums shared across events; a property's `enum`
+becomes a union scoped to that property. Optional plan properties become optional
+fields. The client also stamps a `ruddertyper` context block (platform, CLI version,
+plan ID and version) onto every call, which is how you tell typed traffic apart
+downstream.
+
+## The event-drop footgun
+
+The TypeScript constructor takes a **resolver, not an instance**:
+
+```ts
+export const analytics = new RudderTyper(() => window.rudderanalytics);
+```
+
+The standard RudderStack snippet installs a buffering preloader on
+`window.rudderanalytics` and swaps in the real SDK when the async script lands. A
+client that captured the instance at import time — before the swap — holds the
+preloader forever, and every event fired after the SDK loads goes into an abandoned
+queue. No error, no type error, no failed build. Events simply stop arriving.
+
+Since 0.22.0 the constructor is resolver-only, so the unsafe form does not compile.
+Construct the client **exactly once**, in one module, and export that instance.
+
+Two related gaps to know about:
+
+- The generated code calls `analytics.track(...)` unguarded, so an *absent* SDK (no
+  write key configured) throws rather than no-opping. Absorb it in your construction
+  point with a stub — `examples/instrumentation-e2e/app/src/analytics/client.ts` shows
+  one. Tracked upstream as DEX-554.
+- Wrap `track` calls in `try {} catch {}` when they sit inside a `try` whose `catch`
+  shows the user an error, or a blocked SDK will make a successful action report as a
+  failure. Analytics must never change behaviour.
+
+## Provenance: the client is a build artifact of someone else's repo
+
+Types come from specs on disk, so a stale or wrong-branch catalog checkout silently
+produces a **different, valid-looking** client that compiles and passes tests. Nothing
+in the type system notices, and the default catalog path is usually a directory that
+exists and is usually on some other branch.
+
+Write a `SOURCE.md` beside the generated client recording the catalog commit, branch
+and whether the tree was dirty, and regenerate it on every sync. Check it before
+committing, and when reviewing either side of the pair — it is the only thing tying
+the two repos together.
+
+Wrap the raw command in a small sync script rather than asking people to remember the
+flags. Copy `examples/instrumentation-e2e/app/scripts/tp-sync.sh`, which also pins the
+minimum CLI version, sets `TMPDIR` beside the repo (the CLI renames a temp file onto
+the target, which fails across volumes on older CLIs), and offers a `--check` mode.
+
+### Merge order, when the catalog is a separate repo
+
+Catalog PR **first**, consumer PR second. The committed client has to be reproducible
+by regenerating off the catalog's default branch; merging the consumer first makes a
+regen off main produce a different client, so the committed one drifts and its
+`SOURCE.md` becomes false. Keep the catalog PR rebased on main while it is open, or a
+regen off a stale branch silently drops whatever else landed.
+
+### Enforce it in CI
+
+The above is a convention, and conventions hold as long as everyone remembers them.
+`examples/instrumentation-e2e/ci/typed-client-drift.yml` regenerates against the
+catalog's default branch and fails if the committed client differs — which enforces
+the merge order mechanically, because a consumer PR ahead of its catalog change cannot
+pass. Pin the CLI version in that job: the generated header embeds it, so an unpinned
+CLI turns every release into a spurious diff.
+
+## Mixed-kind projects
+
+`typer generate --local` registers only the data catalog provider and **skips kinds no
+registered provider owns**, so `data-graphs/` and `transformations/` specs can sit
+beside the catalog without breaking the load. This matters because a tracking plan
+needs its catalog loaded alongside it, and the two usually only coexist at the repo
+root — which is exactly where the other kinds live. `rudder-cli apply` is unaffected
+and still validates every kind.
 
 ## Troubleshooting
 
-### Generated Code Not Updating
+| Symptom | Cause |
+| --- | --- |
+| `--local is experimental; enable it by setting both …` | one or both gates are off — see [Enabling `--local`](#enabling---local) |
+| `unsupported platform: …` | `--platform` is required and must be `typescript`, `kotlin` or `swift` |
+| `multiple tracking plans found, specify --tracking-plan-id` | pass the plan's `spec.id`; the error lists the available ones |
+| `'kind' must be one of [...]` | the project holds a kind generation does not own, on a CLI older than 0.21.0 — upgrade |
+| `cross-device link` on generate | repo on a different volume than `/tmp` on a CLI older than 0.22.0 — set `TMPDIR` beside the repo |
+| `error TS2345: … not assignable to parameter of type '() => RudderAnalytics'` | you passed an SDK instance; pass a resolver |
+| Events stop arriving after the SDK loads, no errors | an instance was captured at construction — the resolver is the fix |
+| Generated client changes with no catalog change | a different CLI version; the header embeds it. Pin the CLI |
+| Regenerating drops events you did not touch | you generated from a stale catalog branch. Check `SOURCE.md` |
 
-```bash
-# Ensure tracking plan is applied first
-rudder-cli apply -l ./
+## Red flags — stop
 
-# Then regenerate
-rudder-cli typer generate
-```
-
-### Type Mismatch Errors
-
-Check property types in YAML match expected usage:
-
-```yaml
-# Wrong: price as string
-spec:
-  name: "product_price"
-  type: "string"
-
-# Right: price as number
-spec:
-  name: "product_price"
-  type: "number"
-```
-
-### Missing Required Properties
-
-Generated methods require all `required: true` properties as non-optional parameters:
-
-```kotlin
-// This won't compile if productId is required
-analytics.productViewed(
-    product = ProductType(
-        // productId missing - compile error!
-        productName = "Test"
-    )
-)
-```
-
-### Custom Types Not Generating
-
-Ensure custom types are:
-1. Defined in YAML with correct schema
-2. Referenced in event rules
-3. Applied to workspace before generating
-
-```bash
-rudder-cli validate -l ./
-rudder-cli apply -l ./
-rudder-cli typer generate
-```
-
-## Command Reference
-
-```bash
-# Initialize RudderTyper configuration
-rudder-cli typer init
-
-# Generate code from tracking plan
-rudder-cli typer generate
-
-# Generate with specific config file
-rudder-cli typer generate --config path/to/ruddertyper.yml
-
-# Generate with verbose output
-rudder-cli typer generate --verbose
-```
-
----
-
-## TypeScript Type Alignment (Manual)
-
-Until automated TypeScript generation is available, manually align types with your tracking plan.
-
-### Deriving Types from Tracking Plan
-
-Given this property definition:
-
-```yaml
-# properties/product-properties.yaml
-version: "rudder/v1"
-kind: "property"
-metadata:
-  name: "properties"
-spec:
-  name: "product_category"
-  type: "string"
-  config:
-    enum:
-      - "footwear"
-      - "clothing"
-      - "accessories"
-```
-
-Create matching TypeScript:
-
-```typescript
-// src/analytics/types.ts
-
-export type ProductCategory = "footwear" | "clothing" | "accessories";
-
-export interface ProductType {
-  product_id: string;
-  product_sku: string;
-  product_name: string;
-  product_price: number;
-  product_category: ProductCategory;
-}
-
-export interface ProductViewedEvent {
-  product: ProductType;
-  page_url?: string;
-  referrer_url?: string;
-}
-
-export interface OrderCompletedEvent {
-  order_id: string;
-  order_total: number;
-  currency: string;
-  products: ProductType[];
-}
-```
-
-### Using in Instrumentation
-
-```typescript
-import { ProductType, ProductCategory, ProductViewedEvent } from './analytics/types';
-import analytics from './analytics/client';
-
-function trackProductViewed(product: ProductType, pageUrl?: string) {
-  const event: ProductViewedEvent = {
-    product,
-    page_url: pageUrl,
-  };
-
-  analytics.track('Product Viewed', event);
-}
-
-// Usage - compiler validates everything
-trackProductViewed({
-  product_id: "shoes-001",
-  product_sku: "RUN-001",
-  product_name: "Running Shoes",
-  product_price: 89.99,
-  product_category: "footwear",  // TypeScript ensures valid category
-});
-```
-
-### Compile-Time Validation
-
-TypeScript compiler catches:
-
-| Error Type | Example | Compiler Message |
-|------------|---------|------------------|
-| Wrong enum value | `product_category: "shoes"` | Type '"shoes"' is not assignable |
-| Missing required property | `{ product_name: "Test" }` | Property 'product_id' is missing |
-| Type mismatch | `product_price: "89.99"` | Type 'string' is not assignable to 'number' |
-| Typo in property name | `produt_id: "123"` | Object literal may only specify known properties |
-
-### Type Alignment Workflow
-
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│                   TYPESCRIPT TYPE ALIGNMENT                          │
-└──────────────────────────────────────────────────────────────────────┘
-         │
-         ▼
-┌─────────────────┐
-│ 1. Define YAML  │ ← Properties with enums, types, constraints
-└────────┬────────┘
-         ▼
-┌─────────────────┐
-│ 2. Create TS    │ ← Mirror YAML definitions in TypeScript
-│    Types        │
-└────────┬────────┘
-         ▼
-┌─────────────────┐
-│ 3. Build App    │ ← Compiler validates alignment
-└────────┬────────┘
-         ▼
-┌─────────────────┐
-│ 4. Fix Errors   │ ← Compiler tells you what's wrong
-└────────┬────────┘
-         ▼
-┌─────────────────┐
-│ 5. Commit Both  │ ← YAML + TypeScript stay in sync
-└─────────────────┘
-```
-
-### Keeping Types in Sync
-
-When the tracking plan changes:
-
-1. Update YAML definitions
-2. Update TypeScript types to match
-3. Build app - compiler errors show what needs updating
-4. Fix instrumentation code
-5. Commit YAML + TypeScript + instrumentation together
-
-> "TypeScript for LLMs is the greatest teacher. It puts it in guardrails."
-
----
-
-## TypeSpec for Multi-Platform (Future)
-
-Microsoft's TypeSpec can define constraints once, generate for multiple languages:
-
-```typescript
-// tracking-plan.tsp
-model ProductType {
-  product_id: string;
-  product_sku: string;
-  product_name: string;
-  product_price: float64;
-  product_category: ProductCategory;
-}
-
-enum ProductCategory {
-  footwear,
-  clothing,
-  accessories,
-}
-
-model ProductViewedEvent {
-  product: ProductType;
-  page_url?: string;
-  referrer_url?: string;
-}
-```
-
-Generate to:
-- TypeScript interfaces
-- Swift structs
-- Kotlin data classes
-- JSON Schema for validation
-
-**Note:** This is a future integration opportunity that would unify type generation across all platforms.
+- Writing a `ruddertyper.yml`, or running `rudder-cli typer init` → neither exists
+- Hand-writing TypeScript types to mirror a tracking plan → TypeScript is generated
+- `rudder-cli apply` inside the design loop → applying is a merge-time concern
+- An `as` cast or `?? ''` to satisfy a generated type → fix the catalog
+- Editing the generated file → it is overwritten on the next sync
+- Constructing the client in more than one place, or with an instance
+- Committing a client whose `SOURCE.md` does not match the paired catalog change
+- A consumer PR with a new event and no catalog PR linked → incomplete, not "phase two"

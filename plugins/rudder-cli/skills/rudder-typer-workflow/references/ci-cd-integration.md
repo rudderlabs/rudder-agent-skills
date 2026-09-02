@@ -1,137 +1,152 @@
-# RudderTyper CI/CD Integration
+# CI/CD integration
 
-Automation patterns for keeping generated analytics code in sync.
+The generated client is a build artifact of the catalog's state. Committing it is
+right — consumers should not need the CLI to build — but a committed artifact drifts,
+and a drifted client is valid code that compiles, passes tests and emits the wrong
+shape. CI is the only thing that notices.
 
-## GitHub Actions
+A working version of everything here is `examples/instrumentation-e2e/` in this repo.
+
+## The one check worth having
+
+Regenerate against the catalog's **default branch** and fail if the committed client
+differs.
 
 ```yaml
-name: Validate Analytics
+name: Typed client drift
 
 on:
   pull_request:
     paths:
-      - 'tracking-plan/**'
-      - 'ruddertyper.yml'
+      - 'src/analytics/generated/**'
+      - 'scripts/tp-sync.sh'
+      - 'package.json'
 
 jobs:
-  validate:
+  drift:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
+      # The catalog's default branch — not the PR author's branch. The question is
+      # "is the committed client reproducible from catalog main?", which is what makes
+      # the merge order enforceable instead of advisory.
+      - uses: actions/checkout@v4
+        with:
+          repository: your-org/your-catalog-repo
+          path: .catalog
+          token: ${{ secrets.CATALOG_READ_TOKEN }}
+
+      # Pin the CLI: the generated header embeds the version that produced it, so an
+      # unpinned CLI turns every release into a spurious diff.
       - name: Install rudder-cli
-        # See https://www.rudderstack.com/docs/cli/ for installation options
-        uses: rudderstack/setup-rudder-cli@v1
-
-      - name: Validate tracking plan
-        run: rudder-cli validate -l ./tracking-plan
-
-      - name: Generate code
-        run: rudder-cli typer generate
-
-      - name: Check for changes
+        env:
+          RUDDER_CLI_VERSION: 0.23.0
         run: |
-          if [[ -n $(git status --porcelain generated/) ]]; then
-            echo "Generated code is out of date!"
-            echo "Run 'rudder-cli typer generate' and commit the changes."
-            exit 1
-          fi
+          curl -fsSL "https://github.com/rudderlabs/rudder-iac/releases/download/v${RUDDER_CLI_VERSION}/rudder-cli_Linux_x86_64.tar.gz" \
+            | tar -xz -C /usr/local/bin rudder-cli
+          rudder-cli --version
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+      - run: npm ci
+
+      - name: Committed client must match the catalog
+        env:
+          CATALOG_PATH: .catalog
+        run: npm run tp:check
 ```
 
-## Pre-commit Hook
+`tp:check` regenerates into a temp directory and diffs. The whole implementation:
 
 ```bash
-#!/bin/bash
-# .git/hooks/pre-commit
-
-# Regenerate and check for uncommitted changes
-rudder-cli typer generate
-
-if [[ -n $(git diff --name-only generated/) ]]; then
-    echo "Error: Generated analytics code is out of sync."
-    echo "Please run 'rudder-cli typer generate' and stage the changes."
-    exit 1
-fi
+tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_LOCAL_TYPER=true \
+  rudder-cli typer generate --local --location "$CATALOG_PATH" \
+    --tracking-plan-id "$TRACKING_PLAN_ID" --platform typescript \
+    --output "$tmp" --option outputFileName=index.ts
+diff -u src/analytics/generated/index.ts "$tmp/index.ts" \
+  || { echo "run 'npm run tp:sync' and commit the result" >&2; exit 1; }
 ```
 
-## Multi-Platform Projects
+See `examples/instrumentation-e2e/app/scripts/tp-sync.sh` for the version-gating and
+provenance-writing around it.
 
-For apps with both iOS and Android:
+### What it catches
 
-```yaml
-# ruddertyper-android.yml
-version: "1.0.0"
-trackingPlan:
-  id: "tp_abc123"
-  workspace: "ws_xyz789"
-language: kotlin
-output:
-  path: ./android/app/src/main/java/analytics
-```
+- a call-site PR merged without regenerating
+- a client generated from a wrong-branch or dirty catalog checkout
+- a catalog change merged without the consumer being regenerated
+- the merge order being violated — a consumer PR ahead of its catalog change cannot
+  pass, so the ordering stops depending on reviewer memory
 
-```yaml
-# ruddertyper-ios.yml
-version: "1.0.0"
-trackingPlan:
-  id: "tp_abc123"
-  workspace: "ws_xyz789"
-language: swift
-output:
-  path: ./ios/Analytics
-```
+### Three things that make it flaky if you skip them
 
-Generate both:
+1. **Pin the CLI version.** The `ruddertyper` context block in every generated file
+   carries `rudderCLIVersion`. Bump the pin in the same PR that commits a client
+   regenerated with the newer CLI.
+2. **Check out the catalog's default branch**, not a ref derived from the PR.
+3. **Set `TMPDIR` beside the repo** on CLIs older than 0.22.0, or the temp-file rename
+   fails across volumes. Fixed upstream in 0.22.0; harmless to keep.
+
+## Pre-commit hook
+
+Cheaper feedback than CI, and it uses the same script:
 
 ```bash
-rudder-cli typer generate --config ruddertyper-android.yml
-rudder-cli typer generate --config ruddertyper-ios.yml
+#!/usr/bin/env bash
+# .githooks/pre-commit
+git diff --cached --name-only | grep -q '^src/analytics/generated/' || exit 0
+npm run tp:check
 ```
 
-## Common Patterns
+Do not make this a *sync* hook that regenerates and stages. A hook that rewrites files
+mid-commit surprises people, and regenerating from whatever branch the catalog checkout
+happens to be on is exactly the failure the provenance record exists to catch.
 
-### Shared Analytics Module
+## Multi-platform projects
 
-```
-project/
-├── analytics/                    # Shared tracking plan
-│   ├── tracking-plan.yaml
-│   └── ruddertyper.yml
-├── android/
-│   └── app/src/main/java/
-│       └── generated/            # Kotlin output
-└── ios/
-    └── Generated/                # Swift output
-```
+One command per platform, one output directory each, all from the same catalog commit:
 
-### Monorepo with Multiple Apps
-
-```
-monorepo/
-├── packages/
-│   └── analytics-schema/         # Single source of truth
-│       ├── tracking-plan.yaml
-│       └── ruddertyper.yml
-├── apps/
-│   ├── mobile-android/
-│   │   └── generated/
-│   ├── mobile-ios/
-│   │   └── Generated/
-│   └── web/                      # TypeScript types (manual for now)
+```bash
+export RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_LOCAL_TYPER=true
+for p in typescript kotlin swift; do
+  rudder-cli typer generate --local --location "$CATALOG_PATH" \
+    --tracking-plan-id storefront --platform "$p" --output "clients/$p"
+done
 ```
 
-### Feature Flags for New Events
+Run the drift check for every platform in one job. A plan change that reaches the web
+client but not the Android one is the same drift problem wearing a different hat.
 
-When adding events that aren't ready for all clients:
+## Monorepo with the catalog in-repo
+
+Simplest case: `--location` is a relative path and there is no second checkout, no
+token, and no default-branch question.
+
+```
+repo/
+├── catalog/              # data-catalog/ + tracking-plans/
+└── apps/web/
+    └── src/analytics/generated/
+```
 
 ```yaml
-# events.yaml - add new event
-spec:
-  name: "Checkout Started"
-  description: "User started checkout process (beta)"
-
-# tracking-plan.yaml - only add to beta plan
-spec:
-  name: "Mobile App - Beta"
-  events:
-    - event: "urn:rudder:event/checkout-started"
+on:
+  pull_request:
+    paths: ['catalog/**', 'apps/web/src/analytics/generated/**']
 ```
+
+The check becomes "does the committed client match the catalog *in this PR*", which
+also removes the merge-order problem — both sides land in one commit.
+
+## Do not
+
+- Generate at build time instead of committing. It puts the CLI, the catalog checkout
+  and (for the remote flow) credentials on the critical path of every build, and hides
+  catalog changes from code review — the diff in the generated client is the most
+  reviewable artifact in the whole workflow.
+- Run `rudder-cli apply` from the drift job. Applying mutates a workspace; a PR check
+  must not. Applying belongs in a deploy job on the catalog repo, after merge.

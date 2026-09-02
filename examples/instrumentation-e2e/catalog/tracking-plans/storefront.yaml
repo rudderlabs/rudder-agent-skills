@@ -1,0 +1,65 @@
+version: rudder/v0.1
+kind: tp
+metadata:
+  name: storefront
+spec:
+  id: storefront
+  display_name: "Storefront Tracking Plan"
+  description: "Checkout funnel and account identity for the demo storefront."
+  rules:
+    - type: event_rule
+      id: identify_rule
+      event:
+        $ref: "#/events/account-events/identify"
+        allow_unplanned: true
+        identity_section: context.traits
+      properties:
+        - $ref: "#/properties/storefront-account/email"
+          required: true
+        - $ref: "#/properties/storefront-account/plan_tier"
+          required: true
+
+    - type: event_rule
+      id: checkout_started_rule
+      event:
+        $ref: "#/events/checkout-events/checkout_started"
+        allow_unplanned: false
+      properties:
+        - $ref: "#/properties/storefront-checkout/cart_id"
+          required: true
+        - $ref: "#/properties/storefront-checkout/item_count"
+          required: true
+        - $ref: "#/properties/storefront-checkout/cart_total"
+          required: true
+        - $ref: "#/properties/storefront-checkout/currency"
+          required: true
+        - $ref: "#/properties/storefront-checkout/coupon_code"
+          required: false
+
+    - type: event_rule
+      id: checkout_completed_rule
+      event:
+        $ref: "#/events/checkout-events/checkout_completed"
+        allow_unplanned: false
+      properties:
+        - $ref: "#/properties/storefront-checkout/cart_id"
+          required: true
+        - $ref: "#/properties/storefront-checkout/cart_total"
+          required: true
+        - $ref: "#/properties/storefront-checkout/currency"
+          required: true
+        - $ref: "#/properties/storefront-checkout/payment_method"
+          required: true
+        - $ref: "#/properties/storefront-checkout/coupon_code"
+          required: false
+
+    - type: event_rule
+      id: checkout_abandoned_rule
+      event:
+        $ref: "#/events/checkout-events/checkout_abandoned"
+        allow_unplanned: false
+      properties:
+        - $ref: "#/properties/storefront-checkout/cart_id"
+          required: true
+        - $ref: "#/properties/storefront-checkout/abandonment_reason"
+          required: true

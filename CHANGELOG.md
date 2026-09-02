@@ -9,6 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`rudder-typer-workflow`** — rewritten against the actual CLI. The skill
+  documented a `rudder-cli typer init` command, a `ruddertyper.yml` config file, and
+  `--config` / `--verbose` flags, none of which exist (they belong to the retired npm
+  `rudder-typer` v1); it listed TypeScript as "manual" and shipped a long section on
+  hand-writing types to mirror a tracking plan, when TypeScript has been a generated
+  platform; it omitted `--platform`, which is required, so every command in it would
+  have failed; and it put `rudder-cli apply` inside the iteration loop, mutating a
+  live workspace on every turn. Now covers the offline `--local` flow, its two-gate
+  experimental setup, the real flag and option sets, the resolver-only constructor,
+  and the provenance/drift discipline a committed client needs. Adds
+  `references/platforms.md` (per-platform output, verified against generator output)
+  and rewrites `references/ci-cd-integration.md`, which carried the same phantom
+  config-file flags.
+- **`rudder-instrumentation-planning`, `rudder-code-first-instrumentation`** — fixed
+  the same phantom commands where they had spread: `typer init`, bare
+  `typer generate` with no `--platform`, and the instruction to hand-write TypeScript
+  types "since RudderTyper only does Swift/Kotlin".
+
+### Removed
+
+- **`examples/typer-workflow/`** — removed. Every artifact in it was fictional: a
+  `ruddertyper.yml` nothing reads, a `typer init` step that does not exist, and
+  hand-written files labelled "example generated code" that do not resemble generator
+  output. Superseded by `examples/instrumentation-e2e/`.
+
+### Changed
+
 - **Breaking (repo layout):** renamed the top-level `skills/` directory back to
   `plugins/` (reverting the earlier `plugins/` → `skills/` rename). Each plugin
   lives at `plugins/<plugin>/skills/<skill>/SKILL.md`; marketplace `source` fields
@@ -26,6 +53,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   frontmatter, silently dropping both skills from skills.sh (21/23 → 23/23 now).
 
 ### Added
+
+- **`examples/instrumentation-e2e/`** — a runnable end-to-end example of the catalog
+  → typed client → call sites workflow: a storefront app whose analytics client is
+  generated from YAML on disk with `typer generate --local` (no workspace, apply or
+  auth), a `tp-sync.sh` with provenance recording and a `--check` mode, a CI
+  drift-check workflow, tests pinning the late-binding contract, and type-level
+  assertions that fail the typecheck if the generator stops enforcing the plan.
 
 - **CI / dev tooling** — both directory crawlers now run as gates against the
   working tree: cursor.directory's real `parse.ts` (vendored, pinned) via

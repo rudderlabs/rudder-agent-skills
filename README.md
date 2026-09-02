@@ -87,7 +87,7 @@ npx skills add rudderlabs/rudder-agent-skills -a cursor
 |---|---|
 | `rudder-cli-workflow` | Iterating on RudderStack resources with validate → dry-run → apply |
 | `rudder-import-and-evolve` | Importing existing RudderStack resources to CLI management |
-| `rudder-typer-workflow` | Generating type-safe SDKs (Swift/Kotlin) from tracking plans |
+| `rudder-typer-workflow` | Generating type-safe clients (TypeScript/Kotlin/Swift) from tracking plans, offline with `--local` |
 | `rudder-transformations` | Creating, editing, or managing transformations and libraries |
 | `rudder-cli-setup` | Installing and authenticating rudder-cli |
 
@@ -126,7 +126,7 @@ flowchart TD
     catalog --> cli["rudder-cli-workflow<br/>validate &rarr; dry-run &rarr; apply"]
     evolve --> cli
     plans --> cli
-    cli --> typer["rudder-typer-workflow<br/>generate typed SDKs"]
+    cli --> typer["rudder-typer-workflow<br/>generate typed clients"]
     cli --> transform["rudder-transformations<br/>transform events"]
     cli --> debug["rudder-instrumentation-debugging<br/>fix validation issues"]
 ```

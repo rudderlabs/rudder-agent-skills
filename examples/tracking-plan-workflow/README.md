@@ -216,7 +216,7 @@ ln -s ../../plugins/rudder-cli/skills/rudder-cli-workflow .claude/skills/
 After creating your data catalog and tracking plans:
 
 1. **Connect tracking plans to sources** in the RudderStack UI
-2. **Generate type-safe SDKs** with RudderTyper (see `typer-workflow` example)
+2. **Generate type-safe SDKs** with RudderTyper (see the `instrumentation-e2e` example)
 3. **Monitor violations** in the RudderStack dashboard
 
 ## Resources

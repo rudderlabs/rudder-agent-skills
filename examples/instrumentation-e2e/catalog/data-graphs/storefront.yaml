@@ -1,0 +1,24 @@
+# This file exists to prove a point, not to be applied.
+#
+# `typer generate --local` registers only the data catalog provider, because that
+# is all code generation reads. Before rudder-iac#671 the legal `kind:` list was
+# derived from the registered providers, so a data-graph or transformation spec
+# sitting next to the catalog failed spec-syntax validation and the whole load
+# aborted -- which made --local unusable in the very repo it was built for.
+#
+# Generation now skips kinds no registered provider owns. Delete this file and
+# the generated client is byte-identical.
+version: "rudder/v1"
+kind: "data-graph"
+metadata:
+  name: "storefront-data-graph"
+spec:
+  id: "storefront-data-graph"
+  account_id: "REPLACE_ME"
+  defaults:
+    schema: "STOREFRONT"
+  entities:
+    - id: "user"
+      name: "user"
+      primary_key: "user_id"
+      table: "USERS"

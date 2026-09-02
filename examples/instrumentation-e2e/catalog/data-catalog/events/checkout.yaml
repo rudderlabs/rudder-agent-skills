@@ -1,0 +1,23 @@
+version: rudder/v0.1
+kind: events
+metadata:
+  name: checkout-events
+spec:
+  events:
+    - id: checkout_started
+      name: checkoutStarted
+      event_type: track
+      description: "Shopper opened the checkout drawer with a non-empty cart"
+      category: "#/categories/event-categories/checkout"
+
+    - id: checkout_completed
+      name: checkoutCompleted
+      event_type: track
+      description: "Payment succeeded and the order was created"
+      category: "#/categories/event-categories/checkout"
+
+    - id: checkout_abandoned
+      name: checkoutAbandoned
+      event_type: track
+      description: "Shopper left checkout without completing payment"
+      category: "#/categories/event-categories/checkout"

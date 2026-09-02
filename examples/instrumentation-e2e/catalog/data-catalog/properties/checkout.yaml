@@ -1,0 +1,49 @@
+version: rudder/v0.1
+kind: properties
+metadata:
+  name: storefront-checkout
+spec:
+  properties:
+    - id: cart_id
+      name: cartId
+      type: string
+      description: "Identifier of the cart being checked out"
+      propConfig:
+        minLength: 1
+
+    - id: item_count
+      name: itemCount
+      type: integer
+      description: "Number of line items in the cart"
+
+    - id: cart_total
+      name: cartTotal
+      type: number
+      description: "Cart total in minor units of the currency"
+
+    - id: currency
+      name: currency
+      type: "#/custom-types/shared-types/currency_type"
+      description: "Currency the cart is priced in"
+
+    - id: payment_method
+      name: paymentMethod
+      type: string
+      description: "How the shopper chose to pay"
+      propConfig:
+        enum: ["card", "paypal", "apple_pay"]
+
+    # Deliberately optional: the storefront does not always know the coupon at
+    # checkout-start time. Modelling this as required would force a sentinel at
+    # the call site -- the exact mistake the dogfooding found in the webapp.
+    - id: coupon_code
+      name: couponCode
+      type: string
+      description: "Coupon applied to the cart, when the shopper entered one"
+
+    - id: abandonment_reason
+      name: abandonmentReason
+      type: string
+      description: "Why the shopper left checkout without completing"
+      propConfig:
+        enum: ["closed_tab", "payment_declined", "navigated_away"]

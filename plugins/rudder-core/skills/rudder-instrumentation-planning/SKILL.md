@@ -434,13 +434,21 @@ rudder-cli apply -l ./
 
 ### Generate Type-Safe Code
 
-```bash
-# Initialize RudderTyper
-rudder-cli typer init
+There is no `typer init` and no config file — code generation is all flags. Use
+`--local` to generate straight from the specs on disk, with no workspace, apply or
+auth involved:
 
-# Generate SDK
-rudder-cli typer generate
+```bash
+RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_LOCAL_TYPER=true \
+  rudder-cli typer generate \
+    --local --location ./ \
+    --platform typescript \
+    --output ./src/analytics/generated
 ```
+
+`--platform` is required (`typescript`, `kotlin` or `swift`). Requires rudder-cli
+>= 0.22.0. See the `rudder-typer-workflow` skill for the full flag set, the
+generated client's shape, and the provenance/CI discipline a committed client needs.
 
 ### Implement in Applications
 
