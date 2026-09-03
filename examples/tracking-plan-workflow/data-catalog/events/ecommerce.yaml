@@ -1,78 +1,31 @@
 # E-Commerce Events
 #
-# Core funnel events: Product Viewed → Added to Cart → Order Completed
-# These events reference properties and custom types defined elsewhere.
+# Core funnel: Product Viewed -> Product Added to Cart -> Order Completed.
+#
+# An event declares only its identity (id, wire name, type, category). Which
+# properties it carries -- and whether they are required -- is decided by each
+# tracking plan, so the same event can be stricter on mobile than on web.
 
-version: "rudder/v1"
-kind: "event"
+version: rudder/v0.1
+kind: events
 metadata:
-  name: "events"
+  name: ecommerce-events
 spec:
-  name: "Product Viewed"
-  description: "User viewed a product detail page"
-  category: "urn:rudder:category/ecommerce"
-  rules:
-    # ProductType contains required product fields
-    - property: "urn:rudder:property/product"
-      required: true
-      config:
-        customType: "urn:rudder:custom-type/product-type"
-    # Optional attribution properties
-    - property: "urn:rudder:property/page_url"
-    - property: "urn:rudder:property/referrer_url"
-    - property: "urn:rudder:property/session_id"
+  events:
+    - id: product_viewed
+      name: Product Viewed
+      event_type: track
+      description: "User viewed a product detail page"
+      category: "#/categories/event-categories/ecommerce"
 
----
-version: "rudder/v1"
-kind: "event"
-metadata:
-  name: "events"
-spec:
-  name: "Product Added to Cart"
-  description: "User added a product to their shopping cart"
-  category: "urn:rudder:category/ecommerce"
-  rules:
-    - property: "urn:rudder:property/product"
-      required: true
-      config:
-        customType: "urn:rudder:custom-type/product-type"
-    - property: "urn:rudder:property/quantity"
-      required: true
-    - property: "urn:rudder:property/cart_total"
-    - property: "urn:rudder:property/product_count"
-    - property: "urn:rudder:property/session_id"
+    - id: product_added_to_cart
+      name: Product Added to Cart
+      event_type: track
+      description: "User added a product to their shopping cart"
+      category: "#/categories/event-categories/ecommerce"
 
----
-version: "rudder/v1"
-kind: "event"
-metadata:
-  name: "events"
-spec:
-  name: "Order Completed"
-  description: "Customer completed a purchase"
-  category: "urn:rudder:category/ecommerce"
-  rules:
-    - property: "urn:rudder:property/order_id"
-      required: true
-    - property: "urn:rudder:property/order_total"
-      required: true
-    - property: "urn:rudder:property/currency"
-    - property: "urn:rudder:property/customer_email"
-      required: true
-    # Array of products
-    - property: "urn:rudder:property/products"
-      required: true
-      config:
-        type: "array"
-        items:
-          customType: "urn:rudder:custom-type/product-type"
-        minItems: 1
-    # Addresses using AddressType
-    - property: "urn:rudder:property/shipping_address"
-      required: true
-      config:
-        customType: "urn:rudder:custom-type/address-type"
-    - property: "urn:rudder:property/billing_address"
-      required: true
-      config:
-        customType: "urn:rudder:custom-type/address-type"
+    - id: order_completed
+      name: Order Completed
+      event_type: track
+      description: "Customer completed a purchase"
+      category: "#/categories/event-categories/ecommerce"

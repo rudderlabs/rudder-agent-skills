@@ -1,118 +1,92 @@
 # Product Properties
 #
 # Properties related to products in the catalog.
-# Referenced by ProductType custom type and e-commerce events.
+# Referenced by the ProductType custom type and the e-commerce tracking plans.
 
-version: "rudder/v1"
-kind: "property"
+version: rudder/v0.1
+kind: properties
 metadata:
-  name: "properties"
+  name: product-properties
 spec:
-  name: "product_id"
-  type: "string"
-  description: "Unique product identifier"
-  config:
-    minLength: 3
-    maxLength: 50
+  properties:
+    - id: product_id
+      name: product_id
+      type: string
+      description: "Unique product identifier"
+      propConfig:
+        minLength: 3
+        maxLength: 50
 
----
-version: "rudder/v1"
-kind: "property"
-metadata:
-  name: "properties"
-spec:
-  name: "product_sku"
-  type: "string"
-  description: "Product SKU for inventory tracking"
-  config:
-    minLength: 3
-    maxLength: 50
+    - id: product_sku
+      name: product_sku
+      type: string
+      description: "Product SKU for inventory tracking"
+      propConfig:
+        minLength: 3
+        maxLength: 50
 
----
-version: "rudder/v1"
-kind: "property"
-metadata:
-  name: "properties"
-spec:
-  name: "product_name"
-  type: "string"
-  description: "Human-readable product name"
-  config:
-    maxLength: 200
+    - id: product_name
+      name: product_name
+      type: string
+      description: "Human-readable product name"
+      propConfig:
+        maxLength: 200
 
----
-version: "rudder/v1"
-kind: "property"
-metadata:
-  name: "properties"
-spec:
-  name: "product_price"
-  type: "number"
-  description: "Product price in default currency"
-  config:
-    minimum: 0
-    exclusiveMinimum: true
+    - id: product_price
+      name: product_price
+      type: number
+      description: "Product price in the default currency"
+      propConfig:
+        minimum: 0
 
----
-version: "rudder/v1"
-kind: "property"
-metadata:
-  name: "properties"
-spec:
-  name: "product_msrp"
-  type: "number"
-  description: "Manufacturer's suggested retail price"
-  config:
-    minimum: 0
+    - id: product_msrp
+      name: product_msrp
+      type: number
+      description: "Manufacturer's suggested retail price"
+      propConfig:
+        minimum: 0
 
----
-version: "rudder/v1"
-kind: "property"
-metadata:
-  name: "properties"
-spec:
-  name: "product_category"
-  type: "string"
-  description: "Product category for classification"
-  config:
-    enum:
-      - "Footwear"
-      - "Clothing"
-      - "Accessories"
+    - id: product_category
+      name: product_category
+      type: string
+      description: "Product category for classification"
+      propConfig:
+        enum: ["Footwear", "Clothing", "Accessories"]
 
----
-version: "rudder/v1"
-kind: "property"
-metadata:
-  name: "properties"
-spec:
-  name: "quantity"
-  type: "integer"
-  description: "Number of items"
-  config:
-    minimum: 1
-    maximum: 100
+    # An object property typed by a custom type: every event that carries a
+    # product reuses this one definition instead of restating the fields.
+    - id: product
+      name: product
+      type: "#/custom-types/product-types/product_type"
+      description: "The product the shopper interacted with"
 
----
-version: "rudder/v1"
-kind: "property"
-metadata:
-  name: "properties"
-spec:
-  name: "cart_total"
-  type: "number"
-  description: "Current cart total value"
-  config:
-    minimum: 0
+    # An array whose items are the same custom type.
+    - id: products
+      name: products
+      type: array
+      description: "Line items in a completed order"
+      propConfig:
+        itemTypes: ["#/custom-types/product-types/product_type"]
+        minItems: 1
 
----
-version: "rudder/v1"
-kind: "property"
-metadata:
-  name: "properties"
-spec:
-  name: "product_count"
-  type: "integer"
-  description: "Number of distinct products in cart"
-  config:
-    minimum: 0
+    - id: quantity
+      name: quantity
+      type: integer
+      description: "Number of items added"
+      propConfig:
+        minimum: 1
+        maximum: 100
+
+    - id: cart_total
+      name: cart_total
+      type: number
+      description: "Current cart total value"
+      propConfig:
+        minimum: 0
+
+    - id: product_count
+      name: product_count
+      type: integer
+      description: "Number of distinct products in the cart"
+      propConfig:
+        minimum: 0

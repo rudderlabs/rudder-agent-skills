@@ -1,21 +1,68 @@
 # Web App Tracking Plan
 #
-# Tracking plan for the main e-commerce website.
-# Uses all e-commerce events with page attribution properties.
-# Governance is permissive (forward violations) for development flexibility.
+# The main e-commerce website. Carries page attribution (page_url, referrer_url)
+# and leaves unplanned events flowing while the site is still being instrumented.
 
-version: "rudder/v1"
-kind: "tracking-plan"
+version: rudder/v0.1
+kind: tp
 metadata:
-  name: "tracking-plans"
+  name: web-app
 spec:
-  name: "Web App Tracking Plan"
-  description: "E-commerce events for the main website with page attribution"
-  governance:
-    unplannedEvents: forward    # Forward unplanned events with flag
-    violatingEvents: forward    # Forward violations with metadata
-  events:
-    - event: "urn:rudder:event/product-viewed"
-      # No overrides - use event defaults
-    - event: "urn:rudder:event/product-added-to-cart"
-    - event: "urn:rudder:event/order-completed"
+  id: web_app
+  display_name: "Web App Tracking Plan"
+  description: "E-commerce funnel for the main website, with page attribution."
+  rules:
+    - type: event_rule
+      id: product_viewed_rule
+      event:
+        $ref: "#/events/ecommerce-events/product_viewed"
+        allow_unplanned: true
+      properties:
+        - $ref: "#/properties/product-properties/product"
+          required: true
+        - $ref: "#/properties/customer-properties/page_url"
+          required: true
+        - $ref: "#/properties/customer-properties/referrer_url"
+          required: false
+        - $ref: "#/properties/customer-properties/session_id"
+          required: false
+
+    - type: event_rule
+      id: product_added_to_cart_rule
+      event:
+        $ref: "#/events/ecommerce-events/product_added_to_cart"
+        allow_unplanned: true
+      properties:
+        - $ref: "#/properties/product-properties/product"
+          required: true
+        - $ref: "#/properties/product-properties/quantity"
+          required: true
+        - $ref: "#/properties/product-properties/cart_total"
+          required: false
+        - $ref: "#/properties/product-properties/product_count"
+          required: false
+        - $ref: "#/properties/customer-properties/page_url"
+          required: true
+        - $ref: "#/properties/customer-properties/session_id"
+          required: false
+
+    - type: event_rule
+      id: order_completed_rule
+      event:
+        $ref: "#/events/ecommerce-events/order_completed"
+        allow_unplanned: true
+      properties:
+        - $ref: "#/properties/product-properties/products"
+          required: true
+        - $ref: "#/properties/customer-properties/order_id"
+          required: true
+        - $ref: "#/properties/customer-properties/order_total"
+          required: true
+        - $ref: "#/properties/customer-properties/customer_email"
+          required: true
+        - $ref: "#/properties/customer-properties/currency"
+          required: false
+        - $ref: "#/properties/customer-properties/shipping_address"
+          required: true
+        - $ref: "#/properties/customer-properties/billing_address"
+          required: true

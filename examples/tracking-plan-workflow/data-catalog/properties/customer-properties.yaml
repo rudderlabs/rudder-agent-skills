@@ -1,154 +1,110 @@
 # Customer Properties
 #
-# Properties related to customers and orders.
-# Referenced by Order Completed event and AddressType.
+# Order, address and attribution properties.
+# Referenced by the AddressType custom type and the e-commerce tracking plans.
 
-version: "rudder/v1"
-kind: "property"
+version: rudder/v0.1
+kind: properties
 metadata:
-  name: "properties"
+  name: customer-properties
 spec:
-  name: "customer_email"
-  type: "string"
-  description: "Customer email address"
-  config:
-    pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+  properties:
+    - id: customer_email
+      name: customer_email
+      type: string
+      description: "Customer email address"
+      propConfig:
+        format: email
 
----
-version: "rudder/v1"
-kind: "property"
-metadata:
-  name: "properties"
-spec:
-  name: "order_id"
-  type: "string"
-  description: "Unique order identifier"
-  config:
-    minLength: 3
-    maxLength: 50
+    - id: order_id
+      name: order_id
+      type: string
+      description: "Unique order identifier"
+      propConfig:
+        minLength: 3
+        maxLength: 50
 
----
-version: "rudder/v1"
-kind: "property"
-metadata:
-  name: "properties"
-spec:
-  name: "order_total"
-  type: "number"
-  description: "Total order value"
-  config:
-    minimum: 0
+    - id: order_total
+      name: order_total
+      type: number
+      description: "Total order value"
+      propConfig:
+        minimum: 0
 
----
-version: "rudder/v1"
-kind: "property"
-metadata:
-  name: "properties"
-spec:
-  name: "currency"
-  type: "string"
-  description: "ISO 4217 currency code"
-  config:
-    pattern: "^[A-Z]{3}$"
+    - id: currency
+      name: currency
+      type: string
+      description: "ISO 4217 currency code"
+      propConfig:
+        pattern: "^[A-Z]{3}$"
 
----
-# Address component properties (used by AddressType)
+    # Address component properties, assembled by AddressType.
+    - id: address
+      name: address
+      type: string
+      description: "Street address"
+      propConfig:
+        maxLength: 200
 
-version: "rudder/v1"
-kind: "property"
-metadata:
-  name: "properties"
-spec:
-  name: "address"
-  type: "string"
-  description: "Street address"
-  config:
-    maxLength: 200
+    - id: city
+      name: city
+      type: string
+      description: "City name"
+      propConfig:
+        maxLength: 100
 
----
-version: "rudder/v1"
-kind: "property"
-metadata:
-  name: "properties"
-spec:
-  name: "city"
-  type: "string"
-  description: "City name"
-  config:
-    maxLength: 100
+    - id: state
+      name: state
+      type: string
+      description: "State or province"
+      propConfig:
+        maxLength: 100
 
----
-version: "rudder/v1"
-kind: "property"
-metadata:
-  name: "properties"
-spec:
-  name: "state"
-  type: "string"
-  description: "State or province"
-  config:
-    maxLength: 100
+    - id: zipcode
+      name: zipcode
+      type: string
+      description: "Postal or ZIP code"
+      propConfig:
+        maxLength: 20
 
----
-version: "rudder/v1"
-kind: "property"
-metadata:
-  name: "properties"
-spec:
-  name: "zipcode"
-  type: "string"
-  description: "Postal/ZIP code"
-  config:
-    maxLength: 20
+    - id: shipping_address
+      name: shipping_address
+      type: "#/custom-types/address-types/address_type"
+      description: "Where the order ships to"
 
----
-# Attribution properties
+    - id: billing_address
+      name: billing_address
+      type: "#/custom-types/address-types/address_type"
+      description: "Address the payment method is registered to"
 
-version: "rudder/v1"
-kind: "property"
-metadata:
-  name: "properties"
-spec:
-  name: "page_url"
-  type: "string"
-  description: "URL of the current page"
-  config:
-    format: "uri"
+    # Attribution properties. The web plan requires the page ones, the mobile
+    # plan requires the device ones -- same catalog, different rules.
+    - id: page_url
+      name: page_url
+      type: string
+      description: "URL of the current page"
+      propConfig:
+        maxLength: 2048
 
----
-version: "rudder/v1"
-kind: "property"
-metadata:
-  name: "properties"
-spec:
-  name: "referrer_url"
-  type: "string"
-  description: "URL of the referring page"
-  config:
-    format: "uri"
+    - id: referrer_url
+      name: referrer_url
+      type: string
+      description: "URL of the referring page"
+      propConfig:
+        maxLength: 2048
 
----
-version: "rudder/v1"
-kind: "property"
-metadata:
-  name: "properties"
-spec:
-  name: "session_id"
-  type: "string"
-  description: "Session identifier for grouping events"
-  config:
-    minLength: 10
-    maxLength: 100
+    - id: session_id
+      name: session_id
+      type: string
+      description: "Session identifier for grouping events"
+      propConfig:
+        minLength: 10
+        maxLength: 100
 
----
-version: "rudder/v1"
-kind: "property"
-metadata:
-  name: "properties"
-spec:
-  name: "device_id"
-  type: "string"
-  description: "Device identifier for mobile attribution"
-  config:
-    minLength: 10
-    maxLength: 100
+    - id: device_id
+      name: device_id
+      type: string
+      description: "Device identifier for mobile attribution"
+      propConfig:
+        minLength: 10
+        maxLength: 100

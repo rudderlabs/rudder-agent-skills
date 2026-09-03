@@ -1,27 +1,28 @@
 # ProductType Custom Type
 #
-# Reusable schema for product information.
-# Used by: Product Viewed, Product Added to Cart, Order Completed
+# Reusable object schema for product information, referenced by the `product`
+# property (single) and the `products` property (array of them).
 
-version: "rudder/v1"
-kind: "custom-type"
+version: rudder/v0.1
+kind: custom-types
 metadata:
-  name: "custom-types"
+  name: product-types
 spec:
-  name: "ProductType"
-  type: "object"
-  description: "Consolidated product information for e-commerce events"
-  config:
-    properties:
-      - property: "urn:rudder:property/product_id"
-        required: true
-      - property: "urn:rudder:property/product_sku"
-        required: true
-      - property: "urn:rudder:property/product_name"
-        required: true
-      - property: "urn:rudder:property/product_category"
-        required: true
-      - property: "urn:rudder:property/product_price"
-        required: true
-      - property: "urn:rudder:property/product_msrp"
-        required: false
+  types:
+    - id: product_type
+      name: ProductType
+      description: "Consolidated product information for e-commerce events"
+      type: object
+      properties:
+        - $ref: "#/properties/product-properties/product_id"
+          required: true
+        - $ref: "#/properties/product-properties/product_sku"
+          required: true
+        - $ref: "#/properties/product-properties/product_name"
+          required: true
+        - $ref: "#/properties/product-properties/product_category"
+          required: true
+        - $ref: "#/properties/product-properties/product_price"
+          required: true
+        - $ref: "#/properties/product-properties/product_msrp"
+          required: false
