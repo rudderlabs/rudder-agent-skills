@@ -121,9 +121,12 @@ src/App.tsx:5:7 - error TS2741: Property 'couponCode' is missing in type
   but required in type 'CheckoutStarted'.
 ```
 
-**Five errors across three files, from one line of YAML.** Production code and tests. You
-changed a governance decision and the compiler enumerated its entire blast radius — before
-anything was applied to a workspace, and with nothing published.
+**Every call site that no longer complies, from one line of YAML** — production code and
+tests alike. You changed a governance decision and the compiler enumerated its entire
+blast radius, before anything was applied to a workspace and with nothing published.
+
+(The exact count moves as the example gains call sites, which is the point: it is derived
+from your code, not asserted here.)
 
 Revert the line, run `npm run tp:sync` again, and you are green. The regenerated client is
 byte-identical to the committed one: generation is deterministic given the same catalog and
