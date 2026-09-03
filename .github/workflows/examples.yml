@@ -1,0 +1,103 @@
+# The skills linter checks frontmatter; nothing checked the ~4,900 lines of runnable
+# artifact under examples/. This runs them: the catalogs load, the app the skill points
+# at typechecks, tests and drift-checks, and the copies that ship inside the skill stay
+# identical to the originals.
+name: Examples
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'examples/**'
+      - 'plugins/rudder-cli/skills/rudder-typer-workflow/references/**'
+      - '.github/workflows/examples.yml'
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  # Must match PINNED_CLI in tp-sync.sh — the generated client embeds its generator
+  # version, so a different CLI here reports a false diff.
+  RUDDER_CLI_VERSION: 0.24.0
+
+jobs:
+  examples:
+    name: Examples
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40 # v2.19.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: The skill's copies must match the originals
+        run: |
+          # references/ ships these so `npx skills add` delivers them; examples/ holds
+          # the runnable originals. Two copies, so CI owns keeping them one file.
+          R=plugins/rudder-cli/skills/rudder-typer-workflow/references
+          cmp "$R/tp-sync.sh"            examples/instrumentation-e2e/app/scripts/tp-sync.sh
+          cmp "$R/client.ts"             examples/instrumentation-e2e/app/src/analytics/client.ts
+          cmp "$R/typed-client-drift.yml" examples/instrumentation-e2e/ci/typed-client-drift.yml
+
+      - name: Every shipped YAML parses
+        run: |
+          python3 - <<'PY'
+          import pathlib, sys, yaml
+          bad = []
+          for f in list(pathlib.Path('examples').rglob('*.yaml')) + \
+                   list(pathlib.Path('examples').rglob('*.yml')) + \
+                   list(pathlib.Path('plugins').rglob('references/*.yml')):
+              if 'node_modules' in f.parts:
+                  continue
+              try:
+                  yaml.safe_load(f.read_text())
+              except Exception as e:
+                  bad.append(f"{f}: {e}")
+          print(f"parsed {len(list(pathlib.Path('examples').rglob('*.y*ml')))} files")
+          if bad:
+              print("\n".join(bad)); sys.exit(1)
+          PY
+
+      - name: Install rudder-cli
+        run: |
+          curl -fsSL "https://github.com/rudderlabs/rudder-iac/releases/download/v${RUDDER_CLI_VERSION}/rudder-cli_Linux_x86_64.tar.gz" \
+            | tar -xz -C /usr/local/bin rudder-cli
+          rudder-cli --version
+
+      - name: Example catalogs load and generate
+        env:
+          RUDDERSTACK_CLI_EXPERIMENTAL: 'true'
+          RUDDERSTACK_X_LOCAL_TYPER: 'true'
+        run: |
+          set -euo pipefail
+          # `validate` needs a workspace token; `typer generate --local` is the offline
+          # loader, so it is what proves the specs are well-formed here.
+          rudder-cli typer generate --local --location examples/instrumentation-e2e/catalog \
+            --tracking-plan-id storefront --platform typescript --output "$(mktemp -d)"
+          for tp in web_app mobile_app; do
+            for p in typescript kotlin swift; do
+              rudder-cli typer generate --local --location examples/tracking-plan-workflow \
+                --tracking-plan-id "$tp" --platform "$p" --output "$(mktemp -d)"
+            done
+          done
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: examples/instrumentation-e2e/app/package-lock.json
+
+      - name: The example app typechecks, tests, and is not drifted
+        working-directory: examples/instrumentation-e2e/app
+        env:
+          RUDDERSTACK_CLI_EXPERIMENTAL: 'true'
+          RUDDERSTACK_X_LOCAL_TYPER: 'true'
+        run: |
+          npm ci
+          npm run typecheck
+          npm test
+          npm run tp:check

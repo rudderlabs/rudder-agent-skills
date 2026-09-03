@@ -2,8 +2,8 @@
 #
 # `coupon_code` is deliberately modelled optional: the storefront does not always
 # know the coupon at checkout-start time. Marking it required would force a
-# sentinel at the call site -- the exact mistake the rudder-webapp dogfooding
-# found, where two required-but-usually-absent traits shipped for years.
+# sentinel at the call site, which is how a plan ends up asserting something false
+# about the data.
 version: "rudder/v1"
 kind: "properties"
 metadata:

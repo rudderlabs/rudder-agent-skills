@@ -26,7 +26,7 @@
     {
       "name": "rudder-cli",
       "source": "./plugins/rudder-cli",
-      "description": "Workflows for driving the rudder-cli and rudder-typer CLIs: validate, dry-run, apply, import, transformations.",
+      "description": "Workflows for driving rudder-cli: validate, dry-run, apply, import, transformations, and typed client generation with rudder-cli typer.",
       "author": {
         "name": "RudderStack"
       },
@@ -34,7 +34,7 @@
       "repository": "https://github.com/rudderlabs/rudder-agent-skills",
       "license": "MIT",
       "category": "devtools",
-      "keywords": ["rudderstack", "rudder-cli", "rudder-typer", "cli", "devtools"],
+      "keywords": ["rudderstack", "rudder-cli", "typer", "codegen", "cli", "devtools"],
       "tags": ["rudderstack", "cli"]
     },
     {

@@ -40,13 +40,22 @@ loop fast enough to use on every change.
 
 ---
 
-# Part 1 — Run the reference (2 minutes)
+# Part 1 — Run the reference
 
-Prove the loop works before you wire it into anything of yours.
+Prove the loop works before you wire it into anything of yours. With `rudder-cli`
+already installed, the whole of Part 1 is seconds — installing the CLI is the wall clock.
 
 ## Prerequisites
 
-- **rudder-cli ≥ 0.22.0** — [releases](https://github.com/rudderlabs/rudder-iac/releases). Check with `rudder-cli --version`.
+- **rudder-cli ≥ 0.22.0** — check with `rudder-cli --version`. If you don't have it:
+
+  ```bash
+  curl -fsSL https://github.com/rudderlabs/rudder-iac/releases/latest/download/rudder-cli_Darwin_arm64.tar.gz \
+    | tar -xz -C /usr/local/bin rudder-cli
+  ```
+
+  Swap the asset for your platform — [all releases](https://github.com/rudderlabs/rudder-iac/releases).
+  Installing the CLI is the only slow part here; everything after it takes seconds.
 - **Node 20+**
 
 No account, no access token, no `rudder-cli auth login`.
@@ -86,10 +95,18 @@ still enforced at compile time.
 
 Make one property required in [`catalog/tracking-plans/storefront.yaml`](catalog/tracking-plans/storefront.yaml):
 
+`coupon_code` appears in **both** checkout rules — flip both, which is what the
+command below does:
+
 ```diff
          - property: "#property:coupon_code"
 -          required: false
 +          required: true
+```
+
+```bash
+sed -i '' '/#property:coupon_code/{n;s/required: false/required: true/;}' \
+  ../catalog/tracking-plans/storefront.yaml
 ```
 
 Then:
@@ -199,11 +216,10 @@ optional. Marking something required that is sometimes absent produces a type yo
 cannot satisfy, and the pressure at that point is to paper over it — which is how the
 contract quietly becomes a lie.
 
-> This is not hypothetical. In RudderStack's own app, two `identify` traits were marked
-> required and were missing on ~40% of production calls, because the page fired `identify`
-> before its billing data had loaded. The previous generator leaked `| undefined` into
-> required fields, so it compiled and shipped that way for years — and every funnel
-> segmented by plan was quietly wrong.
+> A common shape: an `identify` trait marked required, fired on login before the store
+> holding it has hydrated. It is absent on a large share of real calls, but a generator
+> that leaks `| undefined` into required fields will compile it anyway — and every
+> analysis that segments on that trait is quietly wrong for as long as it ships.
 
 ## Step 3 — Add a sync script
 
@@ -257,8 +273,7 @@ Since 0.22.0 the unsafe form does not compile.
 `window.rudderanalytics` is `undefined`, firing an event throws a `TypeError`. The stub
 above swallows it. Without it, an event fired inside a `try` whose `catch` shows the user an
 error will report a *successful* action as a failure. (Being fixed upstream in
-[DEX-554](https://linear.app/rudderstack/issue/DEX-554); until then, every consumer needs
-these two lines.)
+a future release; until then, every consumer needs these two lines.)
 
 > Kotlin and Swift clients take an SDK instance rather than a resolver — mobile apps
 > construct the SDK themselves, so there is no swap to survive. Do not carry this pattern
@@ -267,9 +282,9 @@ these two lines.)
 ## Step 5 — Fire your first event
 
 ```ts
-import { analytics, type analyticsTypes } from '@/analytics';
+import { storefront } from './analytics';
 
-analytics.trackCheckoutStarted({
+storefront.trackCheckoutStarted({
   cartId: cart.id,
   itemCount: cart.items.length,
   cartTotal: cart.total,
@@ -524,7 +539,7 @@ survives.
 Worth knowing before you commit to this:
 
 - **Local generation is experimental** and behind feature flags. The flags may change.
-- **A missing SDK throws** from generated code; you supply the guard (DEX-554).
+- **A missing SDK throws** from generated code; you supply the guard.
 - **Only enums are compile-time enforced.** Regex, length and range constraints are runtime
   concerns, as is anything about values rather than shapes.
 - **`SOURCE.md` lags one commit** when the catalog lives in the same repo as the app — it

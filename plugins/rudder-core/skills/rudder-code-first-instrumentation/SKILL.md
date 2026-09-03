@@ -360,12 +360,13 @@ See the `rudder-typer-workflow` skill for the rest.
 ### Verify Alignment
 
 ```typescript
-// This should compile without errors
-import { BillingPlan } from './analytics/types';
+// The generated names are prefixed by kind, and live under the output directory
+// you passed to --output. Assign your code's value to the generated type and let
+// the compiler prove they still agree.
+import type { CustomTypeBillingPlan } from './analytics/generated';
 import { BillingPlan as CodeBillingPlan } from './types/workspace';
 
-// Type assertion - compiler validates they're compatible
-const plan: BillingPlan = CodeBillingPlan.GROWTH;
+const plan: CustomTypeBillingPlan = CodeBillingPlan.GROWTH;
 ```
 
 ### Compiler Catches Mismatches

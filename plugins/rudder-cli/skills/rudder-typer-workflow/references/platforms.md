@@ -20,14 +20,43 @@ concern, not a generation concern.
 
 ## What is the same everywhere
 
-- Track methods are `track`-prefixed; `identify` / `group` / `page` / `screen` are not.
+- Track methods are `track`-prefixed; non-track calls are not. (*Which* non-track
+  types exist differs per platform — see [Event type support](#event-type-support).)
 - Custom types become a shared named enum/union; a property-level `enum` becomes a
-  type scoped to that property (`PropertyPaymentMethod`).
+  type scoped to that property (`PropertyPaymentMethod`). **A custom type no event
+  rule references is omitted entirely** — exit 0, no warning. If a type you defined is
+  missing from the client, that is the reason.
 - Plan-optional properties become optional fields.
 - Every call is stamped with a `ruddertyper` context block — `platform`,
   `rudderCLIVersion`, `trackingPlanId`, `trackingPlanVersion` — merged into whatever
   options the caller passed. This is how typed traffic is identified downstream, and
   it is why the generated file changes when you change CLI version.
+
+## Event type support
+
+`track`, `identify` and `group` generate on all three platforms. The other two do not:
+
+| Event type | TypeScript | Kotlin | Swift |
+| --- | :-: | :-: | :-: |
+| `page` | ✅ | ✅ | — |
+| `screen` | — | ✅ | ✅ |
+
+TypeScript excludes `screen` deliberately — `analytics-js` has no `screen()` API, so a
+generated method could not dispatch. Swift emits no `page`.
+
+**An unsupported rule is skipped, not rejected.** Generating a plan containing a
+`screen` rule for TypeScript:
+
+```
+Warning: unsupported event type "screen", skipping
+✅ Successfully generated typescript bindings in ./out
+$ echo $?
+0
+```
+
+The warning goes to **stdout**, and the exit code is 0. Any wrapper that redirects
+stdout loses the only signal; a cross-platform plan then produces a client with a
+silently missing method. Grep the output for `Warning:` and fail on it.
 
 ## The one thing that is not the same: construction
 

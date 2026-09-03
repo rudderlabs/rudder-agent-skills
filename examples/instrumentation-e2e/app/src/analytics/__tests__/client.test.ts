@@ -12,7 +12,7 @@ describe('the generated client resolves the SDK late', () => {
   });
 
   /**
-   * The regression this pins is the one the rudder-webapp dogfooding surfaced: the
+   * The regression this pins: the
    * snippet swaps `window.rudderanalytics` from a buffering preloader to the real
    * SDK *after* module import, so a client that captured the instance in its
    * constructor sends every subsequent event into an abandoned queue. Silently —
@@ -52,5 +52,44 @@ describe('the generated client resolves the SDK late', () => {
     client.trackCheckoutAbandoned({ cartId: 'c', abandonmentReason: 'closed_tab' });
 
     expect(resolve).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('the absent-SDK stub', () => {
+  /**
+   * The reason client.ts exists at all. The generated client calls
+   * `this.analytics.track(...)` unguarded, so with no write key configured — and
+   * therefore no `window.rudderanalytics` — a plain resolver throws a TypeError out
+   * of a track call. Inside a `try` whose `catch` shows the user an error, that
+   * turns a successful action into a reported failure.
+   *
+   * Without this test, removing the stub (say, once the generator guards internally)
+   * leaves the suite green and the regression invisible.
+   */
+  it('swallows calls instead of throwing when no SDK is present', async () => {
+    delete (globalThis as { rudderanalytics?: unknown }).rudderanalytics;
+    (globalThis as { window?: unknown }).window = globalThis;
+
+    const { storefront } = await import('../client');
+
+    expect(() =>
+      storefront.trackCheckoutStarted({
+        cartId: 'c',
+        itemCount: 1,
+        cartTotal: 1,
+        currency: 'usd',
+      }),
+    ).not.toThrow();
+  });
+
+  it('throws without the stub — the behaviour the stub exists to prevent', () => {
+    const bare = new RudderTyper(
+      () => (globalThis as { rudderanalytics?: RudderAnalytics }).rudderanalytics!,
+    );
+    delete (globalThis as { rudderanalytics?: unknown }).rudderanalytics;
+
+    expect(() =>
+      bare.trackCheckoutStarted({ cartId: 'c', itemCount: 1, cartTotal: 1, currency: 'usd' }),
+    ).toThrow(TypeError);
   });
 });

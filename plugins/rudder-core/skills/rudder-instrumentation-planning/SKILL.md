@@ -455,13 +455,15 @@ generated client's shape, and the provenance/CI discipline a committed client ne
 Use generated code for type-safe tracking:
 
 ```kotlin
-// Type-safe, IDE autocomplete, compile-time validation
-analytics.productViewed(
-    product = ProductType(
+// Track methods are track-prefixed, and payloads are Track<Event>Properties.
+val analytics = RudderAnalytics(sdk)   // Kotlin takes the SDK instance
+
+analytics.trackProductViewed(
+    TrackProductViewedProperties(
         productId = "shoes-001",
         productName = "Running Shoes",
         productPrice = 89.99,
-        productCategory = ProductCategory.FOOTWEAR
+        productCategory = CustomTypeProductCategory.FOOTWEAR
     )
 )
 ```

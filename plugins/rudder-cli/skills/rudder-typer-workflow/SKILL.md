@@ -9,9 +9,13 @@ allowed-tools: "Bash(rudder-cli *), Read, Write, Edit"
 Generate a type-safe analytics client from a tracking plan, so event names and
 payload shapes are enforced by the compiler instead of by review.
 
-**A complete, runnable example lives at `examples/instrumentation-e2e/`** in this
-repo — a storefront app with a catalog, a sync script, a drift check and tests.
-Read it when you need working code rather than instructions.
+Everything this skill tells you to copy ships **with the skill**, under `references/`:
+`tp-sync.sh`, `client.ts` (the construction point) and `typed-client-drift.yml`. Read
+those files rather than reproducing them from the prose here.
+
+A complete runnable app around them — catalog, call sites, tests — lives at
+[`examples/instrumentation-e2e/`](https://github.com/rudderlabs/rudder-agent-skills/tree/main/examples/instrumentation-e2e), which is in the repo but is *not* installed
+alongside the skill.
 
 ## Two ways to generate
 
@@ -57,9 +61,13 @@ rudder-cli typer generate --platform <typescript|kotlin|swift> [flags]
 rudder-cli typer options  --platform <typescript|kotlin|swift>
 ```
 
-There is **no `typer init`**, no `ruddertyper.yml`, no `--config` and no `--verbose`.
-If you are reaching for a config file, you are thinking of the retired npm
-`rudder-typer` v1. Everything is flags.
+There is **no `typer init`**, no `ruddertyper.yml` and no `--verbose`. Code generation
+is configured entirely by flags. (`typer init` prints help and exits **0** rather than
+erroring, so a script chaining `typer init && …` proceeds as if a config was written.)
+
+`-c/--config` does exist, but it is not v1's: it is a global flag naming rudder-cli's
+own `~/.rudder/config.json` — the same file the two gates above can live in — not a
+codegen config. Same spelling, different flag.
 
 | Flag | Notes |
 | --- | --- |
@@ -74,8 +82,8 @@ If you are reaching for a config file, you are thinking of the retired npm
 # offline, from a catalog checked out beside the app
 RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_LOCAL_TYPER=true \
   rudder-cli typer generate \
-    --local --location ../rudder-data-gov \
-    --tracking-plan-id webapp \
+    --local --location ../catalog \
+    --tracking-plan-id storefront \
     --platform typescript \
     --output src/analytics/generated \
     --option outputFileName=index.ts
@@ -83,7 +91,8 @@ RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_LOCAL_TYPER=true \
 
 Platform options are few and real: `outputFileName` on all three, plus `packageName`
 and `composeImmutable` on Kotlin. See `references/platforms.md` for output shapes and
-SDK wiring per platform.
+SDK wiring per platform, and `references/ci-cd-integration.md` for the drift check,
+pre-commit hook and multi-platform layouts.
 
 ## The loop
 
@@ -106,11 +115,14 @@ Only when the call sites need no adapters do you open PRs.
 An `as` cast, a `?? ''`, or a sentinel like `'none'` to make a payload fit is not a
 workaround — it is a finding about the catalog being suppressed.
 
-In the rudder-webapp dogfooding this exact failure mode was a real bug: two `identify`
-traits were `required: true` in the plan but absent on ~40% of production calls,
-because the app fired `identify` before its billing store had hydrated. The previous
-generator leaked `| undefined` into required fields, so it compiled and shipped that
-way for years. The fix was to correct the contract, not the call site.
+A required property that the app cannot always supply is the most common way this
+happens. The type is unsatisfiable at some call site, and the quickest way out is a
+cast — which restores the build and leaves the plan asserting something false about
+the data. Every consumer downstream then reads that assertion as true.
+
+Treat an unsatisfiable generated type as a question about the contract: can this
+property genuinely be present on every call? Answer it from the data, not from the
+call site that is currently failing to compile.
 
 If a property is genuinely not always available, mark it `required: false` and let it
 be optional in the generated type.
@@ -118,9 +130,22 @@ be optional in the generated type.
 ## Reading the generated client
 
 Track events are **`track`-prefixed** — `trackCheckoutStarted`, not `checkoutStarted`.
-`identify`, `group`, `page` and `screen` keep their plain names. The prefix is what
-keeps an event named `page` from colliding with the SDK's own `page` method, and it is
-consistent across all three platforms.
+Non-track calls keep their plain names. The prefix is what keeps an event named `page`
+from colliding with the SDK's own `page` method.
+
+**Not every event type exists on every platform**, and a rule of a type the platform
+does not support is *not* an error:
+
+| Event type | TypeScript | Kotlin | Swift |
+| --- | :-: | :-: | :-: |
+| `track`, `identify`, `group` | ✅ | ✅ | ✅ |
+| `page` | ✅ | ✅ | — |
+| `screen` | — | ✅ | ✅ |
+
+At 0.24.0 a `screen` rule generating for TypeScript prints `Warning: unsupported event
+type "screen", skipping` **on stdout** and exits **0**. The method is simply absent.
+Redirecting stdout in a sync script throws that warning away, so a plan serving both a
+web and an iOS client can go green with a method missing — fail on `Warning:` instead.
 
 Custom types become named unions/enums shared across events; a property's `enum`
 becomes a union scoped to that property. Optional plan properties become optional
@@ -149,8 +174,7 @@ Two related gaps to know about:
 
 - The generated code calls `analytics.track(...)` unguarded, so an *absent* SDK (no
   write key configured) throws rather than no-opping. Absorb it in your construction
-  point with a stub — `examples/instrumentation-e2e/app/src/analytics/client.ts` shows
-  one. Tracked upstream as DEX-554.
+  point with a stub — `references/client.ts` is the whole file, ready to copy.
 - Wrap `track` calls in `try {} catch {}` when they sit inside a `try` whose `catch`
   shows the user an error, or a blocked SDK will make a successful action report as a
   failure. Analytics must never change behaviour.
@@ -168,8 +192,8 @@ committing, and when reviewing either side of the pair — it is the only thing 
 the two repos together.
 
 Wrap the raw command in a small sync script rather than asking people to remember the
-flags. Copy `examples/instrumentation-e2e/app/scripts/tp-sync.sh`, which also pins the
-minimum CLI version, sets `TMPDIR` beside the repo (the CLI renames a temp file onto
+flags. Copy `references/tp-sync.sh`, which also pins the
+minimum CLI version, sets `TMPDIR` beside the repo (belt-and-braces: the CLI renames a temp file onto
 the target, which fails across volumes on older CLIs), and offers a `--check` mode.
 
 ### Merge order, when the catalog is a separate repo
@@ -183,7 +207,7 @@ regen off a stale branch silently drops whatever else landed.
 ### Enforce it in CI
 
 The above is a convention, and conventions hold as long as everyone remembers them.
-`examples/instrumentation-e2e/ci/typed-client-drift.yml` regenerates against the
+`references/typed-client-drift.yml` regenerates against the
 catalog's default branch and fails if the committed client differs — which enforces
 the merge order mechanically, because a consumer PR ahead of its catalog change cannot
 pass. Pin the CLI version in that job: the generated header embeds it, so an unpinned
@@ -203,7 +227,8 @@ and still validates every kind.
 | Symptom | Cause |
 | --- | --- |
 | `--local is experimental; enable it by setting both …` | one or both gates are off — see [Enabling `--local`](#enabling---local) |
-| `unsupported platform: …` | `--platform` is required and must be `typescript`, `kotlin` or `swift` |
+| `required flag(s) "platform" not set` | `--platform` omitted. `--help` advertises `(default "kotlin")`, but the flag is still required |
+| `unsupported platform: …` | `--platform` given an invalid value — use `typescript`, `kotlin` or `swift` |
 | `multiple tracking plans found, specify --tracking-plan-id` | pass the plan's `spec.id`; the error lists the available ones |
 | `'kind' must be one of [...]` | the project holds a kind generation does not own, on a CLI older than 0.21.0 — upgrade |
 | `cross-device link` on generate | repo on a different volume than `/tmp` on a CLI older than 0.22.0 — set `TMPDIR` beside the repo |

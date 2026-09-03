@@ -197,7 +197,8 @@ and `session_id` required on every event.
 
 ## Quick Start
 
-Validate the specs — no auth or network needed:
+Validate the specs. Unlike `typer generate --local`, `validate` reaches the workspace
+API, so it needs `rudder-cli auth login` and a network connection:
 
 ```bash
 rudder-cli validate -l ./
@@ -312,9 +313,6 @@ ln -s ../../plugins/rudder-cli/skills/rudder-cli-workflow .claude/skills/
 1. **Connect tracking plans to sources** in the RudderStack UI
 2. **Generate type-safe SDKs** with RudderTyper (see above, and the `instrumentation-e2e` example)
 3. **Monitor violations** in the RudderStack dashboard
-
-A production catalog in this same dialect lives at
-[rudderlabs/rudder-data-gov](https://github.com/rudderlabs/rudder-data-gov).
 
 ## Resources
 

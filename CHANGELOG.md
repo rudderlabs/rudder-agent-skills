@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (review pass on #26)
+
+- **Platform event-type support was stated wrongly, and the error mode is silent.**
+  `track` / `identify` / `group` generate everywhere, but TypeScript has no `screen`
+  (analytics-js has no `screen()` API) and Swift has no `page`. An unsupported rule is
+  skipped with a warning on **stdout** and **exit 0** — so a plan serving a web and an
+  iOS client can go green with a method missing. `tp-sync.sh` now treats any generator
+  warning as fatal instead of redirecting it to `/dev/null`.
+- **The artifacts the skill says to copy now ship with it.** `tp-sync.sh`, `client.ts`
+  and `typed-client-drift.yml` live in the skill's `references/`, so `npx skills add`
+  delivers them; `examples/` is not installed alongside a skill. CI `cmp`s the copies.
+- **`references/ci-cd-integration.md` was orphaned** — rewritten by the PR, linked by
+  nothing, so it never loaded. Linked from SKILL.md.
+- **The drift workflow could not fire for two of the four cases it advertises.** Its
+  `paths:` filter excluded call-site-only and catalog-only changes — exactly when the
+  client is stale. Filter dropped, `schedule:` added, `.nvmrc` reference replaced (no
+  such file), actions SHA-pinned, `permissions:` declared.
+- **`rudder-cli validate` needs auth and network**; the tracking-plan example said it
+  needed neither. `typer generate --local` is the offline loader.
+- **A fourth file still carried the phantom commands** —
+  `rudder-instrumentation-debugging/references/error-reference.md` had `apply` inside
+  the regeneration loop and a bare `typer generate`. `--verbose`, declared phantom in
+  the typer skill, was still used in three other files; removed.
+- **Two of the three corrected skills contradicted themselves** within five lines of
+  the correction — an import of a module the same commit deleted, and a Kotlin snippet
+  violating the `track`-prefix rule stated three lines above.
+- **A custom type no event rule references is silently omitted** from the generated
+  client (exit 0, no warning). Documented; the previous skill said so and the fact went
+  out with the fiction around it.
+- **`--check` accepted any CLI ≥ 0.22.0** while the committed client encodes an exact
+  version, so a permitted-but-different CLI reported a false diff and advised a commit
+  that breaks pinned CI. It now asserts the exact pin and says so.
+- **`SOURCE.md` claimed `clean` when there was no git checkout at all** — provenance a
+  reviewer reads as evidence. Reports `UNKNOWN` instead.
+- **README Step 5 did not compile**: `@/analytics` (no such alias) and `analytics` /
+  `analyticsTypes` (the exports are `storefront` / `storefrontTypes`).
+- **`-c/--config` is real** — a global flag naming rudder-cli's own config file, not
+  v1's codegen config. Qualified rather than declared phantom. `typer init` exits 0.
+- **Nothing in CI exercised the ~4,900 lines of runnable artifact.** New `examples.yml`
+  loads both catalogs, generates all seven plan × platform combinations, and runs the
+  example app's typecheck, tests and drift check.
+- Internal repository names and a production-defect narrative removed from this public
+  repo; the teaching survives in generic form.
+- Smaller: the absent-SDK stub — the entire reason `client.ts` exists — now has tests
+  in both directions; `--check`'s temp directory no longer lands on the system volume;
+  the troubleshooting table distinguishes a missing `--platform` from an invalid one;
+  discovery text no longer advertises the retired npm `rudder-typer`; the README's
+  examples table lists all four; an install command and honest timing for Part 1.
+
+
 ### Changed
 
 - **`rudder-typer-workflow`** — rewritten against the actual CLI. The skill

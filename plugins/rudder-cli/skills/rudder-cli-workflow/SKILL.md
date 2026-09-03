@@ -264,7 +264,7 @@ rudder-cli apply -l ./
 
 ```bash
 # Run validate with verbose output
-rudder-cli validate -l ./ --verbose
+rudder-cli validate -l ./
 
 # Check specific file syntax
 cat transformations/my-spec.yaml | yq .  # Validate YAML syntax
