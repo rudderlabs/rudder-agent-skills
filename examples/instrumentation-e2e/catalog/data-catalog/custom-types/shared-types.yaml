@@ -1,19 +1,24 @@
-version: rudder/v0.1
-kind: custom-types
+version: "rudder/v1"
+kind: "custom-types"
 metadata:
-  name: shared-types
+  name: "shared-types"
 spec:
   types:
-    - id: currency_type
-      name: Currency_type
+    - config:
+        enum:
+          - "usd"
+          - "eur"
+          - "gbp"
       description: "ISO-4217 currency the storefront prices in"
-      type: string
-      config:
-        enum: ["usd", "eur", "gbp"]
-
-    - id: plan_tier_type
-      name: Plan_tier_type
+      id: "currency_type"
+      name: "Currency_type"
+      type: "string"
+    - config:
+        enum:
+          - "free"
+          - "pro"
+          - "enterprise"
       description: "Subscription tier the account is on"
-      type: string
-      config:
-        enum: ["free", "pro", "enterprise"]
+      id: "plan_tier_type"
+      name: "Plan_tier_type"
+      type: "string"

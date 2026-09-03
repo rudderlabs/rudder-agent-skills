@@ -59,7 +59,7 @@ complies. Make `couponCode` required in
 [`catalog/tracking-plans/storefront.yaml`](catalog/tracking-plans/storefront.yaml):
 
 ```diff
-         - $ref: "#/properties/storefront-checkout/coupon_code"
+         - property: "#property:coupon_code"
 -          required: false
 +          required: true
 ```

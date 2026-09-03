@@ -7,8 +7,8 @@
 
 | | |
 | --- | --- |
-| catalog commit | `3b301ec386099a2a4e3fd0bcbb1b6c56325afdbe` |
+| catalog commit | `b8c37ec66343132b73c2ef1e2afed2d2d87efa47` |
 | branch at generation | `devex/typer-local-skills-and-e2e-example` |
-| catalog working tree | clean |
+| catalog working tree | DIRTY — uncommitted catalog changes, this client is not reproducible from a commit |
 | tracking plan | `storefront` |
 | rudder-cli | `0.23.0` |

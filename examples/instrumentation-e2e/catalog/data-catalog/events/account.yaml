@@ -1,13 +1,14 @@
-version: rudder/v0.1
-kind: events
+# Account Events
+#
+# Non-track events carry an empty `name` -- the call is `identify`, not a named
+# event. `name: ""` is required; omitting the key fails spec validation.
+version: "rudder/v1"
+kind: "events"
 metadata:
-  name: account-events
+  name: "account-events"
 spec:
   events:
-    # Non-track events carry no `name` -- the call is `identify`, not a named
-    # event. `name: ""` is required; omitting the key fails spec validation.
-    - id: identify
-      name: ""
-      event_type: identify
+    - category: "#category:account"
       description: "Establishes the signed-in shopper's identity and traits."
-      category: "#/categories/event-categories/account"
+      event_type: "identify"
+      id: "identify"

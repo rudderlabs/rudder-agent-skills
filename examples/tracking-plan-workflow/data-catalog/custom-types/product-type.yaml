@@ -2,27 +2,26 @@
 #
 # Reusable object schema for product information, referenced by the `product`
 # property (single) and the `products` property (array of them).
-
-version: rudder/v0.1
-kind: custom-types
+version: "rudder/v1"
+kind: "custom-types"
 metadata:
-  name: product-types
+  name: "product-types"
 spec:
   types:
-    - id: product_type
-      name: ProductType
-      description: "Consolidated product information for e-commerce events"
-      type: object
+    - description: "Consolidated product information for e-commerce events"
+      id: "product_type"
+      name: "ProductType"
       properties:
-        - $ref: "#/properties/product-properties/product_id"
+        - property: "#property:product_id"
           required: true
-        - $ref: "#/properties/product-properties/product_sku"
+        - property: "#property:product_sku"
           required: true
-        - $ref: "#/properties/product-properties/product_name"
+        - property: "#property:product_name"
           required: true
-        - $ref: "#/properties/product-properties/product_category"
+        - property: "#property:product_category"
           required: true
-        - $ref: "#/properties/product-properties/product_price"
+        - property: "#property:product_price"
           required: true
-        - $ref: "#/properties/product-properties/product_msrp"
+        - property: "#property:product_msrp"
           required: false
+      type: "object"

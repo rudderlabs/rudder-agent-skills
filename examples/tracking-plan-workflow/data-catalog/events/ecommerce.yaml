@@ -5,27 +5,24 @@
 # An event declares only its identity (id, wire name, type, category). Which
 # properties it carries -- and whether they are required -- is decided by each
 # tracking plan, so the same event can be stricter on mobile than on web.
-
-version: rudder/v0.1
-kind: events
+version: "rudder/v1"
+kind: "events"
 metadata:
-  name: ecommerce-events
+  name: "ecommerce-events"
 spec:
   events:
-    - id: product_viewed
-      name: Product Viewed
-      event_type: track
+    - category: "#category:ecommerce"
       description: "User viewed a product detail page"
-      category: "#/categories/event-categories/ecommerce"
-
-    - id: product_added_to_cart
-      name: Product Added to Cart
-      event_type: track
+      event_type: "track"
+      id: "product_viewed"
+      name: "Product Viewed"
+    - category: "#category:ecommerce"
       description: "User added a product to their shopping cart"
-      category: "#/categories/event-categories/ecommerce"
-
-    - id: order_completed
-      name: Order Completed
-      event_type: track
+      event_type: "track"
+      id: "product_added_to_cart"
+      name: "Product Added to Cart"
+    - category: "#category:ecommerce"
       description: "Customer completed a purchase"
-      category: "#/categories/event-categories/ecommerce"
+      event_type: "track"
+      id: "order_completed"
+      name: "Order Completed"

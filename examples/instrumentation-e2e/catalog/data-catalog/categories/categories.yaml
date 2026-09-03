@@ -1,10 +1,10 @@
-version: rudder/v0.1
-kind: categories
+version: "rudder/v1"
+kind: "categories"
 metadata:
-  name: event-categories
+  name: "event-categories"
 spec:
   categories:
-    - id: checkout
-      name: checkout
-    - id: account
-      name: account
+    - id: "checkout"
+      name: "checkout"
+    - id: "account"
+      name: "account"

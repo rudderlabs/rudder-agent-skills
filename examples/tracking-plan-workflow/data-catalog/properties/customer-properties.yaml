@@ -1,110 +1,94 @@
 # Customer Properties
 #
-# Order, address and attribution properties.
-# Referenced by the AddressType custom type and the e-commerce tracking plans.
-
-version: rudder/v0.1
-kind: properties
+# Order, address and attribution properties. Referenced by the AddressType custom
+# type and by both e-commerce tracking plans -- the web plan requires the page
+# ones, the mobile plan requires the device ones. Same catalog, different rules.
+version: "rudder/v1"
+kind: "properties"
 metadata:
-  name: customer-properties
+  name: "customer-properties"
 spec:
   properties:
-    - id: customer_email
-      name: customer_email
-      type: string
+    - config:
+        format: "email"
       description: "Customer email address"
-      propConfig:
-        format: email
-
-    - id: order_id
-      name: order_id
-      type: string
+      id: "customer_email"
+      name: "customer_email"
+      type: "string"
+    - config:
+        max_length: 50
+        min_length: 3
       description: "Unique order identifier"
-      propConfig:
-        minLength: 3
-        maxLength: 50
-
-    - id: order_total
-      name: order_total
-      type: number
-      description: "Total order value"
-      propConfig:
+      id: "order_id"
+      name: "order_id"
+      type: "string"
+    - config:
         minimum: 0
-
-    - id: currency
-      name: currency
-      type: string
-      description: "ISO 4217 currency code"
-      propConfig:
+      description: "Total order value"
+      id: "order_total"
+      name: "order_total"
+      type: "number"
+    - config:
         pattern: "^[A-Z]{3}$"
-
-    # Address component properties, assembled by AddressType.
-    - id: address
-      name: address
-      type: string
+      description: "ISO 4217 currency code"
+      id: "currency"
+      name: "currency"
+      type: "string"
+    - config:
+        max_length: 200
       description: "Street address"
-      propConfig:
-        maxLength: 200
-
-    - id: city
-      name: city
-      type: string
+      id: "address"
+      name: "address"
+      type: "string"
+    - config:
+        max_length: 100
       description: "City name"
-      propConfig:
-        maxLength: 100
-
-    - id: state
-      name: state
-      type: string
+      id: "city"
+      name: "city"
+      type: "string"
+    - config:
+        max_length: 100
       description: "State or province"
-      propConfig:
-        maxLength: 100
-
-    - id: zipcode
-      name: zipcode
-      type: string
+      id: "state"
+      name: "state"
+      type: "string"
+    - config:
+        max_length: 20
       description: "Postal or ZIP code"
-      propConfig:
-        maxLength: 20
-
-    - id: shipping_address
-      name: shipping_address
-      type: "#/custom-types/address-types/address_type"
-      description: "Where the order ships to"
-
-    - id: billing_address
-      name: billing_address
-      type: "#/custom-types/address-types/address_type"
-      description: "Address the payment method is registered to"
-
-    # Attribution properties. The web plan requires the page ones, the mobile
-    # plan requires the device ones -- same catalog, different rules.
-    - id: page_url
-      name: page_url
-      type: string
+      id: "zipcode"
+      name: "zipcode"
+      type: "string"
+    - description: "Where the order ships to"
+      id: "shipping_address"
+      name: "shipping_address"
+      type: "#custom-type:address_type"
+    - description: "Address the payment method is registered to"
+      id: "billing_address"
+      name: "billing_address"
+      type: "#custom-type:address_type"
+    - config:
+        max_length: 2048
       description: "URL of the current page"
-      propConfig:
-        maxLength: 2048
-
-    - id: referrer_url
-      name: referrer_url
-      type: string
+      id: "page_url"
+      name: "page_url"
+      type: "string"
+    - config:
+        max_length: 2048
       description: "URL of the referring page"
-      propConfig:
-        maxLength: 2048
-
-    - id: session_id
-      name: session_id
-      type: string
+      id: "referrer_url"
+      name: "referrer_url"
+      type: "string"
+    - config:
+        max_length: 100
+        min_length: 10
       description: "Session identifier for grouping events"
-      propConfig:
-        minLength: 10
-        maxLength: 100
-
-    - id: device_id
-      name: device_id
-      type: string
+      id: "session_id"
+      name: "session_id"
+      type: "string"
+    - config:
+        max_length: 100
+        min_length: 10
       description: "Device identifier for mobile attribution"
-      propConfig:
-        minLength: 10
-        maxLength: 100
+      id: "device_id"
+      name: "device_id"
+      type: "string"

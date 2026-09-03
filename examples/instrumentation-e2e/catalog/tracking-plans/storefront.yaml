@@ -1,65 +1,55 @@
-version: rudder/v0.1
-kind: tp
+version: "rudder/v1"
+kind: "tracking-plan"
 metadata:
-  name: storefront
+  name: "storefront"
 spec:
-  id: storefront
-  display_name: "Storefront Tracking Plan"
   description: "Checkout funnel and account identity for the demo storefront."
+  display_name: "Storefront Tracking Plan"
+  id: "storefront"
   rules:
-    - type: event_rule
-      id: identify_rule
-      event:
-        $ref: "#/events/account-events/identify"
-        allow_unplanned: true
-        identity_section: context.traits
+    - additional_properties: true
+      event: "#event:identify"
+      id: "identify_rule"
+      identity_section: "context.traits"
       properties:
-        - $ref: "#/properties/storefront-account/email"
+        - property: "#property:email"
           required: true
-        - $ref: "#/properties/storefront-account/plan_tier"
+        - property: "#property:plan_tier"
           required: true
-
-    - type: event_rule
-      id: checkout_started_rule
-      event:
-        $ref: "#/events/checkout-events/checkout_started"
-        allow_unplanned: false
+      type: "event_rule"
+    - event: "#event:checkout_started"
+      id: "checkout_started_rule"
       properties:
-        - $ref: "#/properties/storefront-checkout/cart_id"
+        - property: "#property:cart_id"
           required: true
-        - $ref: "#/properties/storefront-checkout/item_count"
+        - property: "#property:item_count"
           required: true
-        - $ref: "#/properties/storefront-checkout/cart_total"
+        - property: "#property:cart_total"
           required: true
-        - $ref: "#/properties/storefront-checkout/currency"
+        - property: "#property:currency"
           required: true
-        - $ref: "#/properties/storefront-checkout/coupon_code"
+        - property: "#property:coupon_code"
           required: false
-
-    - type: event_rule
-      id: checkout_completed_rule
-      event:
-        $ref: "#/events/checkout-events/checkout_completed"
-        allow_unplanned: false
+      type: "event_rule"
+    - event: "#event:checkout_completed"
+      id: "checkout_completed_rule"
       properties:
-        - $ref: "#/properties/storefront-checkout/cart_id"
+        - property: "#property:cart_id"
           required: true
-        - $ref: "#/properties/storefront-checkout/cart_total"
+        - property: "#property:cart_total"
           required: true
-        - $ref: "#/properties/storefront-checkout/currency"
+        - property: "#property:currency"
           required: true
-        - $ref: "#/properties/storefront-checkout/payment_method"
+        - property: "#property:payment_method"
           required: true
-        - $ref: "#/properties/storefront-checkout/coupon_code"
+        - property: "#property:coupon_code"
           required: false
-
-    - type: event_rule
-      id: checkout_abandoned_rule
-      event:
-        $ref: "#/events/checkout-events/checkout_abandoned"
-        allow_unplanned: false
+      type: "event_rule"
+    - event: "#event:checkout_abandoned"
+      id: "checkout_abandoned_rule"
       properties:
-        - $ref: "#/properties/storefront-checkout/cart_id"
+        - property: "#property:cart_id"
           required: true
-        - $ref: "#/properties/storefront-checkout/abandonment_reason"
+        - property: "#property:abandonment_reason"
           required: true
+      type: "event_rule"

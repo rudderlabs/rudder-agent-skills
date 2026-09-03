@@ -39,27 +39,40 @@ One spec per file. A file holding several YAML documents separated by `---` is r
 Every file starts with the same three keys:
 
 ```yaml
-version: rudder/v0.1
-kind: <categories | properties | custom-types | events | tp>
+version: "rudder/v1"
+kind: "categories" | "properties" | "custom-types" | "events" | "tracking-plan"
 metadata:
-  name: <group-name>      # the group other files reference this file's entries by
+  name: "<group-name>"
 spec:
   ...
 ```
 
-`metadata.name` matters: it is the middle segment of every reference to the entries in that file.
+`metadata.name` groups the entries in a file for humans and for the CLI's diagnostics.
+It is *not* part of how other files address those entries — see below.
 
 ## Reference System
 
-Resources reference each other with `#/<kind>/<group>/<id>`, where `<group>` is the
-referenced file's `metadata.name` and `<id>` is the entry's `id`:
+Resources reference each other by kind and id: `#<kind>:<id>`. Ids are unique across
+the whole project, so a reference never names the file it points into.
 
 | Target | Pattern | Example |
 |--------|---------|---------|
-| Property | `#/properties/<group>/<id>` | `#/properties/product-properties/product_id` |
-| Event | `#/events/<group>/<id>` | `#/events/ecommerce-events/product_viewed` |
-| Category | `#/categories/<group>/<id>` | `#/categories/event-categories/ecommerce` |
-| Custom type | `#/custom-types/<group>/<id>` | `#/custom-types/product-types/product_type` |
+| Property | `#property:<id>` | `#property:product_id` |
+| Event | `#event:<id>` | `#event:product_viewed` |
+| Category | `#category:<id>` | `#category:ecommerce` |
+| Custom type | `#custom-type:<id>` | `#custom-type:product_type` |
+
+A property is attached to a rule or a custom type as a `property:` entry with its own
+`required` flag, so the same property can be required in one plan and optional in
+another:
+
+```yaml
+properties:
+  - property: "#property:page_url"
+    required: true
+  - property: "#property:session_id"
+    required: false
+```
 
 ## Contents
 
@@ -70,50 +83,52 @@ referenced file's `metadata.name` and `<id>` is the entry's `id`:
 ### Properties
 
 `kind: properties`. Each entry has an `id`, a wire `name`, a `type`, and optional
-constraints under `propConfig`.
+constraints under `config`.
 
 A property's `type` is either a primitive (`string`, `number`, `integer`,
 `boolean`, `null`, `array`, `object`) or a custom type reference:
 
 ```yaml
-- id: shipping_address
-  name: shipping_address
-  type: "#/custom-types/address-types/address_type"
+- id: "shipping_address"
+  name: "shipping_address"
+  type: "#custom-type:address_type"
 ```
 
-Arrays name their element type in `propConfig.itemTypes`:
+Arrays declare their element type in `item_type`, alongside `type: "array"`:
 
 ```yaml
-- id: products
-  name: products
-  type: array
-  propConfig:
-    itemTypes: ["#/custom-types/product-types/product_type"]
-    minItems: 1
+- id: "products"
+  name: "products"
+  type: "array"
+  item_type: "#custom-type:product_type"
+  config:
+    min_items: 1
 ```
 
-`propConfig.format` accepts only `date-time`, `date`, `time`, `email`, `uuid`,
-`hostname`, `ipv4` and `ipv6` — there is no `uri` format, so URL properties use
-`maxLength` instead.
+Constraint keys under `config` are snake_case — `min_length`, `max_length`,
+`minimum`, `maximum`, `min_items`, `enum`, `format`. `format` accepts only
+`date-time`, `date`, `time`, `email`, `uuid`, `hostname`, `ipv4` and `ipv6`; there
+is no `uri` format, so URL properties use `max_length` instead.
 
 ### Custom Types
 
 `kind: custom-types`. A type has an `id`, a `name` starting with an uppercase
-letter, a primitive `type`, and — for `type: object` — a list of property refs:
+letter, a primitive `type`, and — for `type: "object"` — a list of property refs
+with their own `required` flags:
 
 ```yaml
-- id: product_type
-  name: ProductType
-  type: object
+- id: "product_type"
+  name: "ProductType"
+  type: "object"
   properties:
-    - $ref: "#/properties/product-properties/product_id"
+    - property: "#property:product_id"
       required: true
-    - $ref: "#/properties/product-properties/product_msrp"
+    - property: "#property:product_msrp"
       required: false
 ```
 
-Scalar custom types carry constraints under `config` (note: `config` on custom
-types, `propConfig` on properties).
+Scalar custom types carry their constraints under `config`, the same key
+properties use.
 
 **ProductType** — product_id, product_sku, product_name, product_category,
 product_price required; product_msrp optional.
@@ -125,11 +140,11 @@ product_price required; product_msrp optional.
 `kind: events`, group `ecommerce-events`. An event declares only its identity:
 
 ```yaml
-- id: product_viewed
-  name: Product Viewed        # the wire name; "" for identify/group/page calls
-  event_type: track           # track | screen | identify | group | page
+- id: "product_viewed"
+  name: "Product Viewed"      # the wire name; "" for identify/group/page calls
+  event_type: "track"         # track | screen | identify | group | page
   description: "User viewed a product detail page"
-  category: "#/categories/event-categories/ecommerce"
+  category: "#category:ecommerce"
 ```
 
 Events carry no property rules. Which properties an event has, and whether they
@@ -144,32 +159,33 @@ stricter than the web plan over the same event.
 
 ### Tracking Plans
 
-`kind: tp` (not `tracking-plan`). `spec.id` and `spec.display_name` are both
-required. Each rule binds one event to its properties:
+`kind: tracking-plan`. `spec.id` and `spec.display_name` are both required. Each
+rule binds one event to the properties that event must carry *in this plan*:
 
 ```yaml
 spec:
-  id: web_app
+  id: "web_app"
   display_name: "Web App Tracking Plan"
   rules:
-    - type: event_rule
-      id: product_viewed_rule
-      event:
-        $ref: "#/events/ecommerce-events/product_viewed"
-        allow_unplanned: true
+    - type: "event_rule"
+      id: "product_viewed_rule"
+      event: "#event:product_viewed"
+      additional_properties: true
       properties:
-        - $ref: "#/properties/product-properties/product"
+        - property: "#property:product"
           required: true
 ```
 
-`allow_unplanned` on the event ref is what governs unplanned properties — there
-is no separate `governance:` block.
+`additional_properties` on the rule governs whether properties outside the rule are
+allowed through — there is no separate `governance:` block. For `identify` and
+`group` rules, add `identity_section: "context.traits"` to say where the traits sit.
 
 **Web App** (`web_app`) — full funnel, page attribution (`page_url`,
-`referrer_url`), `allow_unplanned: true` while the site is still being instrumented.
+`referrer_url`), `additional_properties: true` while the site is still being
+instrumented.
 
-**Mobile App** (`mobile_app`) — same funnel, `device_id` and `session_id`
-required on every event, `allow_unplanned: false`.
+**Mobile App** (`mobile_app`) — same funnel and the same catalog, but `device_id`
+and `session_id` required on every event.
 
 ## Prerequisites
 
@@ -245,25 +261,24 @@ one plan and optional (or absent) in the other:
 ```yaml
 # tracking-plans/mobile-app.yaml
 properties:
-  - $ref: "#/properties/customer-properties/device_id"
+  - property: "#property:device_id"
     required: true
 ```
 
 ### Create Environment-Specific Plans
 
 Copy a plan file, give it a new `spec.id` and `display_name`, and tighten
-`allow_unplanned`:
+`additional_properties`:
 
 ```yaml
 spec:
-  id: web_app_production
+  id: "web_app_production"
   display_name: "Web App - Production"
   rules:
-    - type: event_rule
-      id: product_viewed_rule
-      event:
-        $ref: "#/events/ecommerce-events/product_viewed"
-        allow_unplanned: false
+    - type: "event_rule"
+      id: "product_viewed_rule"
+      event: "#event:product_viewed"
+      additional_properties: false
 ```
 
 ## CLI Commands Reference
