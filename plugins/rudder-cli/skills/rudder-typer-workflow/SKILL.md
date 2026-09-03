@@ -1,6 +1,6 @@
 ---
 name: rudder-typer-workflow
-description: Generates a type-safe analytics client (TypeScript, Kotlin, Swift) from a RudderStack tracking plan with `rudder-cli typer generate`, including the offline `--local` flow that reads specs off a checkout with no workspace, apply or auth. Use when generating typed event tracking code, wiring a generated client into an app, or setting up the catalog-to-code loop.
+description: Generates a type-safe analytics client (TypeScript, Kotlin, Swift) from a RudderStack tracking plan, including the offline `--local` flow needing no workspace, apply or auth. Use when generating typed tracking code, wiring a generated client into an app, or setting up the catalog-to-code loop.
 allowed-tools: "Bash(rudder-cli *), Read, Write, Edit"
 ---
 
