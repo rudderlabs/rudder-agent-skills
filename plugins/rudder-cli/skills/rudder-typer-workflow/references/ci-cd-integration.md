@@ -41,7 +41,7 @@ jobs:
       # unpinned CLI turns every release into a spurious diff.
       - name: Install rudder-cli
         env:
-          RUDDER_CLI_VERSION: 0.23.0
+          RUDDER_CLI_VERSION: 0.24.0
         run: |
           curl -fsSL "https://github.com/rudderlabs/rudder-iac/releases/download/v${RUDDER_CLI_VERSION}/rudder-cli_Linux_x86_64.tar.gz" \
             | tar -xz -C /usr/local/bin rudder-cli

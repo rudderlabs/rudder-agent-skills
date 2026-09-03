@@ -7,8 +7,8 @@
 
 | | |
 | --- | --- |
-| catalog commit | `5aa36984d1c623fe0c793009a2addb97f9c2ae7e` |
+| catalog commit | `57262c755dd817274ced215cab4e336d969a0ba2` |
 | branch at generation | `devex/typer-local-skills-and-e2e-example` |
 | catalog working tree | clean |
 | tracking plan | `storefront` |
-| rudder-cli | `0.23.0` |
+| rudder-cli | `0.24.0` |
