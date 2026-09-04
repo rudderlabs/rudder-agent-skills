@@ -62,6 +62,11 @@ No account, no access token, no `rudder-cli auth login`.
 
 ## Enable local generation
 
+> **Being removed.** `--local` is promoted to GA in
+> [rudder-iac#821](https://github.com/rudderlabs/rudder-iac/pull/821); once that ships,
+> no flags are needed and the command works out of the box. The gates below apply to
+> rudder-cli **0.24.0 and earlier**, and setting them on a later release is harmless.
+
 It is currently behind two feature flags, and **both** must be on. Each can be an
 environment variable or a persisted setting in `~/.rudder/config.json`:
 

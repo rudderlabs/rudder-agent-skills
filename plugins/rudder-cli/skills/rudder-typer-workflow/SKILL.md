@@ -35,6 +35,11 @@ for generating code.
 
 ## Enabling `--local`
 
+> **Being removed.** `--local` is promoted to GA in
+> [rudder-iac#821](https://github.com/rudderlabs/rudder-iac/pull/821); once that ships,
+> no flags are needed and the command works out of the box. The gates below apply to
+> rudder-cli **0.24.0 and earlier**, and setting them on a later release is harmless.
+
 Experimental, behind **two** gates. Both must be on; each can be an environment
 variable or a persisted setting in `~/.rudder/config.json`:
 
@@ -139,13 +144,22 @@ does not support is *not* an error:
 | Event type | TypeScript | Kotlin | Swift |
 | --- | :-: | :-: | :-: |
 | `track`, `identify`, `group` | ✅ | ✅ | ✅ |
-| `page` | ✅ | ✅ | — |
+| `page` | ✅ | — | — |
 | `screen` | — | ✅ | ✅ |
 
-At 0.24.0 a `screen` rule generating for TypeScript prints `Warning: unsupported event
-type "screen", skipping` **on stdout** and exits **0**. The method is simply absent.
-Redirecting stdout in a sync script throws that warning away, so a plan serving both a
-web and an iOS client can go green with a method missing — fail on `Warning:` instead.
+This mirrors the platforms, not the generator: a screen impression on web is a **page**
+call, and the same impression in a mobile app is a **screen** call. `page` is
+web-only; `screen` is mobile-only.
+
+It matters because **one tracking plan is routinely attached to both a web and a mobile
+source.** A plan carrying both impression types is correct — each platform's client
+takes the half that applies to it. What is not correct is a plan carrying only `page`
+and a mobile client generated from it, which loses the impression event entirely.
+
+That loss is silent. At 0.24.0 a `screen` rule generating for TypeScript prints
+`Warning: unsupported event type "screen", skipping` **on stdout** and exits **0**; the
+method is simply absent. Redirecting stdout in a sync script throws away the only
+signal — fail on `Warning:` instead.
 
 Custom types become named unions/enums shared across events; a property's `enum`
 becomes a union scoped to that property. Optional plan properties become optional

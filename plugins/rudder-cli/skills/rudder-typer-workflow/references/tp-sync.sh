@@ -33,8 +33,9 @@ cli_version="$(rudder-cli --version | awk '{print $NF}')"
   || die "rudder-cli $cli_version is too old; >= $MIN_CLI required."
 
 generate() {
-  # The generator SKIPS an event type the platform doesn't support -- `screen` on
-  # TypeScript, `page` on Swift -- with a warning on STDOUT and exit 0. Redirecting
+  # The generator SKIPS an event type the platform doesn't support -- `page` is
+  # web-only, `screen` is mobile-only -- with a warning on STDOUT and exit 0. One plan
+  # often serves both a web and a mobile source, so this is routine. Redirecting
   # stdout would throw away the only signal that a method is silently missing, so
   # capture it and treat any warning as fatal.
   local out

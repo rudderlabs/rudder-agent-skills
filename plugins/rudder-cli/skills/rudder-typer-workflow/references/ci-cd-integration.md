@@ -12,52 +12,25 @@ A working version of everything here is `examples/instrumentation-e2e/` in this 
 Regenerate against the catalog's **default branch** and fail if the committed client
 differs.
 
-```yaml
-name: Typed client drift
+**The workflow is [`typed-client-drift.yml`](typed-client-drift.yml), which ships beside
+this file — copy that rather than retyping it.** One job: check out the consumer, check
+out the catalog's *default branch*, install a pinned rudder-cli, run `npm run tp:check`.
 
-on:
-  pull_request:
-    paths:
-      - 'src/analytics/generated/**'
-      - 'scripts/tp-sync.sh'
-      - 'package.json'
+Four things in it are load-bearing, and each has bitten someone:
 
-jobs:
-  drift:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+- **No `paths:` filter.** A call-site-only PR touches nothing under `generated/`, and a
+  catalog-only change touches nothing in the consumer repo at all — exactly the two cases
+  where the committed client goes stale. A path filter skips the job when it is needed
+  most.
+- **The catalog's default branch**, not a ref derived from the PR. The question is "is
+  this client reproducible from catalog main?", which is what makes the merge order
+  mechanical rather than advisory.
+- **A pinned CLI version.** The generated header embeds it, so an unpinned CLI turns
+  every release into a diff that looks like drift and isn't.
+- **A `Warning:` guard** wherever a workflow calls the generator directly rather than
+  through `tp-sync.sh`. An unsupported event type is skipped with a warning on stdout and
+  exit 0, so an unguarded step goes green with a method missing.
 
-      # The catalog's default branch — not the PR author's branch. The question is
-      # "is the committed client reproducible from catalog main?", which is what makes
-      # the merge order enforceable instead of advisory.
-      - uses: actions/checkout@v4
-        with:
-          repository: your-org/your-catalog-repo
-          path: .catalog
-          token: ${{ secrets.CATALOG_READ_TOKEN }}
-
-      # Pin the CLI: the generated header embeds the version that produced it, so an
-      # unpinned CLI turns every release into a spurious diff.
-      - name: Install rudder-cli
-        env:
-          RUDDER_CLI_VERSION: 0.24.0
-        run: |
-          curl -fsSL "https://github.com/rudderlabs/rudder-iac/releases/download/v${RUDDER_CLI_VERSION}/rudder-cli_Linux_x86_64.tar.gz" \
-            | tar -xz -C /usr/local/bin rudder-cli
-          rudder-cli --version
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: '.nvmrc'
-          cache: 'npm'
-      - run: npm ci
-
-      - name: Committed client must match the catalog
-        env:
-          CATALOG_PATH: .catalog
-        run: npm run tp:check
-```
 
 `tp:check` regenerates into a temp directory and diffs. The whole implementation:
 
@@ -139,8 +112,11 @@ on:
     paths: ['catalog/**', 'apps/web/src/analytics/generated/**']
 ```
 
-The check becomes "does the committed client match the catalog *in this PR*", which
-also removes the merge-order problem — both sides land in one commit.
+A `paths:` filter **is** right here, unlike the two-repo case above: both the catalog and
+the client are in this PR's diff, so the paths that would make the client stale are
+exactly the ones listed. The check becomes "does the committed client match the catalog
+*in this PR*", which also removes the merge-order problem — both sides land in one
+commit.
 
 ## Do not
 

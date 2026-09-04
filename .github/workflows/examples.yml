@@ -76,11 +76,25 @@ jobs:
           set -euo pipefail
           # `validate` needs a workspace token; `typer generate --local` is the offline
           # loader, so it is what proves the specs are well-formed here.
-          rudder-cli typer generate --local --location examples/instrumentation-e2e/catalog \
+          #
+          # An event type the platform doesn't support is SKIPPED with a warning on
+          # stdout and exit 0 -- so exit status alone would pass with a method missing.
+          # tp-sync.sh guards this; a workflow calling the generator directly has to
+          # guard it too, which is the whole point of the gate.
+          gen() {
+            local out
+            out="$(rudder-cli typer generate --local "$@" 2>&1)" || { echo "$out"; return 1; }
+            echo "$out"
+            if grep -q 'Warning:' <<<"$out"; then
+              echo "::error::generator skipped part of the plan -- see the warning above"
+              return 1
+            fi
+          }
+          gen --location examples/instrumentation-e2e/catalog \
             --tracking-plan-id storefront --platform typescript --output "$(mktemp -d)"
           for tp in web_app mobile_app; do
             for p in typescript kotlin swift; do
-              rudder-cli typer generate --local --location examples/tracking-plan-workflow \
+              gen --location examples/tracking-plan-workflow \
                 --tracking-plan-id "$tp" --platform "$p" --output "$(mktemp -d)"
             done
           done

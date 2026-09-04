@@ -34,15 +34,34 @@ concern, not a generation concern.
 
 ## Event type support
 
-`track`, `identify` and `group` generate on all three platforms. The other two do not:
+`track`, `identify` and `group` generate on all three platforms. The two impression
+types split cleanly along web/mobile lines:
 
 | Event type | TypeScript | Kotlin | Swift |
 | --- | :-: | :-: | :-: |
-| `page` | ✅ | ✅ | — |
+| `page` | ✅ | — | — |
 | `screen` | — | ✅ | ✅ |
 
-TypeScript excludes `screen` deliberately — `analytics-js` has no `screen()` API, so a
-generated method could not dispatch. Swift emits no `page`.
+A screen impression on web is a `page` call; the same impression on mobile is a
+`screen` call. The generator follows the SDKs: `analytics-js` has no `screen()` API
+(the TypeScript generator says so in a comment), and neither mobile generator emits
+`page` — Kotlin's event-type switch handles track/identify/group/screen and its
+`default` arm reads `// Skip page events`.
+
+**One plan, both source types.** A tracking plan attached to a web *and* a mobile
+source will legitimately carry both `page` and `screen` rules; each client generates
+the half that applies. The failure to watch for is the asymmetric one — a plan with
+only `page` rules generating a mobile client, which drops the impression event.
+
+**Two greps that will mislead you** if you try to verify this from the source:
+
+- Kotlin emits a `PageProperties` typealias that no method uses, so grepping a
+  generated Kotlin client for `Page` returns a hit.
+- `naming.go` and the rule-validation switch both have `case plan.EventTypePage`
+  branches — validation, not emission.
+
+Only the emitter settles it (`kotlin/rudderanalytics.go`), or generating a page rule
+and looking for the method.
 
 **An unsupported rule is skipped, not rejected.** Generating a plan containing a
 `screen` rule for TypeScript:
