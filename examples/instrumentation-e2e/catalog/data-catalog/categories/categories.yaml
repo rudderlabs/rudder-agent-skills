@@ -1,0 +1,10 @@
+version: "rudder/v1"
+kind: "categories"
+metadata:
+  name: "event-categories"
+spec:
+  categories:
+    - id: "checkout"
+      name: "checkout"
+    - id: "account"
+      name: "account"

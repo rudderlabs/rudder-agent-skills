@@ -1,118 +1,85 @@
 # Product Properties
 #
-# Properties related to products in the catalog.
-# Referenced by ProductType custom type and e-commerce events.
-
+# Properties related to products in the catalog. Referenced by the ProductType
+# custom type and the e-commerce tracking plans.
+#
+# `product` is an object property typed by a custom type, so every event carrying
+# a product reuses one definition instead of restating the fields; `products` is
+# an array whose items are that same custom type.
 version: "rudder/v1"
-kind: "property"
+kind: "properties"
 metadata:
-  name: "properties"
+  name: "product-properties"
 spec:
-  name: "product_id"
-  type: "string"
-  description: "Unique product identifier"
-  config:
-    minLength: 3
-    maxLength: 50
-
----
-version: "rudder/v1"
-kind: "property"
-metadata:
-  name: "properties"
-spec:
-  name: "product_sku"
-  type: "string"
-  description: "Product SKU for inventory tracking"
-  config:
-    minLength: 3
-    maxLength: 50
-
----
-version: "rudder/v1"
-kind: "property"
-metadata:
-  name: "properties"
-spec:
-  name: "product_name"
-  type: "string"
-  description: "Human-readable product name"
-  config:
-    maxLength: 200
-
----
-version: "rudder/v1"
-kind: "property"
-metadata:
-  name: "properties"
-spec:
-  name: "product_price"
-  type: "number"
-  description: "Product price in default currency"
-  config:
-    minimum: 0
-    exclusiveMinimum: true
-
----
-version: "rudder/v1"
-kind: "property"
-metadata:
-  name: "properties"
-spec:
-  name: "product_msrp"
-  type: "number"
-  description: "Manufacturer's suggested retail price"
-  config:
-    minimum: 0
-
----
-version: "rudder/v1"
-kind: "property"
-metadata:
-  name: "properties"
-spec:
-  name: "product_category"
-  type: "string"
-  description: "Product category for classification"
-  config:
-    enum:
-      - "Footwear"
-      - "Clothing"
-      - "Accessories"
-
----
-version: "rudder/v1"
-kind: "property"
-metadata:
-  name: "properties"
-spec:
-  name: "quantity"
-  type: "integer"
-  description: "Number of items"
-  config:
-    minimum: 1
-    maximum: 100
-
----
-version: "rudder/v1"
-kind: "property"
-metadata:
-  name: "properties"
-spec:
-  name: "cart_total"
-  type: "number"
-  description: "Current cart total value"
-  config:
-    minimum: 0
-
----
-version: "rudder/v1"
-kind: "property"
-metadata:
-  name: "properties"
-spec:
-  name: "product_count"
-  type: "integer"
-  description: "Number of distinct products in cart"
-  config:
-    minimum: 0
+  properties:
+    - config:
+        max_length: 50
+        min_length: 3
+      description: "Unique product identifier"
+      id: "product_id"
+      name: "product_id"
+      type: "string"
+    - config:
+        max_length: 50
+        min_length: 3
+      description: "Product SKU for inventory tracking"
+      id: "product_sku"
+      name: "product_sku"
+      type: "string"
+    - config:
+        max_length: 200
+      description: "Human-readable product name"
+      id: "product_name"
+      name: "product_name"
+      type: "string"
+    - config:
+        minimum: 0
+      description: "Product price in the default currency"
+      id: "product_price"
+      name: "product_price"
+      type: "number"
+    - config:
+        minimum: 0
+      description: "Manufacturer's suggested retail price"
+      id: "product_msrp"
+      name: "product_msrp"
+      type: "number"
+    - config:
+        enum:
+          - "Footwear"
+          - "Clothing"
+          - "Accessories"
+      description: "Product category for classification"
+      id: "product_category"
+      name: "product_category"
+      type: "string"
+    - description: "The product the shopper interacted with"
+      id: "product"
+      name: "product"
+      type: "#custom-type:product_type"
+    - config:
+        min_items: 1
+      description: "Line items in a completed order"
+      id: "products"
+      item_type: "#custom-type:product_type"
+      name: "products"
+      type: "array"
+    - config:
+        maximum: 100
+        minimum: 1
+      description: "Number of items added"
+      id: "quantity"
+      name: "quantity"
+      type: "integer"
+    - config:
+        minimum: 0
+      description: "Current cart total value"
+      id: "cart_total"
+      name: "cart_total"
+      type: "number"
+    - config:
+        minimum: 0
+      description: "Number of distinct products in the cart"
+      id: "product_count"
+      name: "product_count"
+      type: "integer"

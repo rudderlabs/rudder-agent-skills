@@ -1,0 +1,75 @@
+# Copy into .github/workflows/ of the app that consumes a generated client.
+#
+# Why this exists
+# ---------------
+# `typer generate --local` reads YAML off a checkout, so the committed client is a
+# build artifact of *another repository's* state. Nothing in the type system, the
+# linter or the test suite notices when the two drift apart: a stale client is
+# valid TypeScript that compiles, passes tests and silently emits the wrong shape.
+#
+# Without it the discipline lives only in a contributing guide and reviewer memory,
+# so it holds exactly as long as everyone remembers it. This job is the mechanical
+# version.
+#
+# It catches:
+#   - a call-site PR merged without regenerating
+#   - a client generated from a wrong-branch or dirty catalog checkout
+#   - a catalog change merged without the consumer being regenerated
+name: Typed client drift
+
+# Deliberately NO `paths:` filter. Two of the four cases above are call-site-only or
+# catalog-only PRs that touch nothing under `generated/` — filtering on those paths
+# would skip the job exactly when the client is stale. It is one `npm ci` plus one
+# generate; run it on everything.
+#
+# The `schedule:` catches the remaining case: a catalog change merged in the other
+# repo with no PR here at all. Swap it for `repository_dispatch` if the catalog repo
+# can notify this one.
+on:
+  pull_request:
+  schedule:
+    - cron: '0 6 * * 1-5'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      # The catalog is the source of truth. Check out its DEFAULT branch, not the
+      # PR author's branch: the question this job answers is "is the committed
+      # client reproducible from catalog main?", which is what makes the merge
+      # order (catalog first, consumer second) enforceable rather than advisory.
+      - name: Check out the catalog
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          repository: your-org/your-catalog-repo
+          path: .catalog
+          token: ${{ secrets.CATALOG_READ_TOKEN }}
+
+      # Pin the CLI. The generated header embeds the version that produced it, so an
+      # unpinned CLI turns every release into a spurious diff. Bump this in the same
+      # PR that commits a client regenerated with the newer CLI.
+      - name: Install rudder-cli
+        env:
+          RUDDER_CLI_VERSION: 0.24.0
+        run: |
+          curl -fsSL "https://github.com/rudderlabs/rudder-iac/releases/download/v${RUDDER_CLI_VERSION}/rudder-cli_Linux_x86_64.tar.gz" \
+            | tar -xz -C /usr/local/bin rudder-cli
+          rudder-cli --version
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'      # or node-version-file if your repo has one
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Committed client must match the catalog
+        env:
+          CATALOG_PATH: .catalog
+        run: npm run tp:check

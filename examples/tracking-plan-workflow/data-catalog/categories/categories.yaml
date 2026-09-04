@@ -1,11 +1,11 @@
 # Event Categories
 #
 # Organize events into logical groups for easier management.
-
 version: "rudder/v1"
-kind: "category"
+kind: "categories"
 metadata:
-  name: "categories"
+  name: "event-categories"
 spec:
-  name: "ecommerce"
-  description: "Events related to product discovery, cart, and purchase"
+  categories:
+    - id: "ecommerce"
+      name: "ecommerce"

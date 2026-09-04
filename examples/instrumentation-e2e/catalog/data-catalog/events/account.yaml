@@ -1,0 +1,14 @@
+# Account Events
+#
+# Non-track events carry an empty `name` -- the call is `identify`, not a named
+# event. `name: ""` is required; omitting the key fails spec validation.
+version: "rudder/v1"
+kind: "events"
+metadata:
+  name: "account-events"
+spec:
+  events:
+    - category: "#category:account"
+      description: "Establishes the signed-in shopper's identity and traits."
+      event_type: "identify"
+      id: "identify"

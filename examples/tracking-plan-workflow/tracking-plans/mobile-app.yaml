@@ -1,37 +1,58 @@
 # Mobile App Tracking Plan
 #
-# Tracking plan for iOS and Android apps.
-# Requires device_id and session_id for mobile attribution.
-# Governance is strict (block violations) for production safety.
-
+# iOS and Android. Same catalog as the web plan, stricter rules: device_id and
+# session_id are required for mobile attribution, and unplanned properties are
+# rejected rather than forwarded.
 version: "rudder/v1"
 kind: "tracking-plan"
 metadata:
-  name: "tracking-plans"
+  name: "mobile-app"
 spec:
-  name: "Mobile App Tracking Plan"
-  description: "E-commerce events for mobile apps with device attribution"
-  governance:
-    unplannedEvents: block      # Reject events not in plan
-    violatingEvents: block      # Reject events that violate schema
-  events:
-    - event: "urn:rudder:event/product-viewed"
-      rules:
-        # Override: require device_id for mobile attribution
-        - property: "urn:rudder:property/device_id"
+  description: "E-commerce funnel for the mobile apps, with device attribution."
+  display_name: "Mobile App Tracking Plan"
+  id: "mobile_app"
+  rules:
+    - event: "#event:product_viewed"
+      id: "product_viewed_rule"
+      properties:
+        - property: "#property:product"
           required: true
-        # Override: require session_id for session tracking
-        - property: "urn:rudder:property/session_id"
+        - property: "#property:device_id"
           required: true
-    - event: "urn:rudder:event/product-added-to-cart"
-      rules:
-        - property: "urn:rudder:property/device_id"
+        - property: "#property:session_id"
           required: true
-        - property: "urn:rudder:property/session_id"
+      type: "event_rule"
+    - event: "#event:product_added_to_cart"
+      id: "product_added_to_cart_rule"
+      properties:
+        - property: "#property:product"
           required: true
-    - event: "urn:rudder:event/order-completed"
-      rules:
-        - property: "urn:rudder:property/device_id"
+        - property: "#property:quantity"
           required: true
-        - property: "urn:rudder:property/session_id"
+        - property: "#property:cart_total"
+          required: false
+        - property: "#property:device_id"
           required: true
+        - property: "#property:session_id"
+          required: true
+      type: "event_rule"
+    - event: "#event:order_completed"
+      id: "order_completed_rule"
+      properties:
+        - property: "#property:products"
+          required: true
+        - property: "#property:order_id"
+          required: true
+        - property: "#property:order_total"
+          required: true
+        - property: "#property:customer_email"
+          required: true
+        - property: "#property:shipping_address"
+          required: true
+        - property: "#property:billing_address"
+          required: true
+        - property: "#property:device_id"
+          required: true
+        - property: "#property:session_id"
+          required: true
+      type: "event_rule"

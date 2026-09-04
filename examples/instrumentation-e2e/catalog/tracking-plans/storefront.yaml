@@ -1,0 +1,55 @@
+version: "rudder/v1"
+kind: "tracking-plan"
+metadata:
+  name: "storefront"
+spec:
+  description: "Checkout funnel and account identity for the demo storefront."
+  display_name: "Storefront Tracking Plan"
+  id: "storefront"
+  rules:
+    - additional_properties: true
+      event: "#event:identify"
+      id: "identify_rule"
+      identity_section: "context.traits"
+      properties:
+        - property: "#property:email"
+          required: true
+        - property: "#property:plan_tier"
+          required: true
+      type: "event_rule"
+    - event: "#event:checkout_started"
+      id: "checkout_started_rule"
+      properties:
+        - property: "#property:cart_id"
+          required: true
+        - property: "#property:item_count"
+          required: true
+        - property: "#property:cart_total"
+          required: true
+        - property: "#property:currency"
+          required: true
+        - property: "#property:coupon_code"
+          required: false
+      type: "event_rule"
+    - event: "#event:checkout_completed"
+      id: "checkout_completed_rule"
+      properties:
+        - property: "#property:cart_id"
+          required: true
+        - property: "#property:cart_total"
+          required: true
+        - property: "#property:currency"
+          required: true
+        - property: "#property:payment_method"
+          required: true
+        - property: "#property:coupon_code"
+          required: false
+      type: "event_rule"
+    - event: "#event:checkout_abandoned"
+      id: "checkout_abandoned_rule"
+      properties:
+        - property: "#property:cart_id"
+          required: true
+        - property: "#property:abandonment_reason"
+          required: true
+      type: "event_rule"

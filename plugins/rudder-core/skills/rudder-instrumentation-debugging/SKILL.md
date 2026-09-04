@@ -261,7 +261,7 @@ rudder-cli validate -l ./data-catalog/events/
 ### Verbose Output
 
 ```bash
-rudder-cli validate -l ./ --verbose
+rudder-cli validate -l ./
 ```
 
 Shows:
@@ -302,7 +302,7 @@ rudder-cli workspace info
 rudder-cli auth login
 
 # Show detailed validation
-rudder-cli validate -l ./ --verbose
+rudder-cli validate -l ./
 ```
 
 ## Quick Reference: Error → Fix
