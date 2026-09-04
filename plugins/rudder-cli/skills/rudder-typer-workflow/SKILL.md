@@ -35,13 +35,14 @@ for generating code.
 
 ## Enabling `--local`
 
-> **Being removed.** `--local` is promoted to GA in
-> [rudder-iac#821](https://github.com/rudderlabs/rudder-iac/pull/821); once that ships,
-> no flags are needed and the command works out of the box. The gates below apply to
-> rudder-cli **0.24.0 and earlier**, and setting them on a later release is harmless.
+**On rudder-cli 0.25.0 and later there is nothing to enable** — `--local` is generally
+available, promoted in [rudder-iac#821](https://github.com/rudderlabs/rudder-iac/pull/821).
 
-Experimental, behind **two** gates. Both must be on; each can be an environment
-variable or a persisted setting in `~/.rudder/config.json`:
+<details>
+<summary>On 0.24.0 and earlier it sits behind two feature flags</summary>
+
+Both must be on, and each can be an environment variable *or* a persisted setting in
+`~/.rudder/config.json`:
 
 | Gate | Environment variable | `~/.rudder/config.json` |
 | --- | --- | --- |
@@ -49,9 +50,11 @@ variable or a persisted setting in `~/.rudder/config.json`:
 | The `localTyper` flag | `RUDDERSTACK_X_LOCAL_TYPER=true` | `"flags": { "localTyper": true }` |
 
 The umbrella gate zeroes *every* experimental flag when off, so setting only
-`RUDDERSTACK_X_LOCAL_TYPER` on a fresh install does nothing. If the user already has
-`"experimental": true` persisted, the env var alone works — which is why the same
-command can succeed on one machine and fail on another. When it fails, check both.
+`RUDDERSTACK_X_LOCAL_TYPER` on a fresh install did nothing. If `"experimental": true`
+was already persisted, the env var alone worked — which is why the same command could
+succeed on one machine and fail on another. Setting both on 0.25.0+ is harmless.
+
+</details>
 
 Requires **rudder-cli >= 0.22.0**. Check with `rudder-cli --version` before anything
 else; older versions generate a client with a different constructor (see
@@ -85,8 +88,7 @@ codegen config. Same spelling, different flag.
 
 ```bash
 # offline, from a catalog checked out beside the app
-RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_LOCAL_TYPER=true \
-  rudder-cli typer generate \
+rudder-cli typer generate \
     --local --location ../catalog \
     --tracking-plan-id storefront \
     --platform typescript \
@@ -248,7 +250,7 @@ and still validates every kind.
 
 | Symptom | Cause |
 | --- | --- |
-| `--local is experimental; enable it by setting both …` | one or both gates are off — see [Enabling `--local`](#enabling---local) |
+| `--local is experimental; enable it by setting both …` | rudder-cli 0.24.0 or earlier — upgrade to 0.25.0+, or set both flags |
 | `required flag(s) "platform" not set` | `--platform` omitted. `--help` advertises `(default "kotlin")`, but the flag is still required |
 | `unsupported platform: …` | `--platform` given an invalid value — use `typescript`, `kotlin` or `swift` |
 | `multiple tracking plans found, specify --tracking-plan-id` | pass the plan's `spec.id`; the error lists the available ones |

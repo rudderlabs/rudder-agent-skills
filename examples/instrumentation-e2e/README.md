@@ -47,7 +47,9 @@ already installed, the whole of Part 1 is seconds — installing the CLI is the 
 
 ## Prerequisites
 
-- **rudder-cli ≥ 0.22.0** — check with `rudder-cli --version`. If you don't have it:
+- **rudder-cli ≥ 0.25.0** — check with `rudder-cli --version`. 0.22.0 is the floor the
+  sync script enforces; 0.25.0 is the first release where local generation needs no
+  feature flags. If you don't have it:
 
   ```bash
   curl -fsSL https://github.com/rudderlabs/rudder-iac/releases/latest/download/rudder-cli_Darwin_arm64.tar.gz \
@@ -62,13 +64,14 @@ No account, no access token, no `rudder-cli auth login`.
 
 ## Enable local generation
 
-> **Being removed.** `--local` is promoted to GA in
-> [rudder-iac#821](https://github.com/rudderlabs/rudder-iac/pull/821); once that ships,
-> no flags are needed and the command works out of the box. The gates below apply to
-> rudder-cli **0.24.0 and earlier**, and setting them on a later release is harmless.
+**On rudder-cli 0.25.0 and later there is nothing to enable** — local generation is
+generally available. Skip to [Run it](#run-it).
 
-It is currently behind two feature flags, and **both** must be on. Each can be an
-environment variable or a persisted setting in `~/.rudder/config.json`:
+<details>
+<summary>On 0.24.0 and earlier it sits behind two feature flags</summary>
+
+Both must be on, and each can be an environment variable or a persisted setting in
+`~/.rudder/config.json`:
 
 | Gate | Environment variable | `~/.rudder/config.json` |
 | --- | --- | --- |
@@ -76,9 +79,11 @@ environment variable or a persisted setting in `~/.rudder/config.json`:
 | The `localTyper` flag | `RUDDERSTACK_X_LOCAL_TYPER=true` | `"flags": { "localTyper": true }` |
 
 The umbrella gate zeroes *every* experimental flag when it is off, so setting only
-`RUDDERSTACK_X_LOCAL_TYPER` on a fresh install does nothing. If you already have
-`"experimental": true` saved, the environment variable alone is enough — which is why the
-same command can work on a colleague's machine and not yours. When it fails, check both.
+`RUDDERSTACK_X_LOCAL_TYPER` on a fresh install did nothing. If `"experimental": true` was
+already saved, the environment variable alone was enough — which is why the same command
+could work on a colleague's machine and not yours. Setting both on 0.25.0+ is harmless.
+
+</details>
 
 ## Run it
 
