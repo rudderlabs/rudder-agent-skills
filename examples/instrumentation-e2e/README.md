@@ -11,7 +11,7 @@ This is a working reference for that, plus the steps to set it up in your own ap
    ─────────────────                     ────────
    data-catalog/                         src/analytics/generated/   generated,
      events/        ──┐                    index.ts                 committed,
-     properties/      │   rudder-cli       SOURCE.md                never edited
+     properties/      │   rudder-cli                                never edited
      custom-types/    ├──  typer      ──▶
    tracking-plans/  ──┘   generate       src/analytics/client.ts    you write once
      storefront.yaml       --local
@@ -249,7 +249,7 @@ command does not:
 | Enforces a minimum CLI version | 0.22.0 changed the generated constructor; older output silently mismatches your `client.ts` |
 | Sets `TMPDIR` beside the repo | the CLI renames a temp file onto the target, which fails across volumes on older releases |
 | Sets both feature flags | so nobody debugs the two-gate problem twice |
-| Writes `SOURCE.md` | records which catalog commit produced this client |
+| Writes `SOURCE.md` | records which catalog commit produced this client — **only when the catalog is a separate repo**, see below |
 
 ## Step 4 — Wire the client (the only file you write by hand)
 
@@ -315,7 +315,7 @@ Two habits worth adopting immediately:
 
 ## Step 6 — Commit both sides, and add the CI gate
 
-Commit the generated `index.ts` and `SOURCE.md`. Committing the artifact is deliberate:
+Commit the generated `index.ts`. Committing the artifact is deliberate:
 your build stays independent of the CLI, and **the diff of the generated client is the most
 reviewable thing in the whole workflow** — it shows exactly which shapes changed, next to
 the call sites that use them.
@@ -481,6 +481,40 @@ repository, after merge.
 
 ---
 
+## Provenance, and why this example has none
+
+The generated client is a build artifact of **another repository's state**. Generate
+from a stale or wrong-branch catalog and you get a *different, valid-looking* client
+that compiles and passes tests; nothing in the type system notices. That is what
+`SOURCE.md` is for — it records the catalog commit, branch and clean/dirty state beside
+the client, so a reviewer can check the client against the catalog change it claims to
+come from.
+
+**It only works when the catalog is a separate repository.** Then the commit it names is
+already final, and the record is exact.
+
+In a single repo — which is what this example is — it cannot be honest. Writing the
+hash changes the file, which changes the hash, so the record always names the *previous*
+commit; and any regeneration mid-session records `DIRTY`. Committing that is worse than
+committing nothing, because it reads as evidence while asserting something untrue.
+
+So `tp-sync.sh` detects the case and skips the file:
+
+```
+✅ typed client regenerated (catalog is in this repository — provenance is this commit)
+```
+
+Point `CATALOG_PATH` at a catalog in its own repository and you get the real thing:
+
+```
+✅ typed client regenerated from 80aa64904 (main, clean)
+```
+
+Nothing is lost here. When both sides land in one commit, that commit *is* the
+provenance — and [`tp:check`](#step-6--commit-both-sides-and-add-the-ci-gate) still
+proves the committed client matches the catalog, which is the guarantee that actually
+matters.
+
 ## Two repositories
 
 If your catalog is a separate repo from your app, the two pull requests are **ordered, not
@@ -550,8 +584,7 @@ Worth knowing before you commit to this:
 - **A missing SDK throws** from generated code; you supply the guard.
 - **Only enums are compile-time enforced.** Regex, length and range constraints are runtime
   concerns, as is anything about values rather than shapes.
-- **`SOURCE.md` lags one commit** when the catalog lives in the same repo as the app — it
-  cannot name the commit that contains it. Not an issue in the two-repo setup.
+- **No provenance file in this example**, deliberately — see [Provenance, and why this example has none](#provenance-and-why-this-example-has-none).
 - **`rudder-cli migrate` strips comments** and reorders keys. Fine for a production catalog,
   costly for one you use to teach.
 
@@ -567,7 +600,7 @@ instrumentation-e2e/
 │   ├── scripts/tp-sync.sh       regenerate + provenance + --check
 │   ├── index.html               the SDK snippet and the preloader swap
 │   └── src/analytics/
-│       ├── generated/           index.ts + SOURCE.md — committed, never edited
+│       ├── generated/           index.ts — committed, never edited
 │       ├── client.ts            the single construction point
 │       └── contract.type-test.ts  compile-time assertions about the generator
 └── ci/typed-client-drift.yml    the drift check to copy

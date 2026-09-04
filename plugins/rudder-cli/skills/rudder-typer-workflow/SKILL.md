@@ -205,6 +205,14 @@ and whether the tree was dirty, and regenerate it on every sync. Check it before
 committing, and when reviewing either side of the pair — it is the only thing tying
 the two repos together.
 
+**Only when the catalog is a separate repository.** Then the commit it names is already
+final and the record is exact. In a single repo it cannot be: writing the hash changes
+the file, which changes the hash, so it always names the previous commit, and a
+mid-session regeneration records `DIRTY`. Committing that reads as evidence while
+asserting something untrue — `references/tp-sync.sh` detects the case and skips the
+file. When both sides land in one commit, that commit is the provenance, and the drift
+check still proves the client matches the catalog.
+
 Wrap the raw command in a small sync script rather than asking people to remember the
 flags. Copy `references/tp-sync.sh`, which also pins the
 minimum CLI version, sets `TMPDIR` beside the repo (belt-and-braces: the CLI renames a temp file onto

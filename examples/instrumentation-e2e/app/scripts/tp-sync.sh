@@ -110,6 +110,23 @@ fi
 
 generate "$OUT_DIR"
 
+# Provenance only means something when the catalog is a SEPARATE repository: the
+# commit it names is already final, so the record is exact and a reviewer can check
+# the client against the catalog change it claims to come from.
+#
+# In a single repo the record cannot be honest. Writing the hash changes the file,
+# which changes the hash, so it always names the previous commit -- and a mid-session
+# regeneration records DIRTY. Committing that is worse than committing nothing: it
+# reads as evidence while asserting something untrue. Here the provenance *is* the
+# commit, because both sides land in it.
+consumer_root="$(git rev-parse --show-toplevel 2>/dev/null || echo 'no-git')"
+catalog_root="$(git -C "$CATALOG_PATH" rev-parse --show-toplevel 2>/dev/null || echo 'no-catalog-git')"
+if [ "$consumer_root" = "$catalog_root" ]; then
+  rm -f "$OUT_DIR/SOURCE.md"
+  echo "✅ typed client regenerated (catalog is in this repository — provenance is this commit)"
+  exit 0
+fi
+
 cat > "$OUT_DIR/SOURCE.md" <<EOF
 <!-- Written by \`npm run tp:sync\`. Do not edit by hand. -->
 
