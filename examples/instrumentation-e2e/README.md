@@ -85,6 +85,16 @@ It stays empty and error-free: no write key is configured, so the events are swa
 a stub (see [Handling a missing SDK](#handling-a-missing-sdk)) while the payload shapes are
 still enforced at compile time.
 
+**Or watch it instead of reading it.** [`demo/`](demo/) is the six beats below as a
+scripted terminal walkthrough — real commands against this catalog, not a recording:
+
+```bash
+cd demo && ./demo.sh        # -d skips the typing simulation (and the `pv` dependency)
+```
+
+It edits the catalog to show the loop reacting and restores everything on exit. About
+four minutes presented, twenty seconds with `-d -n`. See [`demo/README.md`](demo/README.md).
+
 ## See the loop actually work
 
 Make one property required in [`catalog/tracking-plans/storefront.yaml`](catalog/tracking-plans/storefront.yaml):

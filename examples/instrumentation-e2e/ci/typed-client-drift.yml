@@ -17,7 +17,7 @@
 #   - a catalog change merged without the consumer being regenerated
 name: Typed client drift
 
-# Deliberately NO `paths:` filter. Two of the four cases above are call-site-only or
+# Deliberately NO `paths:` filter. Two of the three cases above are call-site-only or
 # catalog-only PRs that touch nothing under `generated/` — filtering on those paths
 # would skip the job exactly when the client is stale. It is one `npm ci` plus one
 # generate; run it on everything.
@@ -39,6 +39,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
 
       # The catalog is the source of truth. Check out its DEFAULT branch, not the
       # PR author's branch: the question this job answers is "is the committed
@@ -50,6 +52,7 @@ jobs:
           repository: your-org/your-catalog-repo
           path: .catalog
           token: ${{ secrets.CATALOG_READ_TOKEN }}
+          persist-credentials: false
 
       # Pin the CLI. The generated header embeds the version that produced it, so an
       # unpinned CLI turns every release into a spurious diff. Bump this in the same

@@ -9,6 +9,11 @@
 #
 # The demo edits the catalog to show the loop reacting. Everything it touches is
 # backed up first and restored on exit, including on Ctrl-C.
+#
+# In-place edits use `sed -i.bak`, not BSD's `sed -i ''`: the bare-suffix form is the
+# one both BSD and GNU sed accept, so this runs on a presenter's Mac and on a Linux CI
+# runner. The .bak files it leaves are ignored by the catalog loader and removed by
+# restore() along with everything else under the catalog.
 
 set -o pipefail   # deliberately not -e or -u: two steps are *meant* to fail on
                   # camera, and demo-magic unsets TYPE_SPEED under -d
@@ -98,7 +103,7 @@ note "A resolver, not an instance — re-resolved per call, so the SDK swap is s
 
 say "4 — Now break the contract"
 note "Make couponCode required — one line, in the catalog."
-pe "sed -i '' '/#property:coupon_code/{n;s/required: false/required: true/;}' ../catalog/tracking-plans/storefront.yaml"
+pe "sed -i.bak '/#property:coupon_code/{n;s/required: false/required: true/;}' ../catalog/tracking-plans/storefront.yaml"
 pe "npm run tp:sync && npm run typecheck"
 note "Every call site that no longer complies — production code and tests alike,"
 note "from one line of YAML, and with nothing published anywhere."
@@ -107,12 +112,12 @@ note "The compiler just enumerated the blast radius of a governance decision."
 say "5 — The wrong fix, and the right one"
 note "Wrong: couponCode: '' at the call site. Build goes green, catalog now lies."
 note "Right: the storefront genuinely doesn't know the coupon yet. Revert."
-pe "sed -i '' '/#property:coupon_code/{n;s/required: true/required: false/;}' ../catalog/tracking-plans/storefront.yaml"
+pe "sed -i.bak '/#property:coupon_code/{n;s/required: true/required: false/;}' ../catalog/tracking-plans/storefront.yaml"
 pe "npm run tp:sync && npm run typecheck && npm test"
 
 say "6 — The failure mode CI exists for"
 note "Change only a description. Don't regenerate. This is what really happens."
-pe "sed -i '' 's/drawer with a non-empty cart/drawer/' ../catalog/data-catalog/events/checkout.yaml"
+pe "sed -i.bak 's/drawer with a non-empty cart/drawer/' ../catalog/data-catalog/events/checkout.yaml"
 pe "npm run typecheck && npm test && npm run build"
 note "All green. The committed client is stale and nothing noticed."
 pe "npm run tp:check"

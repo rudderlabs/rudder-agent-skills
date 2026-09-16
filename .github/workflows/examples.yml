@@ -33,6 +33,8 @@ jobs:
           egress-policy: audit
 
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
 
       - name: The skill's copies must match the originals
         run: |
@@ -109,3 +111,20 @@ jobs:
           npm run typecheck
           npm test
           npm run tp:check
+          npm run build
+
+      # The demo drives tp:sync, typecheck, test, build and tp:check, so it is a real
+      # consumer of everything above -- and the first thing to rot silently when an npm
+      # script or a path is renamed. -d skips the typing simulation (and the `pv`
+      # dependency), -n skips waiting for ENTER. It edits the catalog and restores it,
+      # so the tree must come back clean; that assertion is the point of the last step.
+      - name: The demo still runs, and leaves the tree as it found it
+        working-directory: examples/instrumentation-e2e/demo
+        run: |
+          ./demo.sh -d -n </dev/null
+          cd "$GITHUB_WORKSPACE"
+          if [ -n "$(git status --porcelain)" ]; then
+            git status --porcelain
+            echo "::error::the demo did not restore the working tree"
+            exit 1
+          fi

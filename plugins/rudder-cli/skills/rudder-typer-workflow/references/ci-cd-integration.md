@@ -16,7 +16,9 @@ differs.
 this file — copy that rather than retyping it.** One job: check out the consumer, check
 out the catalog's *default branch*, install a pinned rudder-cli, run `npm run tp:check`.
 
-Four things in it are load-bearing, and each has bitten someone:
+Four things are load-bearing, and each has bitten someone. The first three are in
+that file; the fourth is not, because this workflow reaches the generator only
+through `npm run tp:check`, which carries the guard itself:
 
 - **No `paths:` filter.** A call-site-only PR touches nothing under `generated/`, and a
   catalog-only change touches nothing in the consumer repo at all — exactly the two cases
@@ -27,9 +29,11 @@ Four things in it are load-bearing, and each has bitten someone:
   mechanical rather than advisory.
 - **A pinned CLI version.** The generated header embeds it, so an unpinned CLI turns
   every release into a diff that looks like drift and isn't.
-- **A `Warning:` guard** wherever a workflow calls the generator directly rather than
+- **A `Warning:` guard** wherever a workflow calls the generator *directly* rather than
   through `tp-sync.sh`. An unsupported event type is skipped with a warning on stdout and
-  exit 0, so an unguarded step goes green with a method missing.
+  exit 0, so an unguarded step goes green with a method missing. Grep for the bare
+  `Warning:` prefix, not the whole sentence — Kotlin spells the message differently from
+  TypeScript and Swift, so a tighter pattern stops catching one of them.
 
 
 `tp:check` regenerates into a temp directory and diffs. The whole implementation:
