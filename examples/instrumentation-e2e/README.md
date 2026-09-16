@@ -109,9 +109,13 @@ command below does:
 ```
 
 ```bash
-sed -i '' '/#property:coupon_code/{n;s/required: false/required: true/;}' \
+sed -i.bak '/#property:coupon_code/{n;s/required: false/required: true/;}' \
   ../catalog/tracking-plans/storefront.yaml
 ```
+
+> `-i.bak` rather than BSD's `-i ''`: the bare-suffix form is the one both BSD and GNU
+> sed accept, so this line works on macOS and Linux alike. Delete the `.bak` afterwards,
+> or leave it — the catalog loader ignores it.
 
 Then:
 
