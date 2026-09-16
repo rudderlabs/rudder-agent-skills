@@ -220,14 +220,13 @@ RudderTyper can generate a client straight from this directory, without applying
 it first. A client is generated from one tracking plan, so name the plan you want:
 
 ```bash
-RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_LOCAL_TYPER=true \
-  rudder-cli typer generate --local --location . \
+rudder-cli typer generate --local --location . \
     --tracking-plan-id web_app --platform kotlin -o ./generated
 ```
 
 Swap `--tracking-plan-id mobile_app` for the mobile client, or `--platform swift`
-/ `--platform typescript` for the other targets. `--local` is experimental and
-needs both environment variables above.
+/ `--platform typescript` for the other targets. `--local` needs rudder-cli >= 0.25.0,
+where it went GA; on 0.24.0 and earlier it sits behind two feature flags.
 
 `--tracking-plan-id` is how you call `typer generate` in general: without
 `--local` it is required outright, since the plan is fetched from the workspace

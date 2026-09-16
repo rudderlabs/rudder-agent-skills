@@ -36,8 +36,7 @@ Four things in it are load-bearing, and each has bitten someone:
 
 ```bash
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
-RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_LOCAL_TYPER=true \
-  rudder-cli typer generate --local --location "$CATALOG_PATH" \
+rudder-cli typer generate --local --location "$CATALOG_PATH" \
     --tracking-plan-id "$TRACKING_PLAN_ID" --platform typescript \
     --output "$tmp" --option outputFileName=index.ts
 diff -u src/analytics/generated/index.ts "$tmp/index.ts" \
@@ -84,7 +83,6 @@ happens to be on is exactly the failure the provenance record exists to catch.
 One command per platform, one output directory each, all from the same catalog commit:
 
 ```bash
-export RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_LOCAL_TYPER=true
 for p in typescript kotlin swift; do
   rudder-cli typer generate --local --location "$CATALOG_PATH" \
     --tracking-plan-id storefront --platform "$p" --output "clients/$p"

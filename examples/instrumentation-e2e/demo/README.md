@@ -15,7 +15,8 @@ Roughly 4 minutes presented, ~20 seconds with `-d -n`.
 
 ## Requirements
 
-- `rudder-cli` >= 0.22.0, Node 20+, and `(cd ../app && npm install)` already run —
+- `rudder-cli` 0.25.1 (the `PINNED_CLI` in `app/scripts/tp-sync.sh`, which step 6
+  checks against), Node 20+, and `(cd ../app && npm install)` already run —
   the script checks all three and exits with the fix if any is missing.
 - `pv` for the typing simulation (`brew install pv`). Not needed with `-d`.
 

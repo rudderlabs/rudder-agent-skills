@@ -1,12 +1,12 @@
 # Platform reference
 
-Everything below was produced by `rudder-cli 0.24.0` from the tracking plan in
+Everything below was produced by `rudder-cli 0.25.1` from the tracking plan in
 `examples/instrumentation-e2e/catalog/`, so the shapes are what the generator
 actually emits rather than an illustration of them.
 
 ## Options
 
-`rudder-cli typer options --platform <p>` prints the live table. As of 0.24.0:
+`rudder-cli typer options --platform <p>` prints the live table. As of 0.25.1:
 
 | Platform | Option | Default |
 | --- | --- | --- |
@@ -204,7 +204,6 @@ public class RudderTyperAnalytics {
 One plan, one command per platform, different output directories:
 
 ```bash
-export RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_LOCAL_TYPER=true
 for p in typescript kotlin swift; do
   rudder-cli typer generate --local --location ../catalog \
     --tracking-plan-id storefront --platform "$p" --output "clients/$p"

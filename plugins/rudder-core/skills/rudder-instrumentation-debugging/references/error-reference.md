@@ -11,15 +11,15 @@ Detailed error codes, causes, and fixes for instrumentation debugging.
 ```bash
 # 1. Regenerate from the specs on disk. No apply, no workspace, no auth --
 #    applying is a merge-time concern, not part of the loop.
-RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_LOCAL_TYPER=true \
-  rudder-cli typer generate --local --location ./ \
+rudder-cli typer generate --local --location ./ \
     --platform typescript --output ./src/analytics/generated
 
 # 2. Check for changes
 git diff src/analytics/generated/
 ```
 
-`--platform` is required. See the `rudder-typer-workflow` skill for the full flag set.
+`--platform` is required, and `--local` needs rudder-cli >= 0.25.0 (two feature flags
+on 0.24.0 and earlier). See the `rudder-typer-workflow` skill.
 
 **Cause:** Type mismatch between schema and usage.
 

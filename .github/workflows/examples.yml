@@ -20,7 +20,7 @@ permissions:
 env:
   # Must match PINNED_CLI in tp-sync.sh — the generated client embeds its generator
   # version, so a different CLI here reports a false diff.
-  RUDDER_CLI_VERSION: 0.24.0
+  RUDDER_CLI_VERSION: 0.25.1
 
 jobs:
   examples:
@@ -69,9 +69,6 @@ jobs:
           rudder-cli --version
 
       - name: Example catalogs load and generate
-        env:
-          RUDDERSTACK_CLI_EXPERIMENTAL: 'true'
-          RUDDERSTACK_X_LOCAL_TYPER: 'true'
         run: |
           set -euo pipefail
           # `validate` needs a workspace token; `typer generate --local` is the offline
@@ -107,9 +104,6 @@ jobs:
 
       - name: The example app typechecks, tests, and is not drifted
         working-directory: examples/instrumentation-e2e/app
-        env:
-          RUDDERSTACK_CLI_EXPERIMENTAL: 'true'
-          RUDDERSTACK_X_LOCAL_TYPER: 'true'
         run: |
           npm ci
           npm run typecheck

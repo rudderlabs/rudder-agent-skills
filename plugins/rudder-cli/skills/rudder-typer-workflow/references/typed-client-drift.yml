@@ -56,7 +56,7 @@ jobs:
       # PR that commits a client regenerated with the newer CLI.
       - name: Install rudder-cli
         env:
-          RUDDER_CLI_VERSION: 0.24.0
+          RUDDER_CLI_VERSION: 0.25.1
         run: |
           curl -fsSL "https://github.com/rudderlabs/rudder-iac/releases/download/v${RUDDER_CLI_VERSION}/rudder-cli_Linux_x86_64.tar.gz" \
             | tar -xz -C /usr/local/bin rudder-cli

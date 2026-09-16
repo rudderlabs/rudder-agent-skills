@@ -334,8 +334,7 @@ from the plan silently, which is the exact failure this phase exists to prevent.
 Generate from the specs on disk — no workspace, no apply, no auth:
 
 ```bash
-RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_LOCAL_TYPER=true \
-  rudder-cli typer generate \
+rudder-cli typer generate \
     --local --location ./ \
     --platform typescript \
     --output ./src/analytics/generated

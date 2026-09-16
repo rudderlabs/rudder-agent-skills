@@ -52,7 +52,9 @@ Both must be on, and each can be an environment variable *or* a persisted settin
 The umbrella gate zeroes *every* experimental flag when off, so setting only
 `RUDDERSTACK_X_LOCAL_TYPER` on a fresh install did nothing. If `"experimental": true`
 was already persisted, the env var alone worked — which is why the same command could
-succeed on one machine and fail on another. Setting both on 0.25.0+ is harmless.
+succeed on one machine and fail on another. Both settings above are inert on 0.25.0+,
+so leaving them in place is harmless. `rudder-cli experimental enable localTyper` is
+the exception: on 0.25.1 it fails with `Error: experimental commands are disabled`.
 
 </details>
 
@@ -158,7 +160,7 @@ source.** A plan carrying both impression types is correct — each platform's c
 takes the half that applies to it. What is not correct is a plan carrying only `page`
 and a mobile client generated from it, which loses the impression event entirely.
 
-That loss is silent. At 0.24.0 a `screen` rule generating for TypeScript prints
+That loss is silent. At 0.25.1 a `screen` rule generating for TypeScript prints
 `Warning: unsupported event type "screen", skipping` **on stdout** and exits **0**; the
 method is simply absent. Redirecting stdout in a sync script throws away the only
 signal — fail on `Warning:` instead.

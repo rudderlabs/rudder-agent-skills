@@ -47,43 +47,27 @@ already installed, the whole of Part 1 is seconds — installing the CLI is the 
 
 ## Prerequisites
 
-- **rudder-cli ≥ 0.25.0** — check with `rudder-cli --version`. 0.22.0 is the floor the
-  sync script enforces; 0.25.0 is the first release where local generation needs no
-  feature flags. If you don't have it:
+- **rudder-cli 0.25.1** — check with `rudder-cli --version`:
 
   ```bash
-  curl -fsSL https://github.com/rudderlabs/rudder-iac/releases/latest/download/rudder-cli_Darwin_arm64.tar.gz \
+  curl -fsSL https://github.com/rudderlabs/rudder-iac/releases/download/v0.25.1/rudder-cli_Darwin_arm64.tar.gz \
     | tar -xz -C /usr/local/bin rudder-cli
   ```
 
   Swap the asset for your platform — [all releases](https://github.com/rudderlabs/rudder-iac/releases).
   Installing the CLI is the only slow part here; everything after it takes seconds.
+
+  **Why a pinned version and not "latest".** Two different floors meet here. `--local`
+  went GA in 0.25.0 ([rudder-iac#821](https://github.com/rudderlabs/rudder-iac/pull/821)),
+  so 0.25.0 is the oldest release that generates without feature flags — that is the
+  `MIN_CLI` the sync script enforces. But the generated client embeds the version that
+  produced it, so `npm run tp:check` compares against one exact version, `PINNED_CLI`.
+  Any other release reports a diff that is not drift. 0.25.1 is what the committed
+  client here was generated with; a newer CLI will fail step 6 until someone bumps
+  `PINNED_CLI` and commits the regenerated client together.
 - **Node 20+**
 
-No account, no access token, no `rudder-cli auth login`.
-
-## Enable local generation
-
-**On rudder-cli 0.25.0 and later there is nothing to enable** — local generation is
-generally available. Skip to [Run it](#run-it).
-
-<details>
-<summary>On 0.24.0 and earlier it sits behind two feature flags</summary>
-
-Both must be on, and each can be an environment variable or a persisted setting in
-`~/.rudder/config.json`:
-
-| Gate | Environment variable | `~/.rudder/config.json` |
-| --- | --- | --- |
-| Umbrella experimental switch | `RUDDERSTACK_CLI_EXPERIMENTAL=true` | `"experimental": true` |
-| The `localTyper` flag | `RUDDERSTACK_X_LOCAL_TYPER=true` | `"flags": { "localTyper": true }` |
-
-The umbrella gate zeroes *every* experimental flag when it is off, so setting only
-`RUDDERSTACK_X_LOCAL_TYPER` on a fresh install did nothing. If `"experimental": true` was
-already saved, the environment variable alone was enough — which is why the same command
-could work on a colleague's machine and not yours. Setting both on 0.25.0+ is harmless.
-
-</details>
+No account, no access token, no `rudder-cli auth login`, and no feature flags to enable.
 
 ## Run it
 

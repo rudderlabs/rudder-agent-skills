@@ -13,8 +13,8 @@ set -euo pipefail
 CATALOG_PATH="${CATALOG_PATH:-../catalog}"
 TRACKING_PLAN_ID="${TRACKING_PLAN_ID:-storefront}"
 OUT_DIR="src/analytics/generated"
-MIN_CLI="0.22.0"      # oldest CLI whose output this app can consume
-PINNED_CLI="0.24.0"   # exact version the committed client was generated with
+MIN_CLI="0.25.0"      # oldest CLI this script can drive
+PINNED_CLI="0.25.1"   # exact version the committed client was generated with
 
 check_only=false
 [ "${1:-}" = "--check" ] && check_only=true
@@ -25,9 +25,11 @@ die() { echo "error: $*" >&2; exit 1; }
 command -v rudder-cli >/dev/null 2>&1 \
   || die "rudder-cli not on PATH (>= $MIN_CLI required) — https://github.com/rudderlabs/rudder-iac/releases"
 
-# 0.22.0 made the generated constructor resolver-only (rudder-iac#681). An older CLI
-# emits a client that captures the analytics instance once, which client.ts no longer
-# matches — fail loudly rather than write out an incompatible client.
+# Two separate floors, and 0.25.0 is the higher one. 0.22.0 made the generated
+# constructor resolver-only (rudder-iac#681); an older CLI emits a client that captures
+# the analytics instance once, which client.ts no longer matches. 0.25.0 is where
+# `--local` went GA (rudder-iac#821) — before it the command needed two feature flags,
+# which this script no longer sets. Fail loudly rather than write out a broken client.
 cli_version="$(rudder-cli --version | awk '{print $NF}')"
 [ "$(printf '%s\n%s\n' "$MIN_CLI" "$cli_version" | sort -V | head -n1)" = "$MIN_CLI" ] \
   || die "rudder-cli $cli_version is too old; >= $MIN_CLI required."
@@ -42,8 +44,6 @@ generate() {
   mkdir -p node_modules/.cache
   out="$(
   TMPDIR="$PWD/node_modules/.cache" \
-  RUDDERSTACK_CLI_EXPERIMENTAL=true \
-  RUDDERSTACK_X_LOCAL_TYPER=true \
     rudder-cli typer generate \
       --local \
       --location "$CATALOG_PATH" \

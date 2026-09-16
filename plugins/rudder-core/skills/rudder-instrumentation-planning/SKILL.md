@@ -439,16 +439,16 @@ There is no `typer init` and no config file — code generation is all flags. Us
 auth involved:
 
 ```bash
-RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_LOCAL_TYPER=true \
-  rudder-cli typer generate \
+rudder-cli typer generate \
     --local --location ./ \
     --platform typescript \
     --output ./src/analytics/generated
 ```
 
 `--platform` is required (`typescript`, `kotlin` or `swift`). Requires rudder-cli
->= 0.22.0. See the `rudder-typer-workflow` skill for the full flag set, the
-generated client's shape, and the provenance/CI discipline a committed client needs.
+>= 0.25.0, where `--local` went GA; on 0.24.0 and earlier it needs two feature flags.
+See the `rudder-typer-workflow` skill for those, the generated client's shape, and the
+provenance/CI discipline a committed client needs.
 
 ### Implement in Applications
 

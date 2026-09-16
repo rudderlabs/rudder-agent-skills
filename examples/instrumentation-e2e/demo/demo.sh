@@ -33,11 +33,17 @@ beat() { echo; }
 # ── preflight ────────────────────────────────────────────────────────────────
 fail() { echo -e "${RED}error:${COLOR_RESET} $*" >&2; exit 1; }
 
+# Step 6 runs `npm run tp:check`, which demands the exact version the committed client
+# was generated with. Read that pin out of tp-sync.sh rather than restating it, so this
+# preflight cannot drift from the thing it is guarding -- and fail here rather than
+# eight steps into a presentation.
+pinned="$(sed -n 's/^PINNED_CLI="\([^"]*\)".*/\1/p' "$APP/scripts/tp-sync.sh")"
+[ -n "$pinned" ] || fail "could not read PINNED_CLI from $APP/scripts/tp-sync.sh"
 command -v rudder-cli >/dev/null 2>&1 \
-  || fail "rudder-cli not on PATH (>= 0.22.0). https://github.com/rudderlabs/rudder-iac/releases"
+  || fail "rudder-cli not on PATH ($pinned required). https://github.com/rudderlabs/rudder-iac/releases"
 cli="$(rudder-cli --version | awk '{print $NF}')"
-[ "$(printf '0.22.0\n%s\n' "$cli" | sort -V | head -n1)" = "0.22.0" ] \
-  || fail "rudder-cli $cli is too old; >= 0.22.0 required."
+[ "$cli" = "$pinned" ] \
+  || fail "rudder-cli $cli is installed; this demo needs exactly $pinned (step 6 runs tp:check)."
 command -v node >/dev/null 2>&1 || fail "node not on PATH (20+ required)."
 node_major="$(node --version | sed 's/^v\([0-9]*\).*/\1/')"
 [ "$node_major" -ge 20 ] || fail "node $(node --version) is too old; 20+ required."
