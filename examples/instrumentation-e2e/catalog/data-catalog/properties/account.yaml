@@ -1,0 +1,14 @@
+version: "rudder/v1"
+kind: "properties"
+metadata:
+  name: "storefront-account"
+spec:
+  properties:
+    - description: "Account email address"
+      id: "email"
+      name: "email"
+      type: "string"
+    - description: "Subscription tier the account is on"
+      id: "plan_tier"
+      name: "planTier"
+      type: "#custom-type:plan_tier_type"

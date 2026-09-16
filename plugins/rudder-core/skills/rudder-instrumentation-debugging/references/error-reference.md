@@ -9,15 +9,17 @@ Detailed error codes, causes, and fixes for instrumentation debugging.
 **Cause:** Schema changes not regenerated.
 
 ```bash
-# 1. Apply schema changes
-rudder-cli apply -l ./
+# 1. Regenerate from the specs on disk. No apply, no workspace, no auth --
+#    applying is a merge-time concern, not part of the loop.
+rudder-cli typer generate --local --location ./ \
+    --platform typescript --output ./src/analytics/generated
 
-# 2. Regenerate code
-rudder-cli typer generate
-
-# 3. Check for changes
-git diff generated/
+# 2. Check for changes
+git diff src/analytics/generated/
 ```
+
+`--platform` is required, and `--local` needs rudder-cli >= 0.25.0 (two feature flags
+on 0.24.0 and earlier). See the `rudder-typer-workflow` skill.
 
 **Cause:** Type mismatch between schema and usage.
 

@@ -1,23 +1,22 @@
 # AddressType Custom Type
 #
-# Reusable schema for shipping/billing addresses.
-# Used by: Order Completed (shipping_address, billing_address)
-
+# Reusable object schema for shipping and billing addresses.
 version: "rudder/v1"
-kind: "custom-type"
+kind: "custom-types"
 metadata:
-  name: "custom-types"
+  name: "address-types"
 spec:
-  name: "AddressType"
-  type: "object"
-  description: "Address structure for shipping and billing"
-  config:
-    properties:
-      - property: "urn:rudder:property/address"
-        required: true
-      - property: "urn:rudder:property/city"
-        required: true
-      - property: "urn:rudder:property/state"
-        required: true
-      - property: "urn:rudder:property/zipcode"
-        required: true
+  types:
+    - description: "Address structure for shipping and billing"
+      id: "address_type"
+      name: "AddressType"
+      properties:
+        - property: "#property:address"
+          required: true
+        - property: "#property:city"
+          required: true
+        - property: "#property:state"
+          required: true
+        - property: "#property:zipcode"
+          required: true
+      type: "object"

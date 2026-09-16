@@ -1,21 +1,63 @@
 # Web App Tracking Plan
 #
-# Tracking plan for the main e-commerce website.
-# Uses all e-commerce events with page attribution properties.
-# Governance is permissive (forward violations) for development flexibility.
-
+# The main e-commerce website. Carries page attribution (page_url, referrer_url)
+# and leaves unplanned events flowing while the site is still being instrumented
+# (`additional_properties: true`).
 version: "rudder/v1"
 kind: "tracking-plan"
 metadata:
-  name: "tracking-plans"
+  name: "web-app"
 spec:
-  name: "Web App Tracking Plan"
-  description: "E-commerce events for the main website with page attribution"
-  governance:
-    unplannedEvents: forward    # Forward unplanned events with flag
-    violatingEvents: forward    # Forward violations with metadata
-  events:
-    - event: "urn:rudder:event/product-viewed"
-      # No overrides - use event defaults
-    - event: "urn:rudder:event/product-added-to-cart"
-    - event: "urn:rudder:event/order-completed"
+  description: "E-commerce funnel for the main website, with page attribution."
+  display_name: "Web App Tracking Plan"
+  id: "web_app"
+  rules:
+    - additional_properties: true
+      event: "#event:product_viewed"
+      id: "product_viewed_rule"
+      properties:
+        - property: "#property:product"
+          required: true
+        - property: "#property:page_url"
+          required: true
+        - property: "#property:referrer_url"
+          required: false
+        - property: "#property:session_id"
+          required: false
+      type: "event_rule"
+    - additional_properties: true
+      event: "#event:product_added_to_cart"
+      id: "product_added_to_cart_rule"
+      properties:
+        - property: "#property:product"
+          required: true
+        - property: "#property:quantity"
+          required: true
+        - property: "#property:cart_total"
+          required: false
+        - property: "#property:product_count"
+          required: false
+        - property: "#property:page_url"
+          required: true
+        - property: "#property:session_id"
+          required: false
+      type: "event_rule"
+    - additional_properties: true
+      event: "#event:order_completed"
+      id: "order_completed_rule"
+      properties:
+        - property: "#property:products"
+          required: true
+        - property: "#property:order_id"
+          required: true
+        - property: "#property:order_total"
+          required: true
+        - property: "#property:customer_email"
+          required: true
+        - property: "#property:currency"
+          required: false
+        - property: "#property:shipping_address"
+          required: true
+        - property: "#property:billing_address"
+          required: true
+      type: "event_rule"

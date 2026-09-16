@@ -21,7 +21,7 @@ One marketplace (`rudder-agent-skills`) bundling five plugins. Install the ones 
 | Plugin | Status | Scope |
 |---|---|---|
 | [`rudder-core`](plugins/rudder-core/) | ✅ Available | Cross-tool domain knowledge: data catalog, tracking plans, data graphs, instrumentation planning & debugging |
-| [`rudder-cli`](plugins/rudder-cli/) | ✅ Available | Workflows for [`rudder-cli`](https://github.com/rudderlabs/rudder-iac) and [`rudder-typer`](https://www.rudderstack.com/docs/features/ruddertyper/) |
+| [`rudder-cli`](plugins/rudder-cli/) | ✅ Available | Workflows for [`rudder-cli`](https://github.com/rudderlabs/rudder-iac), including typed client generation (`rudder-cli typer`) |
 | [`rudder-mcp`](plugins/rudder-mcp/) | ✅ Available | Workflows for [RudderStack's hosted MCP server](https://mcp.rudderstack.com/docs) at `mcp.rudderstack.com` |
 | [`rudder-terraform`](plugins/rudder-terraform/) | ✅ Available | Workflows for the [Terraform provider](https://github.com/rudderlabs/terraform-provider-rudderstack) |
 | [`rudder-profiles`](plugins/rudder-profiles/) | ✅ Available | Workflows for [RudderStack Profiles](https://github.com/rudderlabs/profiles-mcp): setup, project creation, analysis, updates, and debugging |
@@ -87,7 +87,7 @@ npx skills add rudderlabs/rudder-agent-skills -a cursor
 |---|---|
 | `rudder-cli-workflow` | Iterating on RudderStack resources with validate → dry-run → apply |
 | `rudder-import-and-evolve` | Importing existing RudderStack resources to CLI management |
-| `rudder-typer-workflow` | Generating type-safe SDKs (Swift/Kotlin) from tracking plans |
+| `rudder-typer-workflow` | Generating type-safe clients (TypeScript/Kotlin/Swift) from tracking plans, offline with `--local` |
 | `rudder-transformations` | Creating, editing, or managing transformations and libraries |
 | `rudder-cli-setup` | Installing and authenticating rudder-cli |
 
@@ -126,7 +126,7 @@ flowchart TD
     catalog --> cli["rudder-cli-workflow<br/>validate &rarr; dry-run &rarr; apply"]
     evolve --> cli
     plans --> cli
-    cli --> typer["rudder-typer-workflow<br/>generate typed SDKs"]
+    cli --> typer["rudder-typer-workflow<br/>generate typed clients"]
     cli --> transform["rudder-transformations<br/>transform events"]
     cli --> debug["rudder-instrumentation-debugging<br/>fix validation issues"]
 ```
@@ -168,7 +168,14 @@ After installing a plugin, run its setup skill to get started. Use `/rudder-envi
 
 ## Examples
 
-`examples/` contains worked end-to-end projects that demonstrate skills in action — the current example covers the transformations workflow.
+`examples/` contains worked end-to-end projects that demonstrate skills in action:
+
+| Example | What it shows |
+| --- | --- |
+| [`instrumentation-e2e/`](examples/instrumentation-e2e/) | A storefront app whose typed analytics client is generated from tracking-plan YAML on disk — the catalog-to-code loop, provenance, and a CI drift check |
+| [`tracking-plan-workflow/`](examples/tracking-plan-workflow/) | A data catalog and two tracking plans over the same events, one stricter than the other |
+| [`transformations-workflow/`](examples/transformations-workflow/) | Transformations and libraries with tests |
+| [`data-graph-workflow/`](examples/data-graph-workflow/) | Data graph specs |
 
 ## Contributing
 

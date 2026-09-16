@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Storefront — typed instrumentation demo</title>
+
+    <!--
+      The standard RudderStack snippet, trimmed to the part that matters here.
+
+      It installs a *buffering preloader* on `window.rudderanalytics` immediately,
+      then replaces it with the real SDK once the async script lands. Anything that
+      captured `window.rudderanalytics` before that swap holds the preloader
+      forever — see src/analytics/client.ts.
+
+      With no write key configured (the default for this demo) the snippet leaves
+      `window.rudderanalytics` undefined entirely, which is the *other* case the
+      client has to survive.
+    -->
+    <script>
+      window.RUDDERSTACK_WRITE_KEY = '';
+      window.RUDDERSTACK_DATA_PLANE_URL = '';
+
+      if (window.RUDDERSTACK_WRITE_KEY) {
+        !(function () {
+          'use strict';
+          window.RudderSnippetVersion = '3.0.60';
+          var identifier = 'rudderanalytics';
+          window[identifier] || (window[identifier] = []);
+          var sdk = window[identifier];
+          sdk.push(['load', window.RUDDERSTACK_WRITE_KEY, window.RUDDERSTACK_DATA_PLANE_URL]);
+          var script = document.createElement('script');
+          script.src = 'https://cdn.rudderlabs.com/v3/modern/rsa.min.js';
+          script.async = true;
+          document.head.appendChild(script);
+        })();
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

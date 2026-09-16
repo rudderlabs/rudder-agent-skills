@@ -8,5 +8,5 @@
   "homepage": "https://github.com/rudderlabs/rudder-iac",
   "repository": "https://github.com/rudderlabs/rudder-agent-skills",
   "license": "MIT",
-  "keywords": ["rudderstack", "rudder-cli", "rudder-typer", "cli", "devtools"]
+  "keywords": ["rudderstack", "rudder-cli", "typer", "codegen", "cli", "devtools"]
 }
