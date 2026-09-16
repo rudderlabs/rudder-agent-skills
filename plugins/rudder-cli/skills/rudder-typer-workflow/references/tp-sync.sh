@@ -54,7 +54,18 @@ generate() {
   )" || { echo "$out" >&2; return 1; }
 
   echo "$out"
+  # Match on the bare "Warning:" prefix, NOT the whole sentence. The three generators
+  # do not spell it the same way: TypeScript and Swift emit
+  #   Warning: unsupported event type "screen", skipping
+  # while Kotlin emits
+  #   Warning: unsupported event type: "page"
+  # -- colon after "type", no trailing ", skipping". Tightening this grep to either
+  # full sentence silently stops catching the other platform.
   if grep -q "Warning:" <<<"$out"; then
+    # Re-emit on stderr. --check redirects our stdout to /dev/null to stay quiet on
+    # success, so without this the operator is told to read a warning that was thrown
+    # away -- and *which* event type got skipped is the one fact worth having.
+    echo "$out" >&2
     echo >&2
     echo "error: the generator skipped part of the plan (see the warning above)." >&2
     echo "       An unsupported event type is dropped silently — the method will be" >&2
@@ -70,10 +81,8 @@ if $check_only; then
   mkdir -p node_modules/.cache
   tmp="$(TMPDIR="$PWD/node_modules/.cache" mktemp -d)"
   trap 'rm -rf "$tmp"' EXIT
-  generate "$tmp" >/dev/null || exit 1   # stderr (incl. skip warnings) still surfaces
+  generate "$tmp" >/dev/null || exit 1   # quiet on success; failures print on stderr
 
-  # The generated header embeds the CLI version, so CI must pin the same rudder-cli
-  # the client was committed with or this diff is noise. See ci/typed-client-drift.yml.
   # The generated header embeds the CLI version, so a *different* permitted version
   # produces a two-line diff that is not drift. Say so rather than sending the reader
   # off to commit a regeneration that breaks everyone else's pinned CI.
@@ -108,7 +117,15 @@ else
   catalog_state="clean"
 fi
 
-generate "$OUT_DIR"
+# Generate into a temp directory and move into place only once the guards have passed.
+# Writing straight into OUT_DIR means a failed run leaves a method-less client on disk
+# -- green typecheck, missing method, and nothing to tell you why.
+mkdir -p node_modules/.cache
+staging="$(TMPDIR="$PWD/node_modules/.cache" mktemp -d)"
+trap 'rm -rf "$staging"' EXIT
+generate "$staging"
+mkdir -p "$OUT_DIR"
+cp "$staging"/* "$OUT_DIR"/
 
 # Provenance only means something when the catalog is a SEPARATE repository: the
 # commit it names is already final, so the record is exact and a reviewer can check
@@ -119,8 +136,19 @@ generate "$OUT_DIR"
 # regeneration records DIRTY. Committing that is worse than committing nothing: it
 # reads as evidence while asserting something untrue. Here the provenance *is* the
 # commit, because both sides land in it.
-consumer_root="$(git rev-parse --show-toplevel 2>/dev/null || echo 'no-git')"
-catalog_root="$(git -C "$CATALOG_PATH" rev-parse --show-toplevel 2>/dev/null || echo 'no-catalog-git')"
+consumer_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+catalog_root="$(git -C "$CATALOG_PATH" rev-parse --show-toplevel 2>/dev/null || true)"
+
+# Two cases write no record, for the same reason: the file would assert something it
+# cannot establish. Do NOT compare two different "missing" sentinels here -- unequal
+# sentinels make the neither-is-git case look like two separate repos and ship a
+# SOURCE.md whose entire content is that provenance is unknown. That is the likeliest
+# case in practice: someone who downloaded this example as a zip rather than cloning.
+if [ -z "$consumer_root" ] || [ -z "$catalog_root" ]; then
+  rm -f "$OUT_DIR/SOURCE.md"
+  echo "✅ typed client regenerated (no git checkout — no provenance record written)"
+  exit 0
+fi
 if [ "$consumer_root" = "$catalog_root" ]; then
   rm -f "$OUT_DIR/SOURCE.md"
   echo "✅ typed client regenerated (catalog is in this repository — provenance is this commit)"
