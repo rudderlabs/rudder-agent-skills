@@ -121,6 +121,11 @@ jobs:
       - name: The demo still runs, and leaves the tree as it found it
         working-directory: examples/instrumentation-e2e/demo
         run: |
+          # setup-node registers a tsc problem matcher, and two of the demo's steps are
+          # MEANT to fail on camera -- so without this a passing job carries seven red
+          # "failure" annotations for errors it deliberately produced. Drop the matcher
+          # for this step; a green run should not look like a broken one.
+          echo "::remove-matcher owner=tsc::"
           ./demo.sh -d -n </dev/null
           cd "$GITHUB_WORKSPACE"
           if [ -n "$(git status --porcelain)" ]; then
