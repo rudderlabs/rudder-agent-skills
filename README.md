@@ -68,6 +68,16 @@ npx skills add rudderlabs/rudder-agent-skills -a cursor
 
 > Manual symlink, git submodule, agent-specific paths, and troubleshooting live in [`docs/installation.md`](docs/installation.md).
 
+### No install — `AGENTS.md`
+
+Not every agent reads skills, and not every repo wants an install step. [`templates/AGENTS.md`](templates/AGENTS.md) is a single file you copy into the root of a repo that manages RudderStack resources as code — every agent that reads `AGENTS.md` picks it up with no plugin, no marketplace, and no MCP server.
+
+```bash
+curl -o AGENTS.md https://raw.githubusercontent.com/rudderlabs/rudder-agent-skills/main/templates/AGENTS.md
+```
+
+It is the floor, not the ceiling: it covers the workspace check, the validate → dry-run → apply loop, non-interactive flags, and the mistakes that cost the most to recover from. Install the skills above when your agent supports them — they go considerably deeper.
+
 ## Available skills
 
 ### `rudder-core`
@@ -143,6 +153,8 @@ rudder-agent-skills/
 ├── docs/
 │   └── installation.md        # full install guide
 ├── examples/                  # end-to-end worked examples
+├── templates/
+│   └── AGENTS.md              # zero-install baseline to copy into your own repo
 └── plugins/
     └── <plugin>/              # rudder-core, rudder-cli, rudder-mcp, rudder-terraform, rudder-profiles
         ├── .claude-plugin/plugin.json
