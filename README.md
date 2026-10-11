@@ -89,6 +89,7 @@ npx skills add rudderlabs/rudder-agent-skills -a cursor
 | `rudder-import-and-evolve` | Importing existing RudderStack resources to CLI management |
 | `rudder-typer-workflow` | Generating type-safe SDKs (Swift/Kotlin) from tracking plans |
 | `rudder-transformations` | Creating, editing, or managing transformations and libraries |
+| `rudder-destination-authoring` | Authoring destination specs and connections, with secrets as `{{ .VAR }}` placeholders |
 | `rudder-cli-setup` | Installing and authenticating rudder-cli |
 
 ### `rudder-mcp`
