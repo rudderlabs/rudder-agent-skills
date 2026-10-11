@@ -80,6 +80,7 @@ npx skills add rudderlabs/rudder-agent-skills -a cursor
 | `rudder-instrumentation-planning` | Designing event taxonomy from scratch or restructuring |
 | `rudder-instrumentation-debugging` | Fixing validation errors, schema issues, or instrumentation problems |
 | `rudder-environment-check` | Checking prerequisites and setup status |
+| `rudder-onboarding` | First-time setup, from install to one observed delivered event, in nine steps |
 
 ### `rudder-cli`
 
