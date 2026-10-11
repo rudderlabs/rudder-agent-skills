@@ -27,6 +27,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`rudder-core` / `rudder-onboarding`** - new orchestrating skill for first-time
+  setup in the user's own app. Nine steps (start, explore, goal, destination and
+  secrets, plan and apply, instrument, verify locally, verify live, wrap up), each
+  with an entry condition, an evidence-based exit condition and a give-up rule.
+  Carries the measured facts (write key not accepted for about two minutes after
+  apply, MCP metrics drop timestamps, `get_live_events` masks values, unattended
+  `apply` needs `--confirm=false`, `apply` reconciles the whole workspace).
+  Describes `validate --json`, `apply --json`, exit codes and `dev listen`, which
+  are still open rudder-iac pull requests, with a probe and a text fallback for each.
+  Depends on `rudder-destination-authoring` for step 4.
 - **CI / dev tooling** — both directory crawlers now run as gates against the
   working tree: cursor.directory's real `parse.ts` (vendored, pinned) via
   `scripts/cursor-preview/preview.mts`, and skills.sh's real `skills` CLI (pinned)
