@@ -21,11 +21,12 @@ Install rudder-cli, authenticate with RudderStack, and verify the setup works.
          │
          └── rudder-cli --version
 
-3. Check Authentication ──► rudder-cli workspace info
+3. Check Authentication ──► rudder-cli workspace info --json
          │
          ├── Authenticated ──► Done! Show workspace info
          │
-         └── Not Authenticated ──► Guide through auth flow
+         └── Not Authenticated ──► RUDDERSTACK_ACCESS_TOKEN (agents)
+                                   or rudder-cli auth login (people)
 ```
 
 ## Step 1: Check if Installed
@@ -94,12 +95,12 @@ Expected output: Version number (e.g., `rudder-cli version 0.x.x`)
 ### Check Current Status
 
 ```bash
-rudder-cli workspace info
+rudder-cli workspace info --json
 ```
 
-**If authenticated:** Shows workspace name and ID. You're done!
+**If authenticated:** Prints the workspace as JSON. `workspaceID` and `name` identify it. You're done!
 
-**If not authenticated:** Continue with authentication.
+**If not authenticated:** The command exits non-zero with an error. Continue with authentication.
 
 ### Get Access Token
 
@@ -108,31 +109,43 @@ rudder-cli workspace info
 3. Click **Generate New Token**
 4. Copy the token (you won't see it again)
 
-### Run Authentication
+### Provide the Token
+
+rudder-cli reads the token from the `RUDDERSTACK_ACCESS_TOKEN` environment variable, or from the config file that `rudder-cli auth login` writes. When the variable is set, it wins over the config file.
+
+**Agents: use the environment variable.** `rudder-cli auth login` prompts for the token on a terminal, which an agent cannot answer, and a token typed into the conversation ends up in the transcript. Never ask the user to paste a token into the chat. Ask the user to set the variable in their own terminal, in the shell that starts the agent, then restart the agent:
 
 ```bash
-rudder-cli auth login
+# The user runs this in their own terminal. read -s keeps the token
+# off the screen and out of shell history.
+read -rs RUDDERSTACK_ACCESS_TOKEN && export RUDDERSTACK_ACCESS_TOKEN
 ```
 
-This prompts for your access token. Paste it when asked.
+**People at a terminal** can run `rudder-cli auth login` instead. It prompts for the token and saves it in the config file.
 
 ### Verify Authentication
 
 ```bash
-rudder-cli workspace info
+rudder-cli workspace info --json
 ```
 
 Expected output:
-```
-Workspace Information:
-  ID:   2iKXWU4QnqclkpPIfXfsbBqrAVa
-  Name: My Workspace
+```json
+{
+  "dataPlaneURL": "https://example.dataplane.rudderstack.com",
+  "environment": "PRODUCTION",
+  "name": "My Workspace",
+  "region": "US",
+  "status": "ACTIVE",
+  "workspaceID": "2iKXWU4QnqclkpPIfXfsbBqrAVa"
+}
 ```
 
 ## Credential Security
 
 - **Never echo or log your access token**
-- Store tokens in environment variables if needed: `RUDDER_ACCESS_TOKEN`
+- **Never ask the user to paste a token into the chat.** Agents read it from `RUDDERSTACK_ACCESS_TOKEN`
+- Store tokens in the `RUDDERSTACK_ACCESS_TOKEN` environment variable, which rudder-cli reads directly
 - Add `.env` files to `.gitignore`
 - For CI/CD, use repository secrets
 - Rotate tokens periodically in the RudderStack dashboard
@@ -142,8 +155,8 @@ Workspace Information:
 | Issue | Solution |
 |-------|----------|
 | `command not found` after install | Check PATH includes install location |
-| `unauthorized` error | Re-run `rudder-cli auth login` with new token |
-| Wrong workspace | Token is tied to workspace; generate new token in correct workspace |
+| `unauthorized` error | Check that `RUDDERSTACK_ACCESS_TOKEN` holds a valid token in the shell that started the agent, or have the user re-run `rudder-cli auth login` with a new token |
+| Wrong workspace | Token is tied to workspace; generate new token in correct workspace. If `RUDDERSTACK_ACCESS_TOKEN` is set, it overrides the token that `auth login` saved |
 | Download fails | Check network; try browser download from releases page |
 
 ## Next Steps

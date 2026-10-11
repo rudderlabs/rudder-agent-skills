@@ -17,9 +17,9 @@ Follow this loop for every change — authoring a new transformation or library,
 ```dot
 digraph transformations_workflow {
     rankdir=TB;
-    "rudder-cli workspace info" [shape=box];
+    "rudder-cli workspace info --json" [shape=box];
     "Authenticated?" [shape=diamond];
-    "rudder-cli auth login" [shape=box];
+    "User exports RUDDERSTACK_ACCESS_TOKEN" [shape=box];
     "Edit YAML / JS / fixtures" [shape=box];
     "rudder-cli validate -l ./" [shape=box];
     "Validation errors?" [shape=diamond];
@@ -30,12 +30,12 @@ digraph transformations_workflow {
     "rudder-cli apply --dry-run -l ./" [shape=box];
     "Diff matches intent?" [shape=diamond];
     "Adjust specs" [shape=box];
-    "rudder-cli apply -l ./" [shape=box];
+    "rudder-cli apply --confirm=false -l ./" [shape=box];
     "Done" [shape=doublecircle];
 
-    "rudder-cli workspace info" -> "Authenticated?";
-    "Authenticated?" -> "rudder-cli auth login" [label="no"];
-    "rudder-cli auth login" -> "rudder-cli workspace info";
+    "rudder-cli workspace info --json" -> "Authenticated?";
+    "Authenticated?" -> "User exports RUDDERSTACK_ACCESS_TOKEN" [label="no"];
+    "User exports RUDDERSTACK_ACCESS_TOKEN" -> "rudder-cli workspace info --json";
     "Authenticated?" -> "Edit YAML / JS / fixtures" [label="yes"];
     "Edit YAML / JS / fixtures" -> "rudder-cli validate -l ./";
     "rudder-cli validate -l ./" -> "Validation errors?";
@@ -49,17 +49,17 @@ digraph transformations_workflow {
     "rudder-cli apply --dry-run -l ./" -> "Diff matches intent?";
     "Diff matches intent?" -> "Adjust specs" [label="no"];
     "Adjust specs" -> "rudder-cli validate -l ./";
-    "Diff matches intent?" -> "rudder-cli apply -l ./" [label="yes"];
-    "rudder-cli apply -l ./" -> "Done";
+    "Diff matches intent?" -> "rudder-cli apply --confirm=false -l ./" [label="yes"];
+    "rudder-cli apply --confirm=false -l ./" -> "Done";
 }
 ```
 
 **Steps:**
-1. **Verify auth** — `rudder-cli workspace info`; re-auth with `rudder-cli auth login` if needed.
+1. **Verify auth** — `rudder-cli workspace info --json`. If it fails, an agent asks the user to export `RUDDERSTACK_ACCESS_TOKEN` in the shell that starts the agent and restart it; it does not run `rudder-cli auth login` (a terminal prompt) and never asks the user to paste a token into the chat. A person at a terminal can run `rudder-cli auth login`. See `rudder-cli-setup`.
 2. **Validate** — `rudder-cli validate -l ./` catches YAML schema errors, missing files, camelCase `import_name` violations.
 3. **Test locally** — `rudder-cli transformations test --all -l ./` runs each transformation against its `tests/input/*.json` fixtures and diffs against `tests/output/*.json`. Use `--modified` for faster iteration or pass a specific transformation id.
 4. **Dry run** — `rudder-cli apply --dry-run -l ./` shows the diff that would be applied. Check for unexpected deletions.
-5. **Apply** — `rudder-cli apply -l ./` publishes libraries and transformations atomically (correct order handled by the CLI).
+5. **Apply** — `rudder-cli apply --confirm=false -l ./` publishes libraries and transformations atomically (correct order handled by the CLI). Without `--confirm=false`, a non-interactive run (agent, CI) auto-declines the confirmation prompt and applies nothing.
 
 For the broader validate → apply cycle that applies to all CLI-managed resources, see the `rudder-cli-workflow` skill. This skill specializes it with the local-test step.
 
@@ -201,13 +201,12 @@ export function transformEvent(event, metadata) {
 | Command | Description |
 |---------|-------------|
 | `rudder-cli validate` | Validate YAML specs and code |
-| `rudder-cli plan` | Show planned changes |
-| `rudder-cli apply` | Apply changes to workspace |
+| `rudder-cli apply --dry-run` | Show planned changes |
+| `rudder-cli apply --confirm=false` | Apply changes to workspace without the interactive prompt |
 | `rudder-cli transformations test <id>` | Test single transformation |
 | `rudder-cli transformations test --all` | Test all transformations |
 | `rudder-cli transformations test --modified` | Test only modified |
 | `rudder-cli import` | Import existing from workspace |
-| `rudder-cli export` | Export to YAML files |
 
 ## Workflow: Adding a New Library
 
@@ -232,7 +231,7 @@ export function transformEvent(event, metadata) {
 
 4. **Dry-run:** `rudder-cli apply --dry-run -l ./`
 
-5. **Apply:** `rudder-cli apply -l ./`
+5. **Apply:** `rudder-cli apply --confirm=false -l ./`
 
 **See `rudder-cli-workflow` skill for detailed iteration workflow.**
 
@@ -374,7 +373,7 @@ All published atomically - no partial updates.
 ## Credential Security
 
 - **Never hardcode API keys in transformation code** - use workspace credentials/secrets instead
-- **Store workspace tokens in environment variables** - never commit `RUDDER_ACCESS_TOKEN` to git
+- **Store workspace tokens in environment variables** - rudder-cli reads `RUDDERSTACK_ACCESS_TOKEN`; never commit it to git or ask the user to paste it into the chat
 - **Add `.env` to `.gitignore`** - if using dotenv files for local development
 - **Use CI/CD secrets** - for automated deployments, use repository secrets
 - **Reference secrets via workspace credentials** - transformation code can access configured secrets securely

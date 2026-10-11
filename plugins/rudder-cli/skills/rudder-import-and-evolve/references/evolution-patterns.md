@@ -221,7 +221,8 @@ workspaces/
 ### Switch Workspaces
 
 ```bash
-# Login to different workspace
+# Login to different workspace (a person at a terminal; an agent
+# needs the user to export a different RUDDERSTACK_ACCESS_TOKEN)
 rudder-cli auth login
 
 # Verify current workspace

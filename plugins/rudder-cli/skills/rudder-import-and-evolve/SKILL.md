@@ -36,7 +36,7 @@ This skill teaches how to **import existing RudderStack resources** into CLI man
 rudder-cli auth login
 ```
 
-Select your workspace when prompted.
+This prompts for an access token; the token decides the workspace. An agent does not run it: it asks the user to export `RUDDERSTACK_ACCESS_TOKEN` in the shell that starts the agent, and never asks the user to paste a token into the chat. See `rudder-cli-setup`.
 
 ### Step 2: Verify Connection
 
@@ -177,7 +177,7 @@ The CLI tracks what was imported. Missing files = deletions.
 ## CLI Commands Reference
 
 ```bash
-# Authenticate
+# Authenticate (a person at a terminal; agents use RUDDERSTACK_ACCESS_TOKEN)
 rudder-cli auth login
 
 # Show current workspace
@@ -198,6 +198,11 @@ rudder-cli apply --dry-run -l ./
 # Apply changes
 rudder-cli apply -l ./
 ```
+
+## Credential Security
+
+- **Agents read the token from `RUDDERSTACK_ACCESS_TOKEN`** - never run `rudder-cli auth login` on the user's behalf and never ask the user to paste a token into the chat
+- **Never echo or log the token**, and never commit it to git
 
 ## Handling External Content
 
