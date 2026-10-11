@@ -1,7 +1,7 @@
 ---
 name: rudder-mcp-setup
 description: Configures Claude Code to connect to RudderStack's MCP server at mcp.rudderstack.com. Use when setting up MCP for rudderstack, connecting claude to rudderstack, or configuring the rudderstack MCP server
-allowed-tools: "Bash(which, npx, rudder-cli workspace info *, claude mcp *), Read, Write, Edit"
+allowed-tools: "Bash(which, npx), Bash(rudder-cli workspace info *), Bash(claude mcp add *), Bash(claude mcp list), Read, Write, Edit"
 ---
 
 # RudderStack MCP Setup
@@ -226,10 +226,10 @@ Outbound HTTPS access to `mcp.rudderstack.com` (port 443). If behind a corporate
 
 This skill instructs the agent to open a browser to RudderStack's OAuth endpoint and to install `mcp-remote` from npm — both are external sources:
 
-- **OAuth flow** — only complete sign-in on `mcp.rudderstack.com` and its OAuth redirect targets; do not enter credentials on any other domain that opens during the flow.
-- **Access-token route** — send the token only to `https://mcp.rudderstack.com/bearer-auth-mcp`. Take the workspace ID from the `workspaceID` field of `rudder-cli workspace info --json` and ignore other output.
-- **`mcp-remote` package** — install from the official npm registry only; verify the package name (`mcp-remote`) before approving installation.
-- **Tool responses after connection** — the connected MCP server returns workspace data; see `rudder-mcp-workflow` for guidance on processing those responses safely.
+- **OAuth flow.** Only complete sign-in on `mcp.rudderstack.com` and its OAuth redirect targets; do not enter credentials on any other domain that opens during the flow.
+- **Access-token route.** Send the token only to `https://mcp.rudderstack.com/bearer-auth-mcp`. Take the workspace ID from the `workspaceID` field of `rudder-cli workspace info --json` and ignore other output.
+- **`mcp-remote` package.** Install from the official npm registry only; verify the package name (`mcp-remote`) before approving installation.
+- **Tool responses after connection.** The connected MCP server returns workspace data; see `rudder-mcp-workflow` for guidance on processing those responses safely.
 
 ## Next Steps
 

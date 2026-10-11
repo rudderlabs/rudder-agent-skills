@@ -150,13 +150,15 @@ rudder-cli workspace accounts list --type snowflake --json
 
 ## Variables and secrets
 
-Specs live in git, so they must not hold secrets. Write a secret or an environment-specific value as a `{{ .NAME }}` reference, quoted, and supply the value when the CLI loads the project:
+Specs live in git, so they must not hold secrets. Write a secret or an environment-specific value as a `{{ .NAME }}` reference in single quotes, and supply the value when the CLI loads the project:
 
 ```yaml
 spec:
   config:
-    api_key: "{{ .WEBHOOK_API_KEY }}"
+    api_key: '{{ .WEBHOOK_API_KEY }}'
 ```
+
+The CLI inserts the value as is before it parses the YAML. Inside double quotes, a value with `"` or `\` breaks the YAML or silently changes the secret, so use single quotes. A `'` inside the value must be doubled, with the var file entry left unquoted, for example `DB_PASSWORD: it''s`. The CLI reports an unescaped `'` as an error. Up to rudder-cli 0.28.0 that error is a YAML parse error.
 
 Put the values in a var file and pass it to `validate` and to both `apply` runs:
 
@@ -185,7 +187,7 @@ Rules the CLI enforces:
 Git-ignore the var file before writing a value into it, and confirm that git ignores it:
 
 ```bash
-echo 'secrets.vars.yaml' >> .gitignore
+grep -qxF 'secrets.vars.yaml' .gitignore 2>/dev/null || printf '\nsecrets.vars.yaml\n' >> .gitignore
 git check-ignore secrets.vars.yaml   # prints the path when it is ignored
 ```
 
@@ -369,7 +371,7 @@ done
 | "workspace info" shows wrong workspace | Authenticated to wrong workspace | Use a token from the correct workspace. A set `RUDDERSTACK_ACCESS_TOKEN` wins over `auth login` and `-c` |
 | `error[project/var-substitution]: undefined variable` | A `{{ .NAME }}` reference has no value | Pass the var file with `--var-file`, or set `RUDDER_<NAME>` |
 | "Project configuration is valid" but dry-run shows nothing | No changes detected | Verify files are in correct location |
-| Validation passes but dry-run fails | API/auth issue | Run `rudder-cli workspace info` to verify auth |
+| Validation passes but dry-run fails | API/auth issue | Run `rudder-cli workspace info --json` to verify auth |
 | `apply` exits without applying, no error | Default `--confirm=true` auto-declined in a non-TTY (piped/CI/agent) context | Re-run with `--confirm=false` |
 | `Removed resources:` lists resources you didn't expect | `apply` deletes every CLI-managed resource (one with an external id) that the project does not declare, across all providers | Add those resources to your project (e.g. via `rudder-cli import`), or confirm the deletions are intended |
 | Changes not appearing | Wrong project path | Verify `-l ./` points to right directory |

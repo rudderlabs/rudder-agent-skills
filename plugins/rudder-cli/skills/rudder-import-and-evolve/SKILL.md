@@ -41,10 +41,10 @@ This prompts for an access token; the token decides the workspace. An agent does
 ### Step 2: Verify Connection
 
 ```bash
-rudder-cli workspace info
+rudder-cli workspace info --json
 ```
 
-Should show your workspace name and ID.
+Should show your workspace `name` and `workspaceID`.
 
 ### Step 3: Import Resources
 
@@ -105,6 +105,8 @@ See `references/evolution-patterns.md` for detailed patterns including:
 - Adding custom types to existing properties
 - Multi-workspace management (dev/staging/production)
 
+The examples there end with `rudder-cli apply -l ./`, which waits on a confirmation prompt. An agent shows the user the `rudder-cli apply --dry-run -l ./` output first, then runs `rudder-cli apply --confirm=false -l ./`. Without `--confirm=false`, a non-interactive run auto-declines the prompt and applies nothing.
+
 ## Handling Import Drift
 
 **Problem:** Someone made changes in the UI after import.
@@ -126,8 +128,8 @@ rudder-cli apply --dry-run -l ./
 # "Updated" means local differs from workspace
 # Decide: use local (apply) or use workspace (re-import that file)
 
-# 3. Apply your version
-rudder-cli apply -l ./
+# 3. Apply your version, after the user has seen the dry run
+rudder-cli apply --confirm=false -l ./
 ```
 
 **Best practice:** After import, all changes go through CLI. Disable UI editing for data catalog if possible.
@@ -168,8 +170,12 @@ metadata:
 If you import, delete some files, then apply:
 
 ```bash
-# This will DELETE resources from workspace!
-rudder-cli apply -l ./  # Shows "Deleted [event] ..."
+# The dry run lists the deleted files' resources under "Removed resources:".
+# Show it to the user first.
+rudder-cli apply --dry-run -l ./
+
+# This will DELETE those resources from the workspace!
+rudder-cli apply --confirm=false -l ./
 ```
 
 The CLI tracks what was imported. Missing files = deletions.
@@ -181,7 +187,7 @@ The CLI tracks what was imported. Missing files = deletions.
 rudder-cli auth login
 
 # Show current workspace
-rudder-cli workspace info
+rudder-cli workspace info --json
 
 # Import all resources
 rudder-cli import workspace
@@ -195,8 +201,8 @@ rudder-cli validate -l ./
 # Preview changes
 rudder-cli apply --dry-run -l ./
 
-# Apply changes
-rudder-cli apply -l ./
+# Apply changes, after the user has seen the dry run
+rudder-cli apply --confirm=false -l ./
 ```
 
 ## Credential Security
@@ -220,7 +226,7 @@ Before applying changes:
 
 - [ ] Ran `rudder-cli validate -l ./` - no errors
 - [ ] Ran `rudder-cli apply --dry-run -l ./` - reviewed all changes
-- [ ] No unexpected "Deleted" resources in dry-run
+- [ ] No unexpected entries under "Removed resources:" in the dry-run
 - [ ] Breaking changes have migration plan (parallel events, deprecation period)
 - [ ] SDK teams notified of upcoming changes
 - [ ] RudderTyper regenerated if using type-safe code

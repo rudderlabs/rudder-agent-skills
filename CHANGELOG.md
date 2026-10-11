@@ -17,10 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the agent should ask the user to export the variable instead, and that it must
   never ask the user to paste a token into the chat. rudder-cli-setup documents
   that the variable wins over the token saved by `auth login`.
-- **`rudder-cli` / `rudder-cli-workflow`, `rudder-transformations`; `rudder-mcp` /
-  `rudder-mcp-workflow`.** Apply commands an agent runs after a reviewed dry-run
-  now carry `--confirm=false`. The interactive iteration loop in
-  rudder-cli-workflow is labelled as being for a person at a terminal.
+- **`rudder-cli` / `rudder-cli-workflow`, `rudder-transformations`,
+  `rudder-import-and-evolve`; `rudder-mcp` / `rudder-mcp-workflow`.** Apply
+  commands an agent runs after a reviewed dry-run now carry `--confirm=false`.
+  The interactive iteration loop in rudder-cli-workflow is labelled as being for
+  a person at a terminal. rudder-import-and-evolve says its reference examples
+  need the same flag when an agent runs them.
 - **Versions.** `rudder-cli` 0.0.3 to 0.0.4, `rudder-mcp` 0.0.2 to 0.0.3.
 
 - **Breaking (repo layout):** renamed the top-level `skills/` directory back to
@@ -54,12 +56,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **`rudder-cli` / `rudder-cli-workflow`.** A "Variables and secrets" section on
-  `--var-file` for `validate` and `apply`: `{{ .NAME }}` references, the
+- **`rudder-cli` / `rudder-cli-workflow`, `rudder-transformations`.** A
+  "Variables and secrets" section on `--var-file` for `validate` and `apply`:
+  `{{ .NAME }}` references in single quotes, doubling a `'` inside a value, the
   `.vars.yaml` / `.vars.yml` name rule, later files winning, `RUDDER_<NAME>`
   environment variables winning over files, the
   `error[project/var-substitution]` failure, git-ignoring the var file, and that
   substitution is on by default only from rudder-cli 0.25.0.
+  rudder-transformations says `transformations test` needs the same
+  `--var-file` flags.
 - **`rudder-mcp` / `rudder-mcp-setup`, `rudder-mcp-workflow`.** The access-token
   route: `https://mcp.rudderstack.com/bearer-auth-mcp` with
   `Authorization: Bearer <token>` and `X-Workspace-ID` headers, configured in

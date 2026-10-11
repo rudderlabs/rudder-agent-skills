@@ -226,7 +226,7 @@ workspaces/
 rudder-cli auth login
 
 # Verify current workspace
-rudder-cli workspace info
+rudder-cli workspace info --json
 ```
 
 ### Promote Changes

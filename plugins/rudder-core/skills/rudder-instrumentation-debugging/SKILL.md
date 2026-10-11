@@ -296,7 +296,7 @@ rudder-cli validate -l ./
 rudder-cli apply --dry-run -l ./
 
 # Check workspace connection
-rudder-cli workspace info
+rudder-cli workspace info --json
 
 # Re-authenticate if needed (a person at a terminal; agents use
 # RUDDERSTACK_ACCESS_TOKEN and never ask for the token in chat)

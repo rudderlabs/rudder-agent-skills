@@ -55,11 +55,11 @@ digraph transformations_workflow {
 ```
 
 **Steps:**
-1. **Verify auth** — `rudder-cli workspace info --json`. If it fails, an agent asks the user to export `RUDDERSTACK_ACCESS_TOKEN` in the shell that starts the agent and restart it; it does not run `rudder-cli auth login` (a terminal prompt) and never asks the user to paste a token into the chat. A person at a terminal can run `rudder-cli auth login`. See `rudder-cli-setup`.
-2. **Validate** — `rudder-cli validate -l ./` catches YAML schema errors, missing files, camelCase `import_name` violations.
-3. **Test locally** — `rudder-cli transformations test --all -l ./` runs each transformation against its `tests/input/*.json` fixtures and diffs against `tests/output/*.json`. Use `--modified` for faster iteration or pass a specific transformation id.
-4. **Dry run** — `rudder-cli apply --dry-run -l ./` shows the diff that would be applied. Check for unexpected deletions.
-5. **Apply** — `rudder-cli apply --confirm=false -l ./` publishes libraries and transformations atomically (correct order handled by the CLI). Without `--confirm=false`, a non-interactive run (agent, CI) auto-declines the confirmation prompt and applies nothing.
+1. **Verify auth.** `rudder-cli workspace info --json`. If it fails, an agent asks the user to export `RUDDERSTACK_ACCESS_TOKEN` in the shell that starts the agent and restart it; it does not run `rudder-cli auth login` (a terminal prompt) and never asks the user to paste a token into the chat. A person at a terminal can run `rudder-cli auth login`. See `rudder-cli-setup`.
+2. **Validate.** `rudder-cli validate -l ./` catches YAML schema errors, missing files, camelCase `import_name` violations.
+3. **Test locally.** `rudder-cli transformations test --all -l ./` runs each transformation against its `tests/input/*.json` fixtures and diffs against `tests/output/*.json`. Use `--modified` for faster iteration or pass a specific transformation id.
+4. **Dry run.** `rudder-cli apply --dry-run -l ./` shows the diff that would be applied. Check for unexpected deletions.
+5. **Apply.** `rudder-cli apply --confirm=false -l ./` publishes libraries and transformations atomically (correct order handled by the CLI). Without `--confirm=false`, a non-interactive run (agent, CI) auto-declines the confirmation prompt and applies nothing.
 
 For the broader validate → apply cycle that applies to all CLI-managed resources, see the `rudder-cli-workflow` skill. This skill specializes it with the local-test step.
 
@@ -207,6 +207,8 @@ export function transformEvent(event, metadata) {
 | `rudder-cli transformations test --all` | Test all transformations |
 | `rudder-cli transformations test --modified` | Test only modified |
 | `rudder-cli import` | Import existing from workspace |
+
+When specs use `{{ .NAME }}` references, pass the same `--var-file` flags to `transformations test` that you pass to `validate` and `apply`. `transformations test` accepts `--var-file` from rudder-cli 0.28.0. See Variables and secrets in `rudder-cli-workflow`.
 
 ## Workflow: Adding a New Library
 
