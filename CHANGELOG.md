@@ -27,6 +27,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`rudder-cli` / `rudder-destination-authoring`** - new skill for writing a
+  `destination` spec and its `event-stream-connections` link. Secrets are
+  `{{ .VAR }}` placeholders supplied through a gitignored `--var-file` or
+  `RUDDER_`-prefixed environment variables, never requested in chat. Covers the
+  verified destination types, the `unverifiedDestinations` gate (which needs
+  `RUDDERSTACK_CLI_EXPERIMENTAL=true` as well), `connection_mode`, the
+  disabled-by-default `enabled` trap, and a validated webhook example.
 - **CI / dev tooling** — both directory crawlers now run as gates against the
   working tree: cursor.directory's real `parse.ts` (vendored, pinned) via
   `scripts/cursor-preview/preview.mts`, and skills.sh's real `skills` CLI (pinned)
