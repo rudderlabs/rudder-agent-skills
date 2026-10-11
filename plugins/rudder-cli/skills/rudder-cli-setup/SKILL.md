@@ -132,7 +132,7 @@ Workspace Information:
 ## Credential Security
 
 - **Never echo or log your access token**
-- Store tokens in environment variables if needed: `RUDDER_ACCESS_TOKEN`
+- Store the token in the `RUDDERSTACK_ACCESS_TOKEN` environment variable if needed. It overrides the token in `~/.rudder/config.json`, so an agent never has to paste a token into `rudder-cli auth login`. Run `rudder-cli workspace info --json` to confirm it worked.
 - Add `.env` files to `.gitignore`
 - For CI/CD, use repository secrets
 - Rotate tokens periodically in the RudderStack dashboard
