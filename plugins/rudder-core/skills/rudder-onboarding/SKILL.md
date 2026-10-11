@@ -25,10 +25,11 @@ Done means one real event from this app reached the destination the user chose, 
 
 ## Rules that hold in every step
 
+- Begin each step with one line, `Step N of 9 · <title>`, so the user can follow along.
 - Specs live in `rudder/`. Pass `-l rudder` to every `validate` and `apply`. Never `-l .` in an app repository: the CLI parses every YAML file under the location, so a CI workflow file fails validation.
 - Show the dry run and get a yes before every apply. Apply as `rudder-cli apply -l rudder --confirm=false`, because without a terminal the default asks, declines on its own, and still exits 0.
 - Stop if a dry run lists `Removed resources:`. Apply deletes every CLI-managed resource in the workspace that is missing from `rudder/`, including resources another project created.
-- Secrets go in `rudder/secrets.vars.yaml` (git-ignored) and are referenced as `{{ .NAME }}`. Never put a secret in a spec, a commit, a command line or the chat.
+- Secrets go in `rudder/secrets.vars.yaml` (git-ignored) and are referenced in single quotes, `'{{ .NAME }}'`, because the value is pasted in before the YAML is parsed. Never put a secret in a spec, a commit, a command line or the chat.
 - Commit after the apply and after the instrumentation, so either can be undone with `git revert`.
 - Ask one question at a time. Offer choices, and accept a free-text answer.
 - Every retry has a bound. When it is reached, stop and report what you saw.
@@ -182,9 +183,9 @@ Visible choices, a free-text fallback, and no secrets typed into chat.
      - Mixpanel
      - Something else. Type its name.
 2. For a webhook, ask for the URL. It must be a public http(s) domain (fact webhook-public-url). If the user has none, a tunnel to a local listener or a request bin both work; say which you are choosing and that a request bin is a third party.
-3. Ask whether the endpoint needs an auth header. Only if it does, add the header with its value as `{{ .WEBHOOK_AUTH }}`.
+3. Ask whether the endpoint needs an auth header. Only if it does, add the header with its value as `'{{ .WEBHOOK_AUTH }}'`.
 4. Write `rudder/destinations/<id>.yaml` from the destination reference: `definition_version: 1`, `enabled: true`, and `connection_mode: {web: cloud}` for a JavaScript source.
-5. For every secret the destination needs, reference it as `{{ .NAME }}` and add `NAME: ""` to `rudder/secrets.vars.yaml`.
+5. For every secret the destination needs, reference it as `'{{ .NAME }}'` and add `NAME: ""` to `rudder/secrets.vars.yaml`.
 6. If you created a var file, ask the user to fill it in their editor and say continue. Do not read the values back.
 
 Facts that apply here: **webhook-public-url**, **connection-mode**, **destination-disabled**.

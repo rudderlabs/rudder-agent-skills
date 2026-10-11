@@ -78,7 +78,7 @@ spec:
   ```yaml
       headers:
         - from: Authorization
-          to: "{{ .WEBHOOK_AUTH }}"
+          to: '{{ .WEBHOOK_AUTH }}'
   ```
 
 ## Google Analytics 4
@@ -88,9 +88,9 @@ spec:
   definition_version: 1
   enabled: true
   config:
-    api_secret: "{{ .GA4_API_SECRET }}"
+    api_secret: '{{ .GA4_API_SECRET }}'
     client_type: gtag
-    measurement_id: "{{ .GA4_MEASUREMENT_ID }}"
+    measurement_id: '{{ .GA4_MEASUREMENT_ID }}'
     connection_mode:
       web: cloud
 ```
@@ -104,7 +104,7 @@ spec:
   definition_version: 1
   enabled: true
   config:
-    api_key: "{{ .AMPLITUDE_API_KEY }}"
+    api_key: '{{ .AMPLITUDE_API_KEY }}'
     residency_server: standard   # or EU
     connection_mode:
       web: cloud
@@ -117,7 +117,7 @@ spec:
   definition_version: 1
   enabled: true
   config:
-    token: "{{ .MIXPANEL_TOKEN }}"
+    token: '{{ .MIXPANEL_TOKEN }}'
     data_residency: us           # us, eu or in
     identity_merge_api: simplified
     connection_mode:
@@ -138,8 +138,10 @@ WEBHOOK_AUTH: ""
 
 - Pass it with `--var-file rudder/secrets.vars.yaml` on `validate` and `apply`. An environment variable
   `RUDDER_<KEY>` overrides the file.
-- Substitution happens on the raw text before YAML parsing. A value containing double quotes needs a
-  single-quoted reference: `'{{ .VAR }}'`.
+- Substitution pastes the value into the raw text before YAML is parsed, so write every reference in
+  single quotes, `'{{ .VAR }}'`, as these samples do. In a double-quoted slot a value containing `"` or `\`
+  breaks the YAML or silently changes the secret. A `'` inside the value must be doubled (`''`); the CLI
+  reports an unescaped one as an error.
 - Every referenced variable must be defined, even for `validate`. A missing one fails with
   `error[project/var-substitution]` and the file, line and column.
 
