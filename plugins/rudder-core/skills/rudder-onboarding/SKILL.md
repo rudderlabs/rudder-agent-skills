@@ -120,9 +120,9 @@ Do not write a tracking plan in the first run. One delivered event is the target
 **Do.** Follow `rudder-destination-authoring` completely.
 
 1. Offer the destination choices from that skill and one free-text option. For a first run a webhook is the fastest, because the receiving end shows the whole payload. The URL must be public. A `localhost` URL fails validation.
-2. Write the source, destination and connection specs and an ignored `*.vars.yaml` file with empty values.
+2. Write the source, destination and connection specs under a `rudderstack/` directory in the project root (`sources/`, `destinations/`, `connections.yaml`) and an ignored `secrets.vars.yaml` file with empty values at the project root. The CLI reads every YAML file under the `-l` path and rejects any that is not a spec, so `-l .` fails on CI workflows, compose files and anything under `node_modules/`.
 3. Tell the user which file to fill in and wait. Never ask for the values in chat.
-4. Validate with `rudder-cli validate -l . --var-file secrets.vars.yaml`, with `--json` when the probe passed.
+4. Validate with `rudder-cli validate -l ./rudderstack --var-file secrets.vars.yaml`, with `--json` when the probe passed.
 
 **Exit condition.** All three hold, and you can show each.
 - Validate reports zero errors and zero warnings. A disabled-destination warning counts as a failure.
@@ -136,11 +136,11 @@ Do not write a tracking plan in the first run. One delivered event is the target
 **Entry condition.** Step 4 exited and step 1's workspace is still the target. Run `rudder-cli workspace info --json` again and compare `workspaceID`.
 
 **Do.**
-1. Dry-run. `rudder-cli apply --dry-run -l . --var-file secrets.vars.yaml` (add `--json` when available).
+1. Dry-run. `rudder-cli apply --dry-run -l ./rudderstack --var-file secrets.vars.yaml` (add `--json` when available).
 2. Read the plan. Count creates, updates and deletes.
 3. Show the user the plan in plain words. If any delete appears that this session did not cause, stop here.
 4. Ask. Wait for a yes.
-5. Apply. `rudder-cli apply -l . --var-file secrets.vars.yaml --confirm=false`.
+5. Apply. `rudder-cli apply -l ./rudderstack --var-file secrets.vars.yaml --confirm=false`.
 6. Commit the specs and `.gitignore`. Never stage a `*.vars.yaml` file. Record the short sha.
 7. Note the UTC time in RFC 3339 form. No event can reach the destination before it, so it bounds `start_time` in step 8.
 
@@ -225,7 +225,7 @@ Without MCP, the exit condition falls back to the webhook sink, or to the live e
 - What changed in code, as a list of files.
 - The evidence. The event name, the delivered and failed counts, and the `start_time` window you measured.
 - The commits, with short shas, for specs and for code.
-- The undo command. `git revert <specs-sha>`, then `rudder-cli apply --dry-run -l . --var-file secrets.vars.yaml`, then `rudder-cli apply -l . --var-file secrets.vars.yaml --confirm=false`. Tell the user that the dry run will list deletes, and that here they are the intended ones.
+- The undo command. `git revert <specs-sha>`, then `rudder-cli apply --dry-run -l ./rudderstack --var-file secrets.vars.yaml`, then `rudder-cli apply -l ./rudderstack --var-file secrets.vars.yaml --confirm=false`. Tell the user that the dry run will list deletes, and that here they are the intended ones.
 - What was not verified, if anything.
 
 Offer to open a pull request. Do not push or open one without a yes.

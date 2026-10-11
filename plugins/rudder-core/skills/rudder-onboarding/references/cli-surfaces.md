@@ -21,7 +21,7 @@ Each line prints only when the feature exists.
 Pull request rudder-iac#877, branch `feature/dex-905-validate-json`. Requires the rudder-cli release that ships #877. Flag is `--json` or `-j`.
 
 ```bash
-rudder-cli validate -l . --var-file secrets.vars.yaml --json
+rudder-cli validate -l ./rudderstack --var-file secrets.vars.yaml --json
 ```
 
 stdout holds one document and nothing else.
@@ -33,7 +33,7 @@ stdout holds one document and nothing else.
       "ruleId": "destination/spec-syntax-valid",
       "severity": "error",
       "message": "unknown config field \"webhookUrl\"",
-      "file": "destinations/storefront-webhook.yaml",
+      "file": "rudderstack/destinations/storefront-webhook.yaml",
       "line": 12,
       "column": 5
     }
@@ -54,7 +54,7 @@ Without it, parse the text. Errors and the summary go to stdout and the final `E
 
 ```text
 error[destination/spec-syntax-valid]: unknown config field "webhookUrl"
-  --> destinations/storefront-webhook.yaml:12:5
+  --> rudderstack/destinations/storefront-webhook.yaml:12:5
 ...
 Found 1 error(s), 0 warning(s)
 ```
@@ -66,8 +66,8 @@ A clean run prints `Project configuration is valid`. A warning prints `warning[<
 Pull request rudder-iac#880, branch `feature/dex-905-apply-json`. Requires the release that ships #880. Flag is `--json` or `-j`.
 
 ```bash
-rudder-cli apply -l . --var-file secrets.vars.yaml --dry-run --json
-rudder-cli apply -l . --var-file secrets.vars.yaml --confirm=false --json
+rudder-cli apply -l ./rudderstack --var-file secrets.vars.yaml --dry-run --json
+rudder-cli apply -l ./rudderstack --var-file secrets.vars.yaml --confirm=false --json
 ```
 
 ```json
