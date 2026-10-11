@@ -374,7 +374,7 @@ All published atomically - no partial updates.
 ## Credential Security
 
 - **Never hardcode API keys in transformation code** - use workspace credentials/secrets instead
-- **Store workspace tokens in environment variables** - never commit `RUDDER_ACCESS_TOKEN` to git
+- **Store workspace tokens in environment variables** - never commit `RUDDERSTACK_ACCESS_TOKEN` to git
 - **Add `.env` to `.gitignore`** - if using dotenv files for local development
 - **Use CI/CD secrets** - for automated deployments, use repository secrets
 - **Reference secrets via workspace credentials** - transformation code can access configured secrets securely

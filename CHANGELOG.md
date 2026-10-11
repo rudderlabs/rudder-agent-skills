@@ -20,6 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`rudder-cli` / `rudder-cli-setup`, `rudder-cli-workflow`, `rudder-transformations`.**
+  The skills named `RUDDER_ACCESS_TOKEN`, but the CLI binds `RUDDERSTACK_ACCESS_TOKEN`
+  (`cli/internal/config/config.go` in rudder-iac), so an agent that exported the documented
+  name failed authentication. All four mentions now use the name the CLI reads, and
+  `rudder-cli-setup` says the variable overrides `~/.rudder/config.json` and that
+  `rudder-cli workspace info --json` confirms it took effect.
 - **`rudder-profiles` / `rudder-profiles-setup`, `rudder-profiles-update`** —
   quoted the `description` frontmatter. An unquoted `: ` (colon-space) made the
   skills.sh CLI's YAML parser read it as a nested mapping and reject the
