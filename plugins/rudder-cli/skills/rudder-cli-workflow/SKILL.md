@@ -45,10 +45,10 @@ Settings → Access Tokens in the RudderStack dashboard.
 
 ### Credential Security
 
-- **Never log or echo access tokens** - use `rudder-cli auth login` interactively or `RUDDER_ACCESS_TOKEN` environment variable
+- **Never log or echo access tokens** - use `rudder-cli auth login` interactively or `RUDDERSTACK_ACCESS_TOKEN` environment variable
 - **Store tokens in environment variables** - never hardcode in scripts or commit to git
 - **Add `.env` to `.gitignore`** - if using dotenv files for local development
-- **Use CI/CD secrets** - for GitHub Actions, use repository secrets for `RUDDER_ACCESS_TOKEN`
+- **Use CI/CD secrets** - for GitHub Actions, use repository secrets for `RUDDERSTACK_ACCESS_TOKEN`
 - **Rotate tokens regularly** - regenerate access tokens in RudderStack dashboard periodically
 
 ### Handling External Content
