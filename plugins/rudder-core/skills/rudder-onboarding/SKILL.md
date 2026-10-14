@@ -130,14 +130,15 @@ Two questions. What is this app, and what does the workspace already hold?
 
 1. Read the manifest and entry points (package.json, vite or next config, src/). Decide where the code runs.
 2. Search code and dependencies for an analytics SDK: `@rudderstack/analytics-js`, `rudder-sdk-js`, `@segment/analytics-next`, `gtag(`, `mixpanel`, `amplitude`, `posthog`.
-3. Call MCP `list_sources` (retl_type none), `list_destinations` and `list_connections`. Run `rudder-cli workspace event-stream-sources list --json`; an `externalId` marks a CLI-managed source.
-4. Report in four short lines: what the app is, analytics found in the code, what the workspace holds, the source you propose. A browser app gets a JavaScript source.
-5. Ask the user: "I will create a new JavaScript source called <name>. OK?"
+3. Call MCP `list_sources` (retl_type none), `list_destinations` and `list_connections` to see what the workspace holds.
+4. Find resources other projects manage: with `rudder/` still empty, run `rudder-cli apply -l rudder --dry-run`. Every line under `Removed resources:` is a CLI-managed resource that an apply from this project would delete, of any type (sources, destinations, tracking plans, transformations). `No changes to apply` means there are none.
+5. Report in four short lines: what the app is, analytics found in the code, what the workspace holds, the source you propose. A browser app gets a JavaScript source.
+6. Ask the user: "I will create a new JavaScript source called <name>. OK?"
      - Yes
      - Use a different name
      - or a free-text answer
 
-If the workspace holds CLI-managed resources that are not in `rudder/`:
+If that dry run lists anything under `Removed resources:`:
 
 - Stop. Explain that apply would delete them (fact apply-scope). Offer to continue in an empty workspace, or to bring them into this project first with `rudder-cli import workspace`.
 
