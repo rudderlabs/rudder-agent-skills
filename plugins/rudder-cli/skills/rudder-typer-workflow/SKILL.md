@@ -316,6 +316,8 @@ rudder-cli typer generate
 xcodebuild               # iOS
 ```
 
+After the build, fire each changed event from the app and confirm the payload locally with `rudder-cli sources listen` (the `rudder-cli-sources-listen` skill). Set the SDK's `dataPlaneUrl` and `controlPlaneUrl` to the listener `url`. A clean compile proves the types; the capture proves what the app sends.
+
 ## CI/CD Integration
 
 See `references/ci-cd-integration.md` for GitHub Actions workflows, pre-commit hooks, multi-platform project patterns, and monorepo configurations.

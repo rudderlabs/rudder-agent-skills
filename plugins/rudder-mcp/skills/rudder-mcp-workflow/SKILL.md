@@ -69,6 +69,10 @@ Patterns to ask Claude — phrased as a user would say them:
 After instrumenting events (via CLI, Terraform, or code), verify they reach destinations:
 
 ```
+0. VERIFY LOCALLY (optional, no workspace needed)
+   └── Capture the app's events with rudder-cli sources listen
+       (rudder-cli-sources-listen skill) and fix them before applying
+
 1. APPLY TRACKING PLAN
    └── e.g. rudder-cli apply -l ./
 
