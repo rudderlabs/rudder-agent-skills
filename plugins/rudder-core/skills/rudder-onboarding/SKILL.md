@@ -1,6 +1,6 @@
 ---
 name: rudder-onboarding
-description: Takes an app from no analytics to one real event delivered to a destination the user picks, with the pipeline as rudder-cli specs in git. Use when the user says "set up RudderStack", "onboard", "send my first event", or AGENTS.md points here.
+description: Takes an app from no analytics to one real event delivered to a destination the user picks, with the pipeline as rudder-cli specs in git. Use when the user says "set up RudderStack", "onboard" or "send my first event", or when the RudderStack Get started card or plugin sent them here.
 allowed-tools: Bash(rudder-cli *), Bash(git *), Bash(npm *), Bash(npx *), Bash(curl *), Bash(jq *), Read, Write, Edit, Grep, Glob
 ---
 
@@ -8,20 +8,20 @@ allowed-tools: Bash(rudder-cli *), Bash(git *), Bash(npm *), Bash(npx *), Bash(c
 
 # Set up RudderStack in this project
 
-Done means one real event from this app reached the destination the user chose, proven by the destination's delivery count and by the destination's own copy of the payload. The pipeline exists as specs in `rudder/` and the instrumentation is committed, so `git revert` followed by `rudder-cli apply` undoes it. The user makes three decisions: what to learn, where events go, and whether to apply the plan.
+Done means one real event from this app reached the destination the user chose, proven by the destination's delivery count and by the destination's own copy of the payload. The pipeline exists as specs in `rudder/` and the instrumentation is committed, so `git revert` followed by `rudder-cli apply` undoes it. The user makes three decisions: the plan (what to learn and which events), where events go, and whether to apply the specs.
 
 ## When to use
 
 - The user asks to set up RudderStack, add analytics, or send a first event, in a repository you can edit.
-- `rudder-cli init` ran here: there is an `AGENTS.md` with a `rudderstack` block and a `rudder/` directory.
+- The user pasted the prompt from RudderStack's Get started card, or ran the onboarding command of the RudderStack plugin.
 - Not for a workspace that already has CLI-managed resources from another project. Step 2 stops in that case.
 
 ## Before you start
 
 - **rudder-cli**: check with `rudder-cli --version`. If missing, install with `curl -fsSL https://raw.githubusercontent.com/rudderlabs/rudder-iac/main/install.sh -o /tmp/install-rudder-cli.sh && sh /tmp/install-rudder-cli.sh`. Download the installer and run it as two steps; do not pipe it into a shell.
 - **git**: check with `git --version`.
-- **the rudderstack MCP server**: check that the tools list_sources, get_source and get_destination_event_metrics are available to you. `rudder-cli init` writes it into `.mcp.json` (the `/bearer-auth-mcp` route, same token as the CLI). An MCP server added during a session loads only after a restart, see step 1.
-- **RUDDERSTACK_ACCESS_TOKEN** (environment variable): A read-write access token for the workspace, exported in the shell the agent was started from. Check it with `test -n "$RUDDERSTACK_ACCESS_TOKEN"`. The user creates one on Get started or in Settings, Access tokens. Never ask the user to paste it into chat, and never echo it.
+- **the rudderstack MCP server**: check that the tools list_sources, get_source and get_destination_event_metrics are available to you. It is the HTTP server at https://mcp.rudderstack.com/mcp. It signs in with the user's RudderStack login in the browser (OAuth), not with the access token. The RudderStack plugin for Claude Code brings it; otherwise the user adds it, see step 1. An MCP server added during a session loads only after a restart.
+- **RUDDERSTACK_ACCESS_TOKEN** (environment variable): A read-write access token for the workspace, exported in the shell the agent was started from. Check it with `test -n "$RUDDERSTACK_ACCESS_TOKEN"`. The user creates one on Get started or in Settings, Access tokens. It is for rudder-cli only; MCP signs in separately. Never ask the user to paste it into chat, and never echo it.
 
 ## Rules that hold in every step
 
@@ -38,8 +38,8 @@ Stop and wait for an explicit yes at these gates: step 3 (Goal and plan), step 5
 
 ## Credential Security
 
-- The access token comes from `RUDDERSTACK_ACCESS_TOKEN`. Never echo it, write it to a file or ask the user to paste it into chat. `.mcp.json` refers to it as `${RUDDERSTACK_ACCESS_TOKEN}`, never by value.
-- Destination secrets live in `rudder/secrets.vars.yaml`, which `rudder-cli init` git-ignores. Confirm with `git check-ignore rudder/secrets.vars.yaml` before writing a value.
+- The access token comes from `RUDDERSTACK_ACCESS_TOKEN` and is only for rudder-cli. Never echo it, write it to a file or ask the user to paste it into chat. MCP signs in through the browser; never put the token in an MCP configuration.
+- Destination secrets live in `rudder/secrets.vars.yaml`, which step 1 git-ignores. Confirm with `git check-ignore rudder/secrets.vars.yaml` before writing a value.
 - The write key goes only in `.env.local` (git-ignored) and in the app's runtime config. Print at most its first 6 characters.
 - Before each commit, run `git diff --cached` and make sure no token, write key or secret is staged.
 
@@ -67,7 +67,7 @@ Measured, not guessed. Plan around them.
 
 | # | Step | Who | After |
 |---|---|---|---|
-| 1 | Start | you, cli, skill | start |
+| 1 | Start | you, cli, skill, mcp | start |
 | 2 | Explore | skill, mcp, cli | 1 |
 | 3 | Goal and plan | you, skill | 2 |
 | 4 | Destination and secrets | you, skill | 2 |
@@ -98,27 +98,31 @@ Keep these values as you go, and restate them in the wrap-up:
 
 ## 1. Start
 
-Confirm the tools, the token and the workspace before changing anything.
+Confirm the tools, the token, MCP and the workspace before changing anything.
 
 1. Check `rudder-cli --version`. If it is missing, install it with the two-step command under Before you start.
 2. Check the token is set with `test -n "$RUDDERSTACK_ACCESS_TOKEN"`, without printing it.
 3. Run `rudder-cli workspace info --json`. Tell the user the workspace name you are about to change.
-4. If there is no `rudder/` directory or `.mcp.json` has no `rudderstack` server, run `rudder-cli init`. It creates `rudder/`, git-ignores `rudder/*.vars.yaml`, writes `AGENTS.md` and `.mcp.json`, and runs `git init` if needed. It never changes the workspace.
-5. Check that the rudderstack MCP tools are available to you.
+4. If this is not a git repository, run `git init`. If there is no `rudder/` directory, create it. Make sure `.gitignore` has the line `rudder/*.vars.yaml`, creating the file if needed.
+5. Call the MCP tool `user_details`. It answers only when the rudderstack server is connected and signed in.
+6. Compare `selectedWorkspace.id` from `user_details` with `workspaceID` from `workspace info`. If they differ, call `user_switch_workspace` with the CLI's workspace id and tell the user which workspace MCP now reads. MCP and the CLI must talk about the same workspace.
 
 If the token is not set, or workspace info answers 401:
 
 - Ask the user to create a read-write access token (Get started, or Settings, Access tokens), export it as RUDDERSTACK_ACCESS_TOKEN in the terminal they start you from, and restart you. Stop.
 
-If init just wrote `.mcp.json`, so the MCP tools are not loaded yet:
+If the rudderstack MCP tools are missing, or a call says the server needs authentication:
 
-- Ask the user to restart you in this directory so the server loads (in Claude Code, `/exit` then `claude --continue`), and stop. On restart, begin again at this step; it is idempotent.
+- Ask the user to connect the RudderStack MCP server and stop. In Claude Code, if `/mcp` does not list rudderstack, run `claude mcp add --transport http rudderstack https://mcp.rudderstack.com/mcp` in a terminal and start Claude Code again in this directory. Then type `/mcp`, choose rudderstack, choose Authenticate and approve in the browser. In other agents, add an HTTP MCP server with that URL in the agent's MCP settings and sign in. It uses the user's RudderStack login, not the access token. On restart, begin again at this step; it is idempotent.
+
+If `user_switch_workspace` says the workspace is not found:
+
+- The RudderStack login MCP signed in with cannot see the token's workspace. Ask the user to sign in to MCP with a login that belongs to that workspace, or to create the token in the workspace they mean. Stop.
 
 Done when:
 
 - the token reaches the workspace (check: `rudder-cli workspace info --json | jq -e .workspaceID`)
 - `rudder/` exists and its var files are git-ignored (check: `test -d rudder && git check-ignore -q rudder/secrets.vars.yaml`)
-- `.mcp.json` has the rudderstack server (check: `jq -e .mcpServers.rudderstack .mcp.json`)
 
 Record: `workspace_id`, `workspace_name`, `data_plane_url`.
 
@@ -217,7 +221,7 @@ Needs: `source_id`, `destination_id`.
 2. Validate: `rudder-cli validate -l rudder --json`, adding `--var-file rudder/secrets.vars.yaml` when the file exists. If this CLI has no `--json` on validate, run it without and read `error[<rule>]: <message> --> <file>:<line>:<col>`.
 3. Dry run: `rudder-cli apply -l rudder --dry-run` with the same `--var-file`. Show the plan as N to create, N to change, N to delete.
 4. Apply: `rudder-cli apply -l rudder --confirm=false` with the same `--var-file`. Expect exit 0 and the created resources listed.
-5. Commit `rudder/`, `.gitignore`, `AGENTS.md`, `CLAUDE.md` and `.mcp.json` with the message "Add RudderStack event delivery as specs". Tell the user the undo: `git revert <sha>`, then a dry run and an apply.
+5. Commit `rudder/` and `.gitignore`, plus `.mcp.json` if it exists and holds no secret, with the message "Add RudderStack event delivery as specs". Tell the user the undo: `git revert <sha>`, then a dry run and an apply.
 
 **Loop.** Fix the reported file and line, then validate again until validate exits 0 with no errors, at most 5 attempts. When the bound is hit: Show the remaining errors and their files to the user and stop.
 

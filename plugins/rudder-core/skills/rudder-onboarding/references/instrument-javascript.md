@@ -12,6 +12,9 @@ VITE_RUDDERSTACK_WRITE_KEY=<write key from MCP list_sources>
 VITE_RUDDERSTACK_DATA_PLANE_URL=<dataPlaneURL from rudder-cli workspace info --json>
 ```
 
+Add `VITE_RUDDERSTACK_CONFIG_URL` only when the workspace's control plane is not RudderStack cloud, for example a
+self-hosted or local stack; the SDK then fetches the source's config from there. Leave it unset otherwise.
+
 Variables already set in the process environment win over `.env` files, which is how step 7 points the
 app at the local server without editing `.env.local`.
 
@@ -37,7 +40,7 @@ import { RudderAnalytics } from '@rudderstack/analytics-js/bundled'
 
 const writeKey = import.meta.env.VITE_RUDDERSTACK_WRITE_KEY
 const dataPlaneUrl = import.meta.env.VITE_RUDDERSTACK_DATA_PLANE_URL
-// Point the config fetch at the same host as events when testing locally.
+// Set only when the control plane is not RudderStack cloud (self-hosted or a local stack).
 const configUrl = import.meta.env.VITE_RUDDERSTACK_CONFIG_URL
 
 export function loadRudderStack(): void {
