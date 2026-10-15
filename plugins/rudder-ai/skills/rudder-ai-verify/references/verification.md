@@ -23,7 +23,7 @@ Choose one and record it in the report:
 | No tests, or a script/cron job, or routes that are hard to call in-process | B |
 | A RudderStack development source and permission to use it | C, after A or B passes |
 
-What to drive, per planned surface: chat: one turn (and a second turn in the same conversation), one feedback action, one turn with an invalid `x-interaction-id`; background: one full run; client: the planned browser events. Skip what the app does not have.
+What to drive, per planned surface: chat: one turn (and a second turn in the same conversation), one feedback action, and with `interaction_id_source: client` one turn with an invalid `x-interaction-id`; background: one full run; client: the planned browser events; event rules: one turn that calls each ruled tool. Skip what the app does not have.
 
 ### A. Stub client
 
@@ -109,6 +109,19 @@ class Handler(BaseHTTPRequestHandler):
                     f.write(json.dumps(message) + "\n")
             return self._json(200, {})
         if self.path.endswith("/chat/completions"):  # OpenAI Chat Completions (non-streaming)
+            tools = [t["function"]["name"] for t in body.get("tools", []) if t.get("type") == "function"]
+            last = str((body.get("messages") or [{}])[-1].get("content", ""))
+            call = next((name for name in tools if f"call:{name}" in last), None)
+            if call:  # a prompt containing "call:<tool>" gets a tool call, to exercise event_rules
+                return self._json(200, {
+                    "id": "chatcmpl-mock-tool", "object": "chat.completion", "created": 0,
+                    "model": body.get("model", "mock"),
+                    "choices": [{"index": 0, "finish_reason": "tool_calls", "message": {
+                        "role": "assistant", "content": None, "tool_calls": [{
+                            "id": "call_mock_1", "type": "function",
+                            "function": {"name": call, "arguments": json.dumps({"priority": "high"})}}]}}],
+                    "usage": {"prompt_tokens": 12, "completion_tokens": 5, "total_tokens": 17},
+                })
             return self._json(200, {
                 "id": "chatcmpl-mock", "object": "chat.completion", "created": 0, "model": body.get("model", "mock"),
                 "choices": [{"index": 0, "finish_reason": "stop",
@@ -131,7 +144,7 @@ ThreadingHTTPServer(("127.0.0.1", int(sys.argv[1]) if len(sys.argv) > 1 else 878
 ```
 
 1. Start it in the background: `python3 mock_server.py 8787 events.jsonl`.
-2. Run the app from its usual working directory (static files and relative paths depend on it), with variables set for that command only (`env NAME=value ... <start command>`), never in `.env`:
+2. Run the app from its usual working directory (static files and relative paths depend on it), with variables set for that command only, never in `.env`. Without a `cd`, use the package manager's directory flag: `env NAME=value ... npm --prefix <repo> start`, `env NAME=value ... uv --directory <repo> run python -m <module>`. Variables:
    - the plan's data plane URL variable: `http://127.0.0.1:8787`; its write key variable: `local-test`
    - OpenAI: `OPENAI_BASE_URL=http://127.0.0.1:8787/v1`, `OPENAI_API_KEY=test`; Anthropic: `ANTHROPIC_BASE_URL=http://127.0.0.1:8787`, `ANTHROPIC_API_KEY=test`
    - `RUDDERSTACK_AI_DEBUG=1` (Node.js) to log anything the SDK drops; Python: `PYTHONUNBUFFERED=1` so output survives a background run
@@ -141,7 +154,7 @@ ThreadingHTTPServer(("127.0.0.1", int(sys.argv[1]) if len(sys.argv) > 1 else 878
    - Script or cron job: run it to completion; a top-level task flushes before exit.
 4. Stop a server gracefully so its shutdown flush runs: `kill -TERM <pid>` (find it with `lsof -ti tcp:<port> -sTCP:LISTEN`), then wait a few seconds; the RudderStack clients send in batches.
 
-Streaming routes, tool loops and other providers need the app's own test doubles (option A).
+To exercise an OpenAI event rule, send a prompt containing `call:<tool name>` (for example `call:create_ticket`): the mock answers with that tool call when the request lists the tool. Streaming routes, multi-step tool loops and other providers need the app's own test doubles (option A).
 
 ### C. RudderStack Live Events (end to end)
 
@@ -158,7 +171,7 @@ window.rudderanalytics = { track: (event, properties) => captured.push({ event, 
 // then write captured as JSON lines and append them to events.jsonl
 ```
 
-Turns driven only in the browser harness never reach the server, so `check_events.py` notes their actions as "for an answer not in this capture"; that is expected there.
+In Node.js the page's `fetch` sends no browser cookies: either stub `fetch` (then the harness's actions refer to answers not in the capture, which `check_events.py` notes as expected), or wrap it to add the test `cookie` header so harness turns pass `--expect-session`. Otherwise run `check_events.py` without `--expect-session` for harness turns and check sessions on the curl turns.
 
 ## 3. Validate
 
@@ -312,7 +325,7 @@ Pass only the flags that apply: `--capture-content` when the plan turns capture 
 |---|---|
 | Schema | every AI event passes its spec definition; client events pass the client schema |
 | One answer per turn | each `interaction_id` has exactly one `ai_response_received` and at most one `ai_user_prompt_created` |
-| Joins | prompt, answer, actions and declared tool events of a turn share `interaction_id` and `conversation_id`; the browser-minted ID equals the server's, and an invalid one is replaced by the ID the server returns |
+| Joins | prompt, answer, actions and declared tool events of a turn share `interaction_id` and `conversation_id`; the ID the client uses for actions equals the server's (`client`: the browser-minted one, an invalid one replaced by the returned ID; `app`: the app's per-answer ID; `sdk`: the returned ID) |
 | Identity | chat events carry the planned `userId` and, with cookies, `anonymousId` and `context.sessionId`; background events have no `userId` and carry `account_id` / `on_behalf_of` where planned |
 | Content | no `prompt_text`, `response_text`, `feedback_text` or `intent_summary` unless the plan turns capture on |
 | Counted once | no call reported by two integrations (one answer per turn, not one per model call); the browser never repeats a server event |

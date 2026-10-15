@@ -132,7 +132,8 @@ spec:
 
   client_events:                     # browser, through the existing RudderStack JavaScript SDK
     sdk_path: public/app.js
-    interaction_id_minted_by: client # client: crypto.randomUUID() per prompt, sent to the server
+    interaction_id_minted_by: client # same as the chat surface's interaction_id_source: client (crypto.randomUUID()
+                                     # per prompt, sent to the server) | app | sdk (read from the chat response)
     events:                          # every browser-sent event, including browser-sent ai_user_action
       - event: ai_assistant_opened
         handler: public/app.js (launcher click)
@@ -150,7 +151,9 @@ spec:
         completionTokens: ai_response_received.total_output_tokens
         latencyMs: ai_response_received.latency_ms
         chatId: ai_response_received.conversation_id
-      unmapped: [messageId]          # kept as extra properties on ai_response_received, or dropped
+      unmapped: [promptLength]       # kept as extra properties on ai_response_received, or dropped
+                                     # (a per-answer ID such as messageId maps to interaction_id when the
+                                     # surface uses interaction_id_source: app)
       migration:
         flag_env: AI_EVENTS_LEGACY_EVENT   # default on: old event keeps sending
         remove_after: "2026-12-31"   # a date the user picks; consumers move to the new events first

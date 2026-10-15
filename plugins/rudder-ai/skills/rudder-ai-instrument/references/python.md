@@ -97,6 +97,7 @@ def chat(body: ChatRequest, request: Request, user: User = Depends(current_user)
     return {"answer": reply.choices[0].message.content, "interaction_id": interaction.id}  # always the ID used
 ```
 
+- `interaction_id_source: app`: mint or read the app's per-answer ID before `ai_interaction` (move it up if it is minted after the model call) and pass it as `interaction_id`.
 - Exceptions propagate unchanged and fail the answer; keep the route's error handling.
 - `trace_id=` (or `interaction.set_trace_id(...)`) when the plan has a tracing source; extras via `interaction.end(extra_properties={...})`.
 - Async routes: `async with ai_interaction(...)` works the same.

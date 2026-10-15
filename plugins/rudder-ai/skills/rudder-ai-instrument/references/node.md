@@ -103,6 +103,16 @@ const completion = await aiInteraction(
 res.json({ answer, conversationId, interactionId }); // the ID the server actually used
 ```
 
+`interaction_id_source: app`: mint or read the app's per-answer ID before the interaction (move its existing `randomUUID()` up if it is minted after the model call), pass it as `interactionId`, and keep returning it as the app already does:
+
+```ts
+const messageId = randomUUID(); // the app's per-answer ID, now minted before the call
+const completion = await aiInteraction(
+  { userId: req.user?.id, conversationId, interactionId: messageId, feature: 'support_bot', inputMethod: 'text' },
+  () => openai.chat.completions.create({ model, messages, tools }),
+);
+```
+
 A route written from scratch (non-streaming):
 
 ```ts
