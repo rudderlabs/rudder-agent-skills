@@ -34,7 +34,7 @@ Done means one real event from this app reached the destination the user chose, 
 - Ask one question at a time. Offer choices, and accept a free-text answer.
 - Every retry has a bound. When it is reached, stop and report what you saw.
 
-Stop and wait for an explicit yes at these gates: step 5 (Plan and apply).
+Stop and wait for an explicit yes at these gates: step 3 (Goal and plan), step 5 (Plan and apply).
 
 ## Credential Security
 
@@ -68,7 +68,7 @@ Measured, not guessed. Plan around them.
 |---|---|---|---|
 | 1 | Start | you, cli, skill | start |
 | 2 | Explore | skill, mcp, cli | 1 |
-| 3 | Goal | you, skill | 2 |
+| 3 | Goal and plan | you, skill | 2 |
 | 4 | Destination and secrets | you, skill | 2 |
 | 5 | Plan and apply | cli, you | 4 |
 | 6 | Instrument | skill, mcp | 3, 5 |
@@ -86,6 +86,7 @@ Keep these values as you go, and restate them in the wrap-up:
 - `app_kind`: browser, server or mobile, and the framework
 - `source_id`: the spec id of the event stream source, for example storefront
 - `events`: the agreed events, each with where it fires and its typed properties
+- `plan`: rudder/plan.md, the question and the agreed events, committed with the specs
 - `destination_id`: the spec id of the destination
 - `specs_commit`: the commit that added the specs
 - `remote_source_id`: the source's id in RudderStack, from MCP list_sources
@@ -154,9 +155,9 @@ Not in scope yet, mention as a next step if relevant:
 
 - Reuse a source and pipeline that already exist in the workspace instead of creating new ones.
 
-## 3. Goal
+## 3. Goal and plan
 
-One answer decides which events and properties get instrumented.
+One answer becomes a written plan, and the user agrees to it before anything is built.
 
 Consult: `rudder-instrumentation-planning`.
 
@@ -164,14 +165,22 @@ Consult: `rudder-instrumentation-planning`.
      - if the user has no preference, offer: How many visitors view a product, add it to the cart and complete an order, and what is the order value?
 2. Read the code that can answer it (views, click handlers, checkout). Find where each moment happens.
 3. Propose at most four events, named Object Action in Title Case (Product Viewed, Order Completed). Give each the properties the code already has, with types: string, number, integer or boolean. Money is a number.
-4. Show a table: event, where it fires (file and function), properties with types.
-5. Ask the user: "Add or drop any?"
+4. Write the plan to `rudder/plan.md`: the question, then a table of event, where it fires (file and function), and properties with types. The CLI loads only YAML from `rudder/`, so the plan does not change what apply does.
+5. Show the plan's table.
 
-Record: `events`.
+**Loop.** Apply the user's changes to `rudder/plan.md` and show the table again until the user agrees to the plan, at most 5 attempts. When the bound is hit: Keep the plan as it stands, list the changes still open, and ask whether to go ahead with it.
+
+**Gate.** Ask "Is this the plan? Add, drop or change anything, or say go." Do not continue without an explicit yes.
+
+Done when:
+
+- the plan is written (check: `test -s rudder/plan.md`)
+
+Record: `events`, `plan`.
 
 Not in scope yet, mention as a next step if relevant:
 
-- Turn the agreed events into a tracking plan (rudder-tracking-plans) so violations are caught in the pipeline.
+- Turn `rudder/plan.md` into a tracking plan (rudder-tracking-plans) so violations are caught in the pipeline.
 
 ## 4. Destination and secrets
 
@@ -209,9 +218,9 @@ Needs: `source_id`, `destination_id`.
 4. Apply: `rudder-cli apply -l rudder --confirm=false` with the same `--var-file`. Expect exit 0 and the created resources listed.
 5. Commit `rudder/`, `.gitignore`, `AGENTS.md`, `CLAUDE.md` and `.mcp.json` with the message "Add RudderStack event delivery as specs". Tell the user the undo: `git revert <sha>`, then a dry run and an apply.
 
-**Gate.** Show the dry-run plan and ask "Apply these changes to <workspace_name>?" Do not continue without an explicit yes.
-
 **Loop.** Fix the reported file and line, then validate again until validate exits 0 with no errors, at most 5 attempts. When the bound is hit: Show the remaining errors and their files to the user and stop.
+
+**Gate.** Show the dry-run plan and ask "Apply these changes to <workspace_name>?" Do not continue without an explicit yes.
 
 Facts that apply here: **silent-decline**, **apply-scope**.
 
