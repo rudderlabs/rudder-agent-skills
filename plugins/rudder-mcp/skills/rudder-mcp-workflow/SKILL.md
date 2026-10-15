@@ -16,8 +16,8 @@ The user wants an AI agent to drive RudderStack, mentions RudderStack + MCP, ask
 
 Before running any workflow, verify:
 
-- [ ] Your MCP client is configured to connect to `https://mcp.rudderstack.com/mcp`. See `rudder-mcp-setup` for the Claude Code walkthrough; the official docs cover Claude Desktop, Cursor, VS Code, Windsurf, and the claude.ai web UI.
-- [ ] OAuth flow completed (browser sign-in to your RudderStack account on first tool use).
+- [ ] Your MCP client is configured to connect to `https://mcp.rudderstack.com/mcp` (OAuth, the default) or `https://mcp.rudderstack.com/bearer-auth-mcp` (access token). See `rudder-mcp-setup` for the Claude Code walkthrough of both; the official docs cover Claude Desktop, Cursor, VS Code, Windsurf, and the claude.ai web UI.
+- [ ] OAuth route: browser sign-in to your RudderStack account completed on first tool use. Access-token route: `RUDDERSTACK_ACCESS_TOKEN` was exported in the shell that started the client, and the `X-Workspace-ID` header holds the workspace ID.
 - [ ] `mcp.rudderstack.com` is reachable on port 443 from your network.
 
 ## Client configuration
@@ -34,6 +34,8 @@ Claude Code `mcpServers` block (HTTP transport via `mcp-remote`):
   }
 }
 ```
+
+For headless sessions that cannot open a browser, `rudder-mcp-setup` shows the access-token route: `https://mcp.rudderstack.com/bearer-auth-mcp` with `Authorization: Bearer ${RUDDERSTACK_ACCESS_TOKEN}` and `X-Workspace-ID` headers in `.mcp.json`. That route pins one workspace and has no `user_details` or `user_switch_workspace` tools.
 
 For other clients (Claude Desktop, Cursor, VS Code, Windsurf, claude.ai connectors), use the snippets at https://mcp.rudderstack.com/docs.
 
@@ -70,7 +72,8 @@ After instrumenting events (via CLI, Terraform, or code), verify they reach dest
 
 ```
 1. APPLY TRACKING PLAN
-   └── e.g. rudder-cli apply -l ./
+   └── e.g. rudder-cli apply --dry-run -l ./, review it,
+       then rudder-cli apply --confirm=false -l ./
 
 2. TRIGGER EVENTS
    └── Run your app, trigger the instrumented events
@@ -112,11 +115,13 @@ Workflow:
 
 ```
 1. Point your MCP client at the Dev workspace
-   (your MCP client surfaces a workspace-switch tool if your account
-    has access to multiple workspaces)
+   (OAuth route: user_switch_workspace switches workspaces if your
+    account has access to several; access-token route: set
+    X-Workspace-ID to the Dev workspace and restart the client)
 
 2. Apply changes to Dev
-   └── e.g. rudder-cli apply -l ./
+   └── e.g. rudder-cli apply --dry-run -l ./, review it,
+       then rudder-cli apply --confirm=false -l ./
 
 3. Verify events end-to-end in Dev
    └── Live events + warehouse check via MCP
@@ -137,7 +142,8 @@ Workflow:
 
 ## Credential Security
 
-- OAuth flow; no long-lived tokens to manage. `mcp-remote` brokers the handshake with `mcp.rudderstack.com` per session.
+- OAuth route: no long-lived tokens to manage. `mcp-remote` brokers the handshake with `mcp.rudderstack.com` per session.
+- Access-token route: the token stays in `RUDDERSTACK_ACCESS_TOKEN` and `.mcp.json` references it as `${RUDDERSTACK_ACCESS_TOKEN}`. Never write the token into a config file and never ask the user to paste it into the chat.
 - `mcp-remote` caches session tokens locally — don't share or commit your client config or the mcp-remote cache directory.
 - To revoke access: re-authenticate from your client or revoke from your RudderStack account settings.
 

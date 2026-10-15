@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`rudder-cli` / `rudder-cli-setup`, `rudder-cli-workflow`, `rudder-transformations`,
+  `rudder-import-and-evolve`; `rudder-core` / `rudder-instrumentation-debugging`.**
+  Agents now check auth with `rudder-cli workspace info --json` and read the token
+  from `RUDDERSTACK_ACCESS_TOKEN`. Every place that tells an agent to run
+  `rudder-cli auth login` now says that the command prompts on a terminal, that
+  the agent should ask the user to export the variable instead, and that it must
+  never ask the user to paste a token into the chat. rudder-cli-setup documents
+  that the variable wins over the token saved by `auth login`.
+- **`rudder-cli` / `rudder-cli-workflow`, `rudder-transformations`,
+  `rudder-import-and-evolve`; `rudder-mcp` / `rudder-mcp-workflow`.** Apply
+  commands an agent runs after a reviewed dry-run now carry `--confirm=false`.
+  The interactive iteration loop in rudder-cli-workflow is labelled as being for
+  a person at a terminal. rudder-import-and-evolve says its reference examples
+  need the same flag when an agent runs them.
+- **Versions.** `rudder-cli` 0.0.3 to 0.0.4, `rudder-mcp` 0.0.2 to 0.0.3.
+
 - **Breaking (repo layout):** renamed the top-level `skills/` directory back to
   `plugins/` (reverting the earlier `plugins/` → `skills/` rename). Each plugin
   lives at `plugins/<plugin>/skills/<skill>/SKILL.md`; marketplace `source` fields
@@ -20,12 +36,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`rudder-cli` / `rudder-cli-setup`, `rudder-cli-workflow`, `rudder-transformations`.**
+  Replaced `RUDDER_ACCESS_TOKEN` with `RUDDERSTACK_ACCESS_TOKEN`, the variable
+  rudder-cli reads (rudder-iac `cli/internal/config/config.go:86`).
+- **`rudder-cli` / `rudder-cli-workflow`, `rudder-transformations`.** Removed
+  `rudder-cli plan`, which does not exist; `rudder-cli apply --dry-run` is the
+  plan. Removed `rudder-cli export` from the transformations command table for
+  the same reason.
+- **`rudder-cli` / `rudder-cli-workflow`.** Corrected what `apply` deletes. It
+  plans a delete for every CLI-managed resource (one with an external id) in the
+  workspace that the local project does not declare, across all providers.
+  Resources created in the dashboard have no external id and are never touched.
+  The old text said every remote resource of any kind was deleted.
+
 - **`rudder-profiles` / `rudder-profiles-setup`, `rudder-profiles-update`** —
   quoted the `description` frontmatter. An unquoted `: ` (colon-space) made the
   skills.sh CLI's YAML parser read it as a nested mapping and reject the
   frontmatter, silently dropping both skills from skills.sh (21/23 → 23/23 now).
 
 ### Added
+
+- **`rudder-cli` / `rudder-cli-workflow`, `rudder-transformations`.** A
+  "Variables and secrets" section on `--var-file` for `validate` and `apply`:
+  `{{ .NAME }}` references in single quotes, doubling a `'` inside a value, the
+  `.vars.yaml` / `.vars.yml` name rule, later files winning, `RUDDER_<NAME>`
+  environment variables winning over files, the
+  `error[project/var-substitution]` failure, git-ignoring the var file, and that
+  substitution is on by default only from rudder-cli 0.25.0.
+  rudder-transformations says `transformations test` needs the same
+  `--var-file` flags.
+- **`rudder-mcp` / `rudder-mcp-setup`, `rudder-mcp-workflow`.** OAuth setup
+  uses Claude Code's native HTTP transport:
+  `claude mcp add --transport http rudderstack https://mcp.rudderstack.com/mcp`,
+  then `/mcp` and Authenticate, with no `npx` or `mcp-remote`. OAuth is the
+  route for people and coding agents alike. The access-token route,
+  `https://mcp.rudderstack.com/bearer-auth-mcp` with `Authorization: Bearer
+  <token>` and `X-Workspace-ID` headers referenced as
+  `${RUDDERSTACK_ACCESS_TOKEN}` in `.mcp.json`, is documented for sessions that
+  cannot open a browser. The skills note that `user_details` and
+  `user_switch_workspace` exist only on the OAuth route.
 
 - **CI / dev tooling** — both directory crawlers now run as gates against the
   working tree: cursor.directory's real `parse.ts` (vendored, pinned) via
