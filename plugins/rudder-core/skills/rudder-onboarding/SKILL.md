@@ -59,6 +59,7 @@ Measured, not guessed. Plan around them.
 - **webhook-public-url**: A webhook `webhook_url` must be a public http(s) domain. `localhost` and `*.ngrok.io` are rejected. _Source: rudder-iac definitions/webhook/definition.go._
 - **write-key-delay**: A new source's write key is refused with HTTP 401 `invalid write key` for about two minutes after apply. It is propagation, not a wrong key. Sending immediately fails. _Source: live run, 1 Oct 2026._
 - **metrics-no-timestamps**: MCP metrics tools return counts without last-seen times, so a count only means "somewhere in the window". Pass `start_time` set to the time you recorded before sending. _Source: rudder-mcp-server sdk/webapp/model.go (timestamps are json:"-")._
+- **metrics-lag**: Delivery metrics lag, and unevenly by event. On 15 Oct one event showed as delivered 2 minutes after RudderStack received it and another took between 4 and 8 minutes. A payload at a destination the user can read arrives within seconds, so check there first and treat metrics as the later confirmation. _Source: one end-to-end run against a dev workspace, 15 Oct 2026._
 - **mcp-hashes-values**: `get_live_events` hashes every property value, so it can confirm event names and property keys but not values or types. The destination's own copy proves the payload. _Source: rudder-mcp-server internal/pii/pii.go._
 - **local-no-types**: The local capture server counts events by name but does not check property types. Check types yourself with jq. _Source: rudder-iac#952 devlisten/api/summary.go._
 
@@ -294,9 +295,9 @@ Needs: `write_key`, `data_plane_url`, `remote_destination_id`.
 5. If anything failed, call `get_destinations_errors` for the destination and report the error.
 6. If the destination is a webhook the user can read, check the payload there, values and types included.
 
-**Loop.** Probe the write key every 20 seconds, then poll delivery metrics every 15 seconds until the write key is accepted and the agreed events show as delivered since started_at, give up after 5 minutes for the write key, then 3 minutes for delivery. When the bound is hit: Report the last probe status and the last metrics seen, and suggest get_destinations_errors and the live events page.
+**Loop.** Probe the write key every 20 seconds, then poll delivery metrics every 30 seconds until the write key is accepted, and each agreed event shows as delivered since started_at or has arrived at a destination the user can read, give up after 5 minutes for the write key, then 10 minutes for delivery. When the bound is hit: Report the last probe status and the last metrics seen, and suggest get_destinations_errors and the live events page.
 
-Facts that apply here: **write-key-delay**, **metrics-no-timestamps**, **mcp-hashes-values**.
+Facts that apply here: **write-key-delay**, **metrics-no-timestamps**, **metrics-lag**, **mcp-hashes-values**.
 
 Record: `started_at`.
 

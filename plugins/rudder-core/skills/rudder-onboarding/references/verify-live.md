@@ -37,11 +37,14 @@ Call the MCP tool:
 get_destination_event_metrics(destination_id=<remote destination id>, start_time=<STARTED_AT>)
 ```
 
-Poll every 15 seconds for up to 3 minutes. Done when each agreed event has `deliveredCount >= 1` and
-`failedCount == 0`. Reporting lags delivery by up to a minute.
+Poll every 30 seconds for up to 10 minutes. Done when each agreed event has `deliveredCount >= 1` and
+`failedCount == 0`. Metrics lag delivery, and unevenly by event: on 15 Oct one event showed after 2 minutes
+and another after 4 to 8. When the destination is one the user can read, check the payload (section 5)
+first; it arrives within seconds.
 
 - `failedCount > 0`: call `get_destinations_errors` for the destination and show the error.
-- Nothing at all: call `get_source_event_metrics(source_id=..., start_time=<STARTED_AT>)`. If the source
+- Nothing at all after 10 minutes: call `get_source_event_metrics(source_id=..., start_time=<STARTED_AT>)`.
+  Source metrics lag the same way, so wait the full 10 minutes before reading anything into them. If the source
   saw nothing, the app is not sending (check the browser console and the network tab for the data plane
   request). If the source saw events and the destination did not, check the connection is enabled.
 
