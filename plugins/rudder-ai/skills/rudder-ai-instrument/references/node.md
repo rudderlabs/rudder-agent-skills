@@ -11,15 +11,15 @@ Node.js 24+. ESM shown; CommonJS works the same with `require('@rudderstack/ai')
 | yarn | `yarn add --exact @rudderstack/ai@0.4.0` |
 | bun | `bun add --exact @rudderstack/ai@0.4.0` |
 
-Only when the plan says `rudderstack.client: new`, add the client too: `@rudderstack/rudder-sdk-node@3.0.16`. The provider and framework packages (`openai`, `@anthropic-ai/sdk`, `ai`, `@langchain/core`, ...) are optional peer dependencies the app already has; do not add or bump them. Run the install from the `sdks[].path` directory. Commit the lockfile change.
+Only when the plan says `rudderstack.client: new`, add the client too: `@rudderstack/rudder-sdk-node@3.0.16`. The provider and framework packages (`openai`, `@anthropic-ai/sdk`, `ai`, `@langchain/core`, ...) are optional peer dependencies the app already has; do not add or bump them. Run the install from the `sdks[].path` directory; the lockfile change belongs in the same diff.
 
 ## 2. Configure once at startup
 
-Put this next to where the app's RudderStack client is created (`rudderstack.client_path`), so it runs once per process before any request:
+Put this in the module that creates the app's RudderStack client (`rudderstack.client_path`), at module level, right after the client: it then runs once per process, as soon as the server imports the client, before any request. If nothing imports that module at startup, call it from the server's entry file instead. Snippets use `.js` import suffixes; match the repo's convention (`.ts`, none).
 
 ```ts
 import { configure } from '@rudderstack/ai';
-import { analytics } from './analytics.js'; // the app's existing @rudderstack/rudder-sdk-node client
+import { analytics } from './analytics.js'; // or, in the client module itself, the client defined just above
 
 configure({
   analytics,
@@ -78,7 +78,32 @@ app.use(aiContextMiddleware()); // before the chat and feedback routes
 
 Next.js App Router: `export const POST = withAiContext(async (request: Request) => handle(request));`. Hono or any Fetch handler: `serve({ fetch: withAiContext(app.fetch) })`. Without middleware, pass `request: req` (or `cookies`) to `aiInteraction`.
 
-The route (non-streaming):
+Smallest change to an existing route: wrap only the model call, keep everything else as it is, and return the ID used.
+
+```ts
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+// inside the existing handler, replacing `const completion = await openai.chat.completions.create(...)`
+const clientId = req.get('x-interaction-id'); // interaction_id_source: client
+let interactionId: string | undefined;
+const completion = await aiInteraction(
+  {
+    userId: req.user?.id, // identity.user_id; no placeholder fallback
+    conversationId,
+    interactionId: clientId && UUID.test(clientId) ? clientId : undefined,
+    feature: 'support_bot',
+    inputMethod: 'text',
+  },
+  (interaction) => {
+    interactionId = interaction.id;
+    return openai.chat.completions.create({ model, messages, tools });
+  },
+);
+// ...existing code (history, legacy event) unchanged...
+res.json({ answer, conversationId, interactionId }); // the ID the server actually used
+```
+
+A route written from scratch (non-streaming):
 
 ```ts
 import { aiInteraction } from '@rudderstack/ai';
@@ -107,7 +132,7 @@ app.post('/api/chat', async (req, res) => {
 ```
 
 - Keep the route's existing error handling: `aiInteraction` rethrows the original error after recording it.
-- Return `interaction.id` to the client (body field or `x-interaction-id` header) when the plan's `interaction_id_source` is `sdk`, so feedback can reference it.
+- Always return the ID the interaction used (body field or `x-interaction-id` header): with `sdk` the client learns it, with `client` an invalid browser ID was replaced and the client must switch to the returned one.
 - Pass `traceId` (or call `interaction.setTraceId(id)`) when the plan has `tracing.trace_id_source`.
 - Business-specific extras ride on the answer: `interaction.end({ extraProperties: { ... } })`; SDK-owned names are ignored.
 
@@ -143,7 +168,7 @@ app.post('/api/feedback', (req, res) => {
 });
 ```
 
-`interactionId` and `conversationId` are required (else dropped with a warning). Cookies come from the middleware's context; without middleware, wrap the call in `aiContext({ cookies: req.headers.cookie }, () => trackAction(...))`.
+`interactionId` and `conversationId` are required (else dropped with a warning). When the endpoint does not receive them today (`request_changes` in the plan), add them to the client's request body and read them here; skip `trackAction` when they are missing or the ID is not a UUID, and keep the endpoint's existing response. Pass the real user ID or nothing, never a legacy placeholder such as `'anonymous'`. Cookies come from the middleware's context; without middleware, wrap the call in `aiContext({ cookies: req.headers.cookie }, () => trackAction(...))`.
 
 ## 6. Background surface: one `aiTask` per run
 
@@ -171,7 +196,7 @@ await aiContext({ accountId: job.workspaceId, onBehalfOf: job.requestedBy }, () 
 
 | Process | Do |
 |---|---|
-| Long-running server | `await flush()` in the existing shutdown hook (SIGTERM handler, `server.close` callback); add one only if none exists |
+| Long-running server | `await flush()` in the existing shutdown hook (SIGTERM handler, `server.close` callback), before the app's own client flush, which stays; add a hook only if none exists |
 | Serverless handler, script, CLI | `await flush()` before returning or exiting (a top-level `aiTask` already does it) |
 
 ```ts
@@ -193,14 +218,14 @@ configure({
       create_ticket: {
         event: 'ticket_created',
         properties: (args) => ({ priority: (args as { priority?: string })?.priority }),
-        when: (_args, result) => result !== undefined, // when: success
+        // when: result_seen in the plan -> add: when: (_args, result) => result !== undefined,
       },
     },
   },
 });
 ```
 
-Names starting with `ai_` throw. Results reach the rule only when the whole tool loop runs inside one `aiInteraction`.
+Names starting with `ai_` throw. `when: always` needs no `when` function. Results reach a rule only when the app sends the tool result back to the model inside the same `aiInteraction`; an app that never executes the tool gets the event with `tool_status: "unknown"`.
 
 ## 9. Classifier (`spec.config.classifier.enabled: true`)
 

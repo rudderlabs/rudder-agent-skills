@@ -1,6 +1,6 @@
 # Discovery heuristics
 
-Read-only. Use Glob and Grep (or `rg` / `grep -rn`) over source files; skip `node_modules/`, `.venv/`, `venv/`, `dist/`, `build/`, `.next/`, `vendor/` and lockfiles except to read resolved versions. Never open `.env*`, `*.pem`, `*.key`, secrets files or credential stores. Every finding goes into `ai-events.yaml` with a `path:line`.
+Read-only. Use Glob and Grep (or `rg` / `grep -rn`) over source files; skip `node_modules/`, `.venv/`, `venv/`, `dist/`, `build/`, `.next/`, `vendor/` and lockfiles except to read resolved versions. Never open `.env*`, `*.pem`, `*.key`, secrets files or credential stores. Every finding goes into `ai-events.yaml` as a `path` plus a `symbol` (route, function, variable).
 
 ## 1. Runtimes and manifests
 
@@ -10,7 +10,7 @@ Read-only. Use Glob and Grep (or `rg` / `grep -rn`) over source files; skip `nod
 | Python version | `requires-python` in `pyproject.toml`, `.python-version`, `runtime.txt`, `Dockerfile` `FROM python:` | below 3.12 (`rudderstack-ai` needs 3.12+) |
 | Package manager | `package-lock.json` (npm), `pnpm-lock.yaml`, `yarn.lock`, `bun.lock`; `uv.lock`, `poetry.lock`, `Pipfile.lock`, `requirements*.txt` | |
 
-A blocked surface stays in the plan with `status: blocked` and the reason; do not upgrade the runtime yourself.
+Manifests give a floor; the interpreter in use comes from `node --version`, `.venv/bin/python --version` or `uv run python --version` (read-only commands). Record where the version came from. A blocked surface stays in the plan with `status: blocked` and the reason; do not upgrade the runtime yourself.
 
 ### LLM and agent libraries
 
@@ -64,6 +64,10 @@ Streaming: note whether the route returns a stream (`stream: true`, `.stream(`, 
 
 Thread pools (Python): `ThreadPoolExecutor`, `run_in_executor` inside a background job need `propagate()`.
 
+Tool loops: when requests pass `tools`, check whether the app executes the returned tool calls and sends results back (a `role: "tool"` / `tool_result` message in a follow-up call, or a framework agent loop). If it only passes `tools` and ignores the calls, an event rule can fire only with `when: always`.
+
+Background granularity: note what one run is (the whole cron invocation, one queue message) and whether it fans out per item (per workspace, per document). Per-item steps that should report their own usage become `child_tasks`; ask the user which level they want.
+
 ## 3. Browser client
 
 | Look for | Pattern |
@@ -72,7 +76,7 @@ Thread pools (Python): `ThreadPoolExecutor`, `run_in_executor` inside a backgrou
 | Legacy browser SDK v1.1 | `rudder-sdk-js`, `cdn.rudderlabs.com/v1.1` (cookies unsupported by the server SDKs: note it, suggest a v3 upgrade, do not do it) |
 | Other analytics | `analytics.load(` (Segment), `posthog.init(`, `mixpanel.init(`, `amplitude.init(`, `gtag(` |
 | Chat UI | components or templates with `chat`, `assistant`, `copilot`, `message`, `prompt` in names; `useChat(` (Vercel AI SDK UI); `fetch('/api/chat'` / EventSource / WebSocket calls to the chat route |
-| Feedback and actions | thumbs up/down, `rating`, `feedback`, copy-to-clipboard (`navigator.clipboard.writeText`), share, report, regenerate/retry buttons, and the endpoints they call |
+| Feedback and actions | thumbs up/down, `rating`, `feedback`, copy-to-clipboard (`navigator.clipboard.writeText`), share, report, regenerate/retry buttons, and the endpoints they call; for each endpoint, whether its request already carries the answer's ID and the conversation ID (`trackAction` needs both) |
 | Assistant open/close, conversation list | launcher/toggle handlers, new-chat, switch, rename, delete conversation handlers |
 
 No RudderStack JavaScript SDK on the page: the `client` surface is `status: skipped` with the reason. Do not add a browser SDK; server events still work.
@@ -111,7 +115,7 @@ Record each server's file, name, transport (`stdio`, `StreamableHTTPServerTransp
 | Background jobs | who the job is for (`on_behalf_of`), which customer (`account_id`), a stable per-job or per-thread conversation key |
 | Logout | does the page call `rudderanalytics.reset()` on logout? If not, `rl_user_id` can name the previous user: prefer the server's own user ID |
 
-Identity is ambiguous when: there are two plausible user IDs (internal DB id vs auth-provider id), the chat route has no auth, the browser SDK `identify()` uses a different ID than the server, or a background job has no clear tenant. Ask the user, one question at a time; never guess.
+Identity is ambiguous when: there are two plausible user IDs (internal DB id vs auth-provider id), the chat route has no auth, the browser SDK `identify()` uses a different ID than the server or is never called (browser events then carry only `anonymousId` while server events carry `userId`; ask whether the user wants an `identify()` call on login, as a separate change), a legacy event falls back to a placeholder user (`'anonymous'`: do not carry it over; the SDK uses cookies or `ai_system`), or a background job has no clear tenant. Ask the user, one question at a time; never guess.
 
 ## 7. Intent sources
 

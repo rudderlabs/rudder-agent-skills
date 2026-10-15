@@ -1,25 +1,33 @@
 # Verification kit
 
-Everything here runs locally, without provider keys and without sending anything to RudderStack. Put the scripts and captures in a scratch directory outside the repo (for example `$TMPDIR/ai-events-verify/`), never in the user's source tree.
+Everything here runs locally, without provider keys and without sending anything to RudderStack. Put the scripts and captures in a scratch directory outside the repo (for example `$TMPDIR/ai-events-verify/`), never in the user's source tree. Python: the mock server runs on 3.9+, `check_events.py` needs 3.10+ (use any such interpreter; it does not have to be the app's).
 
 ## 1. Schemas
 
-The AI events schema ships inside the npm package (the Python wheel does not include it):
+The AI events schema ships inside the npm package (the Python wheel does not include it). Read it as a file; it is not an importable export.
 
 | App | Get `ai-events-v0.2.schema.json` |
 |---|---|
-| Node.js, after install | `node_modules/@rudderstack/ai/spec/ai-events-v0.2.schema.json` |
-| Any (no Node.js needed) | download `https://registry.npmjs.org/@rudderstack/ai/-/ai-0.4.0.tgz` and extract `package/spec/ai-events-v0.2.schema.json` (`tar -xzf ai-0.4.0.tgz package/spec/ai-events-v0.2.schema.json`) |
+| Node.js, after install | copy `node_modules/@rudderstack/ai/spec/ai-events-v0.2.schema.json` |
+| Any (no Node.js needed; one download from the npm registry) | `curl -sSLo ai-0.4.0.tgz https://registry.npmjs.org/@rudderstack/ai/-/ai-0.4.0.tgz`, then `tar -xzf ai-0.4.0.tgz package/spec/ai-events-v0.2.schema.json` |
 
 Client events: copy the JSON block under "Schema" in the `rudder-ai-instrument` skill's `references/client-events.md` into `ai-client-events.schema.json`.
 
 ## 2. Capture events
 
-Pick the first option that fits; record which one in the report.
+Choose one and record it in the report:
 
-### A. Stub client in a test (fastest)
+| App has | Use |
+|---|---|
+| A test runner that can call its routes or job functions (supertest, `TestClient`, Django test client, pytest) | A, as a new test or a harness |
+| No tests, or a script/cron job, or routes that are hard to call in-process | B |
+| A RudderStack development source and permission to use it | C, after A or B passes |
 
-Point `configure()` at an in-memory client in a test or a small harness script, run one chat turn, one feedback call and one background run, then write the captured messages as JSON lines.
+What to drive, per planned surface: chat: one turn (and a second turn in the same conversation), one feedback action, one turn with an invalid `x-interaction-id`; background: one full run; client: the planned browser events. Skip what the app does not have.
+
+### A. Stub client
+
+Point `configure()` at an in-memory client after importing the app (its own `configure()` may run at import; a later call changes only the keys passed), drive the surfaces, then write the messages as JSON lines. The model still needs a stand-in: the app's existing test doubles, or the mock model in option B through the provider's base URL variable.
 
 Node.js:
 
@@ -34,7 +42,7 @@ await flush();
 writeFileSync(process.env.CAPTURE_FILE ?? 'events.jsonl', events.map((e) => JSON.stringify(e)).join('\n') + '\n');
 ```
 
-Python:
+Python (run from the scratch directory with the app's environment, for example `env PYTHONPATH=<repo> uv --directory <repo> run python <scratch>/harness.py`):
 
 ```python
 import json
@@ -45,7 +53,7 @@ class StubClient:
     def __init__(self) -> None:
         self.events: list[dict] = []
 
-    def track(self, **message) -> None:  # the rudder-sdk-python track() keyword arguments
+    def track(self, **message) -> None:  # rudder-sdk-python keyword arguments: user_id, anonymous_id, event, ...
         self.events.append(message)
 
     def flush(self) -> None:
@@ -61,14 +69,15 @@ with open("events.jsonl", "w") as f:
         f.write(json.dumps(e, default=str) + "\n")
 ```
 
-The app's `configure()` call may run at import and replace the stub: call the stub `configure()` after importing the app module (it changes only the keys passed).
+Stub messages use `user_id` / `anonymous_id` (Python) or the SDK's message shape (Node.js); `check_events.py` reads both, and the data plane shape.
 
 ### B. Local mock data plane and mock model (no code changes)
 
-Runs the app as is, with its real RudderStack client and real provider SDK pointed at localhost. Save as `mock_server.py` and run it with any Python 3.9+ (stdlib only):
+Runs the app as is, with its real RudderStack client and real provider SDK pointed at localhost. Save as `mock_server.py`:
 
 ```python
 """Mock RudderStack data plane and OpenAI/Anthropic endpoints. Writes every tracked message to events.jsonl."""
+import gzip
 import json
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -87,7 +96,13 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         raw = self.rfile.read(int(self.headers.get("content-length") or 0))
-        body = json.loads(raw or b"{}")
+        try:
+            if self.headers.get("content-encoding") == "gzip":  # both RudderStack server SDKs gzip batches
+                raw = gzip.decompress(raw)
+            body = json.loads(raw or b"{}")
+        except Exception as exc:  # always answer, so a bad body never leaves the app retrying
+            print(f"mock: unreadable body on {self.path}: {exc}", file=sys.stderr)
+            return self._json(200, {})
         if self.path.endswith("/v1/batch"):  # RudderStack data plane
             with open(OUT, "a") as f:
                 for message in body.get("batch", []):
@@ -115,20 +130,42 @@ class Handler(BaseHTTPRequestHandler):
 ThreadingHTTPServer(("127.0.0.1", int(sys.argv[1]) if len(sys.argv) > 1 else 8787), Handler).serve_forever()
 ```
 
-Start it (`python3 mock_server.py 8787 events.jsonl`), then start the app with, for this shell only: the plan's data plane URL variable set to `http://127.0.0.1:8787`, its write key variable set to any placeholder such as `local-test`, `OPENAI_BASE_URL=http://127.0.0.1:8787/v1` or `ANTHROPIC_BASE_URL=http://127.0.0.1:8787`, and the provider key variable set to a placeholder such as `test`. Never put these in `.env`. Streaming routes, tool loops and other providers need the app's own test doubles (option A).
+1. Start it in the background: `python3 mock_server.py 8787 events.jsonl`.
+2. Run the app from its usual working directory (static files and relative paths depend on it), with variables set for that command only (`env NAME=value ... <start command>`), never in `.env`:
+   - the plan's data plane URL variable: `http://127.0.0.1:8787`; its write key variable: `local-test`
+   - OpenAI: `OPENAI_BASE_URL=http://127.0.0.1:8787/v1`, `OPENAI_API_KEY=test`; Anthropic: `ANTHROPIC_BASE_URL=http://127.0.0.1:8787`, `ANTHROPIC_API_KEY=test`
+   - `RUDDERSTACK_AI_DEBUG=1` (Node.js) to log anything the SDK drops; Python: `PYTHONUNBUFFERED=1` so output survives a background run
+3. Drive it:
+   - Server: send requests with a user, an interaction ID and browser cookies. The SDK reads cookies only in the JavaScript SDK's encoding (URL-encoded JSON or `RS_ENC_v3_`), so use, for example:
+     `curl -s -X POST http://localhost:<port>/api/chat -H 'content-type: application/json' -H 'x-interaction-id: 3b9e5d0a-7c2f-4e18-9a6b-2c4d6e8f0a1b' -H 'cookie: rl_anonymous_id=%22anon-123%22; rl_session=%7B%22id%22%3A1760500000000%2C%22expiresAt%22%3A4102444800000%7D' -d '{"message":"Where is my order?"}'`
+   - Script or cron job: run it to completion; a top-level task flushes before exit.
+4. Stop a server gracefully so its shutdown flush runs: `kill -TERM <pid>` (find it with `lsof -ti tcp:<port> -sTCP:LISTEN`), then wait a few seconds; the RudderStack clients send in batches.
 
-Send a sample request (`curl -s -X POST localhost:<port>/api/chat -H 'content-type: application/json' -H 'x-interaction-id: <uuid>' -d '{...}'`), a feedback request, and trigger a background run. Stop the app gracefully (SIGTERM) so its shutdown flush runs; the RudderStack clients batch for a few seconds.
+Streaming routes, tool loops and other providers need the app's own test doubles (option A).
 
 ### C. RudderStack Live Events (end to end)
 
 Point the app at a development source, trigger the same requests, and inspect them in the source's Live Events view, or through the RudderStack MCP server (`rudder-mcp-workflow`). Use a dev workspace or source, never production.
 
+### Browser events
+
+Record what the page sends by replacing the SDK with a recorder before the page script runs (a browser test, or Node.js with stubbed `window`/`document` globals importing the page script):
+
+```js
+const captured = [];
+window.rudderanalytics = { track: (event, properties) => captured.push({ event, properties }) };
+// ...click through: open the assistant, send a message, copy, give feedback, close...
+// then write captured as JSON lines and append them to events.jsonl
+```
+
+Turns driven only in the browser harness never reach the server, so `check_events.py` notes their actions as "for an answer not in this capture"; that is expected there.
+
 ## 3. Validate
 
-Save as `check_events.py`; run it with Python 3.10+ in a throwaway virtualenv that has `jsonschema==4.26.0`:
+Save as `check_events.py`; run it in a throwaway virtualenv that has `jsonschema==4.26.0`:
 
 ```python
-"""Check captured AI events: spec schema, client schema, joins, counts, content and identity."""
+"""Check captured AI events: spec schema, client schema, joins, counts, identity, background fields and content."""
 import argparse
 import collections
 import json
@@ -148,7 +185,10 @@ p.add_argument("events")
 p.add_argument("--spec", required=True)
 p.add_argument("--client-schema")
 p.add_argument("--capture-content", action="store_true", help="the plan sets capture_content: true")
-p.add_argument("--expect-legacy", action="append", default=[], help="legacy event names that must still be sent")
+p.add_argument("--expect-legacy", action="append", default=[], help="legacy event that must still be sent")
+p.add_argument("--feature", action="append", default=[], help="allowed feature values (the plan's surfaces)")
+p.add_argument("--user-id", help="userId expected on user-triggered server events that carry one")
+p.add_argument("--expect-session", action="store_true", help="user-triggered server events carry context.sessionId")
 args = p.parse_args()
 
 spec = json.load(open(args.spec))
@@ -165,14 +205,16 @@ def validator(schema, name):
 problems, notes = [], []
 messages = [json.loads(line) for line in open(args.events) if line.strip()]
 tracks = [m for m in messages if m.get("type", "track") == "track" and m.get("event")]
-by_interaction = collections.defaultdict(lambda: collections.Counter())
+by_interaction = collections.defaultdict(collections.Counter)
 conversations = collections.defaultdict(set)
 names = collections.Counter(m["event"] for m in tracks)
+runs = []
 
 for i, m in enumerate(tracks):
     name, props = m["event"], m.get("properties") or {}
     user = m.get("userId") or m.get("user_id")
     anon = m.get("anonymousId") or m.get("anonymous_id")
+    context = m.get("context") or {}
     is_client = props.get("source") == "client"
     is_declared = not name.startswith("ai_") and "tool_status" in props
     where = f"#{i} {name}"
@@ -189,15 +231,28 @@ for i, m in enumerate(tracks):
         problems += [f"{where} (spec): {e.message}" for e in
                      validator(spec, "declared_tool_event" if is_declared else name).iter_errors(props)]
         if not is_client:
-            w = (m.get("context") or {}).get("wrapperLibrary") or {}
+            w = context.get("wrapperLibrary") or {}
             if w.get("specVersion") != "0.2.0":
                 problems.append(f"{where}: context.wrapperLibrary.specVersion is {w.get('specVersion')!r}")
+    # trackAction takes no feature, so server ai_user_action has none
+    if args.feature and not (name == "ai_user_action" and not is_client) and props.get("feature") not in args.feature:
+        problems.append(f"{where}: feature {props.get('feature')!r} not in {args.feature}")
     if not args.capture_content:
         leaked = CONTENT & props.keys() | ({"feedback_text"} & (props.get("action_details") or {}).keys())
         if leaked:
             problems.append(f"{where}: content sent with capture off: {sorted(leaked)}")
-    if props.get("trigger") == "system" and user:
+    system = props.get("trigger") == "system"
+    if system and user:
         problems.append(f"{where}: system-triggered event carries userId {user!r}")
+    if not system and not is_client and name in {"ai_user_prompt_created", "ai_response_received"}:
+        if args.user_id and user and user != args.user_id:
+            problems.append(f"{where}: userId {user!r}, expected {args.user_id!r}")
+        if args.expect_session and not context.get("sessionId"):
+            problems.append(f"{where}: no context.sessionId (cookies not read?)")
+    if system and name == "ai_response_received":
+        if not props.get("task_name"):
+            notes.append(f"{where}: system answer without task_name (a call outside any interaction or task?)")
+        runs.append(props)
     iid = props.get("interaction_id")
     if iid:
         by_interaction[iid][(name, "client" if is_client else "server")] += 1
@@ -213,13 +268,19 @@ for iid, c in by_interaction.items():
         problems.append(f"interaction {iid}: {prompts} ai_user_prompt_created (expected at most 1)")
     if prompts and not responses:
         problems.append(f"interaction {iid}: prompt without ai_response_received")
-    for action in ("ai_user_action",):
-        if c[(action, "server")] and c[(action, "client")]:
-            notes.append(f"interaction {iid}: ai_user_action from both server and client; check they are different actions")
+    if c[("ai_user_action", "server")] and c[("ai_user_action", "client")]:
+        notes.append(f"interaction {iid}: ai_user_action from both server and client; check they are different actions")
     if (c[("ai_user_action", "server")] or c[("ai_user_action", "client")]) and not responses:
         notes.append(f"interaction {iid}: ai_user_action for an answer not in this capture")
     if len(conversations[iid]) > 1:
         problems.append(f"interaction {iid}: several conversation_id values {sorted(conversations[iid])}")
+
+for r in runs:
+    parent = r.get("parent_interaction_id")
+    if parent and parent not in by_interaction:
+        notes.append(f"task {r.get('task_name')}: parent_interaction_id {parent} not in this capture")
+    print("run:", {k: r.get(k) for k in ("task_name", "trigger_source", "conversation_id", "account_id",
+                                          "on_behalf_of", "parent_interaction_id", "llm_call_count", "total_tokens")})
 
 for legacy in args.expect_legacy:
     if not names[legacy]:
@@ -236,14 +297,14 @@ sys.exit(1 if problems else 0)
 ```
 
 ```text
-python3 -m venv $TMPDIR/ai-events-verify/.venv
+<python3.10+> -m venv $TMPDIR/ai-events-verify/.venv
 $TMPDIR/ai-events-verify/.venv/bin/pip install jsonschema==4.26.0
 $TMPDIR/ai-events-verify/.venv/bin/python check_events.py events.jsonl \
   --spec ai-events-v0.2.schema.json --client-schema ai-client-events.schema.json \
-  --expect-legacy chatTurnCompleted
+  --feature support_bot --user-id demo_user_1 --expect-session --expect-legacy chatTurnCompleted
 ```
 
-Add `--capture-content` only when the plan turns capture on. Browser events captured from a browser test (stubbing `window.rudderanalytics.track` and recording `{event, properties}`) can be appended to the same file.
+Pass only the flags that apply: `--capture-content` when the plan turns capture on; `--feature` once per planned feature; `--user-id` / `--expect-session` when the test requests carried a user and cookies; `--expect-legacy` per planned legacy event. The `run:` lines list each background answer; compare them with the plan's `task_name`, `trigger_source`, `conversation_id_source`, `account_id_source`, `on_behalf_of_source` and `child_tasks`.
 
 ## 4. Checklist
 
@@ -251,11 +312,13 @@ Add `--capture-content` only when the plan turns capture on. Browser events capt
 |---|---|
 | Schema | every AI event passes its spec definition; client events pass the client schema |
 | One answer per turn | each `interaction_id` has exactly one `ai_response_received` and at most one `ai_user_prompt_created` |
-| Joins | prompt, answer, actions and declared tool events of a turn share `interaction_id` and `conversation_id`; the browser-minted ID (when used) equals the server's |
-| Identity | chat events carry the planned `userId` and, with the browser SDK, the cookie `anonymousId` and `context.sessionId`; background events have no `userId` and carry `account_id` / `on_behalf_of` when planned |
+| Joins | prompt, answer, actions and declared tool events of a turn share `interaction_id` and `conversation_id`; the browser-minted ID equals the server's, and an invalid one is replaced by the ID the server returns |
+| Identity | chat events carry the planned `userId` and, with cookies, `anonymousId` and `context.sessionId`; background events have no `userId` and carry `account_id` / `on_behalf_of` where planned |
 | Content | no `prompt_text`, `response_text`, `feedback_text` or `intent_summary` unless the plan turns capture on |
 | Counted once | no call reported by two integrations (one answer per turn, not one per model call); the browser never repeats a server event |
-| Background | one `ai_response_received` per run with `trigger: system`, `task_name`, `trigger_source`; nested steps carry `parent_interaction_id` |
+| Background | one `ai_response_received` per run and per planned child task, with `trigger: system`, `task_name`, `trigger_source`; children carry the parent's ID as `parent_interaction_id`; a parent with zero tokens is expected when all calls happen in children |
 | Flush | a script or job run delivers its events before exit |
-| Legacy | each legacy event still sends while its flag is on |
+| Legacy | each legacy event still sends, unchanged, while its flag is on |
 | Optional | `trace_id` when tracing is planned; declared tool events per `event_rules`; `ai_interaction_classified` when the classifier is on |
+
+Rows for surfaces the app does not have are `n/a` in the report.

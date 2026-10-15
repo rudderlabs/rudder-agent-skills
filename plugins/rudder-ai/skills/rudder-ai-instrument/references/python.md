@@ -15,7 +15,7 @@ Replace `openai` with the plan's `extras`, comma-separated (`rudderstack-ai[anth
 
 ## 2. Configure once at startup
 
-Next to where the RudderStack client is created (FastAPI lifespan, Django `AppConfig.ready()`, Flask app factory, a worker's `main()`):
+In the module that creates the RudderStack client, at module level right after it (runs once, on import, before any request or job); or at app startup (FastAPI lifespan, Django `AppConfig.ready()`, Flask app factory, a worker's `main()`) when that module is not imported at startup. Background-only apps: `identity_from_cookies=False`.
 
 ```python
 import rudderstack.ai
@@ -94,7 +94,7 @@ def chat(body: ChatRequest, request: Request, user: User = Depends(current_user)
         prompt_text=body.message,  # sent only when capture_content is on
     ) as interaction:
         reply = client.chat.completions.create(model=MODEL, messages=messages)
-    return {"answer": reply.choices[0].message.content, "interaction_id": interaction.id}
+    return {"answer": reply.choices[0].message.content, "interaction_id": interaction.id}  # always the ID used
 ```
 
 - Exceptions propagate unchanged and fail the answer; keep the route's error handling.
@@ -131,27 +131,51 @@ track_action(
 ## 6. Background surface: one `ai_task` per run
 
 ```python
-import rudderstack.ai
-from rudderstack.ai import ai_context, ai_task
+from rudderstack.ai import ai_task
 
 
 def run_digest(job: Job) -> None:
-    with ai_context(account_id=job.workspace_id):
-        with ai_task(
-            "nightly-digest",  # task_name
-            trigger_source="schedule",
-            on_behalf_of=job.requested_by,
-            conversation_id=f"nightly-digest:{job.workspace_id}",
-            feature="digest",
-        ) as task:
-            summary = summarise(job)  # wrapped clients and the LangChain handler report into the task
-            task.set_outcome("resolved")
+    with ai_task(
+        "nightly-digest",  # task_name
+        trigger_source="schedule",
+        account_id=job.workspace_id,  # account_id_source
+        on_behalf_of=job.requested_by,  # on_behalf_of_source
+        conversation_id=f"nightly-digest:{job.workspace_id}",
+        feature="digest",
+    ) as task:
+        summary = summarise(job)  # wrapped clients and the LangChain handler report into the task
+        task.set_outcome("resolved")
 ```
 
+Planned `child_tasks` (a run that fans out per item, here through a thread pool):
+
+```python
+import rudderstack.ai
+from rudderstack.ai import ai_task
+
+
+def send_digest(workspace: Workspace) -> None:
+    with ai_task(
+        "workspace-digest",  # child task_name
+        account_id=workspace.id,
+        on_behalf_of=workspace.owner_id,
+        conversation_id=f"nightly-digest:{workspace.id}",
+        feature="digest",
+    ):
+        ...  # model calls for this item
+
+
+def main() -> None:
+    with ai_task("nightly-digest", trigger_source="schedule", conversation_id=f"nightly-digest:{run_date}", feature="digest"):
+        with ThreadPoolExecutor() as pool:
+            list(pool.map(rudderstack.ai.propagate(send_digest), workspaces))
+```
+
+- Pass identity fields as `ai_task` arguments; `ai_context(account_id=...)` around the task is equivalent and useful only when several tasks share them.
+- No `user_id`: the actor is the system (`anonymousId: ai_system`). When the plan has `anonymous_id_source` (multi-tenant jobs), pass `anonymous_id=` with it.
+- A child task chains to the running task: `parent_interaction_id` is set and `trigger_source` defaults to `agent`. The parent reports only calls made outside its children, often none (zero tokens, no model): per-run totals come from summing the tree by `parent_interaction_id`.
 - Works as `with`, `async with` or a decorator (`@ai_task("nightly-digest")`).
-- No `user_id`: the actor is the system (`anonymousId: ai_system`). For multi-tenant jobs also pass a stable `anonymous_id` per tenant.
-- A non-chained `ai_task` flushes on exit, so a cron script or Lambda can exit. A long-lived worker: `flush=False` and flush at shutdown, so a slow data plane never stalls the loop.
-- Nested steps: an `ai_task` inside another chains via `parent_interaction_id`.
+- A non-chained `ai_task` flushes on exit, so a cron script or Lambda can exit; keep the app's own `flush()` call. A long-lived worker: `flush=False` and flush at shutdown, so a slow data plane never stalls the loop.
 - Thread pools: `executor.submit(rudderstack.ai.propagate(fn), ...)`; `ThreadPoolExecutor` and `run_in_executor` do not copy context (`asyncio.to_thread` does).
 
 ## 7. Flush
@@ -173,6 +197,7 @@ rudderstack.ai.configure(
             "create_ticket": rudderstack.ai.ToolRule(
                 event="ticket_created",
                 properties=lambda args, result: {"priority": (args or {}).get("priority")},
+                # when: result_seen in the plan -> add: when=lambda args, result: result is not None,
             ),
         }
     },
