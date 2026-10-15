@@ -23,7 +23,7 @@ Choose one and record it in the report:
 | No tests, or a script/cron job, or routes that are hard to call in-process | B |
 | A RudderStack development source and permission to use it | C, after A or B passes |
 
-What to drive, per planned surface: chat: one turn (and a second turn in the same conversation), one feedback action, and with `interaction_id_source: client` one turn with an invalid `x-interaction-id`; background: one full run; client: the planned browser events; event rules: one turn that calls each ruled tool. Skip what the app does not have.
+What to drive, per planned surface: chat: one turn (and a second turn in the same conversation), one feedback action, and with `interaction_id_source: client` one turn with an invalid `x-interaction-id`; background: one full run; client: the planned browser events, including the client copies of a turn and its feedback; event rules: one turn that calls each ruled tool. Skip what the app does not have.
 
 ### A. Stub client
 
@@ -167,7 +167,7 @@ Record what the page sends by replacing the SDK with a recorder before the page 
 ```js
 const captured = [];
 window.rudderanalytics = { track: (event, properties) => captured.push({ event, properties }) };
-// ...click through: open the assistant, send a message, copy, give feedback, close...
+// ...click through: open the assistant, send a message, copy, give feedback, open a card, close...
 // then write captured as JSON lines and append them to events.jsonl
 ```
 
@@ -240,13 +240,12 @@ for i, m in enumerate(tracks):
     if is_client and client:
         problems += [f"{where} (client schema): {e.message}" for e in validator(client, name).iter_errors(props)] \
             if name in client["$defs"] else [f"{where}: not a client event name"]
-    if name in SPEC_EVENTS or is_declared:
+    if (name in SPEC_EVENTS and not is_client) or is_declared:  # client copies: client schema only
         problems += [f"{where} (spec): {e.message}" for e in
                      validator(spec, "declared_tool_event" if is_declared else name).iter_errors(props)]
-        if not is_client:
-            w = context.get("wrapperLibrary") or {}
-            if w.get("specVersion") != "0.2.0":
-                problems.append(f"{where}: context.wrapperLibrary.specVersion is {w.get('specVersion')!r}")
+        w = context.get("wrapperLibrary") or {}
+        if w.get("specVersion") != "0.2.0":
+            problems.append(f"{where}: context.wrapperLibrary.specVersion is {w.get('specVersion')!r}")
     # trackAction takes no feature, so server ai_user_action has none
     if args.feature and not (name == "ai_user_action" and not is_client) and props.get("feature") not in args.feature:
         problems.append(f"{where}: feature {props.get('feature')!r} not in {args.feature}")
@@ -272,17 +271,23 @@ for i, m in enumerate(tracks):
         if props.get("conversation_id"):
             conversations[iid].add(props["conversation_id"])
 
+# Server rows are the counted ones; client copies (source: client) sit alongside them, one per side.
+has_client_copies = any(c[("ai_response_received", "client")] or c[("ai_user_prompt_created", "client")]
+                        for c in by_interaction.values())
 for iid, c in by_interaction.items():
+    for side in ("server", "client"):
+        if c[("ai_response_received", side)] > 1:
+            problems.append(f"interaction {iid}: {c[('ai_response_received', side)]} {side} ai_response_received (expected 1)")
+        if c[("ai_user_prompt_created", side)] > 1:
+            problems.append(f"interaction {iid}: {c[('ai_user_prompt_created', side)]} {side} ai_user_prompt_created (expected at most 1)")
+    if c[("ai_user_prompt_created", "server")] and not c[("ai_response_received", "server")]:
+        problems.append(f"interaction {iid}: server prompt without a server ai_response_received")
+    if has_client_copies:  # gaps: expected only where the harness skipped a side, else a lost event
+        if c[("ai_user_prompt_created", "client")] and not c[("ai_user_prompt_created", "server")]:
+            notes.append(f"interaction {iid}: client prompt with no server prompt (request never reached the SDK)")
+        if c[("ai_response_received", "server")] and not c[("ai_response_received", "client")]:
+            notes.append(f"interaction {iid}: server answer with no client copy (not shown, or client event lost)")
     responses = c[("ai_response_received", "server")] + c[("ai_response_received", "client")]
-    prompts = c[("ai_user_prompt_created", "server")] + c[("ai_user_prompt_created", "client")]
-    if responses > 1:
-        problems.append(f"interaction {iid}: {responses} ai_response_received (expected 1)")
-    if prompts > 1:
-        problems.append(f"interaction {iid}: {prompts} ai_user_prompt_created (expected at most 1)")
-    if prompts and not responses:
-        problems.append(f"interaction {iid}: prompt without ai_response_received")
-    if c[("ai_user_action", "server")] and c[("ai_user_action", "client")]:
-        notes.append(f"interaction {iid}: ai_user_action from both server and client; check they are different actions")
     if (c[("ai_user_action", "server")] or c[("ai_user_action", "client")]) and not responses:
         notes.append(f"interaction {iid}: ai_user_action for an answer not in this capture")
     if len(conversations[iid]) > 1:
@@ -324,11 +329,12 @@ Pass only the flags that apply: `--capture-content` when the plan turns capture 
 | Check | Pass when |
 |---|---|
 | Schema | every AI event passes its spec definition; client events pass the client schema |
-| One answer per turn | each `interaction_id` has exactly one `ai_response_received` and at most one `ai_user_prompt_created` |
+| One answer per turn | each `interaction_id` has exactly one server `ai_response_received` and at most one server `ai_user_prompt_created`; with a client surface, at most one client copy of each |
 | Joins | prompt, answer, actions and declared tool events of a turn share `interaction_id` and `conversation_id`; the ID the client uses for actions equals the server's (`client`: the browser-minted one, an invalid one replaced by the returned ID; `app`: the app's per-answer ID; `sdk`: the returned ID) |
 | Identity | chat events carry the planned `userId` and, with cookies, `anonymousId` and `context.sessionId`; background events have no `userId` and carry `account_id` / `on_behalf_of` where planned |
 | Content | no `prompt_text`, `response_text`, `feedback_text` or `intent_summary` unless the plan turns capture on |
-| Counted once | no call reported by two integrations (one answer per turn, not one per model call); the browser never repeats a server event |
+| Counted once | no call reported by two integrations (one answer per turn, not one per model call); browser copies carry `source: client` and no generation details (model, tokens, cost, `trace_id`) |
+| Client copies | unless the plan opts out: each driven turn has a client prompt and answer copy, and each feedback click both a server and a client `ai_user_action`; a click-through is a client `ai_user_action` with `clicked_through` and no URL |
 | Background | one `ai_response_received` per run and per planned child task, with `trigger: system`, `task_name`, `trigger_source`; children carry the parent's ID as `parent_interaction_id`; a parent with zero tokens is expected when all calls happen in children |
 | Flush | a script or job run delivers its events before exit |
 | Legacy | each legacy event still sends, unchanged, while its flag is on |

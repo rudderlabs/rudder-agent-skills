@@ -115,7 +115,9 @@ with ai_interaction(user_id=user.id, conversation_id=body.chat_id) as interactio
 return StreamingResponse(body_stream, headers={"x-interaction-id": interaction.id})
 ```
 
-## 5. Feedback and other actions (server sender)
+## 5. Feedback and other actions (server copy)
+
+The server copy of each action in `surfaces[].feedback`. By default the browser sends its own copy of feedback too (`references/client-events.md`); dashboards use the client row per `interaction_id` and fall back to this one.
 
 ```python
 from rudderstack.ai import track_action
@@ -125,7 +127,7 @@ track_action(
     interaction_id=body.interaction_id,
     conversation_id=body.conversation_id,
     user_id=user.id,
-    action_details={"feedback_type": "thumbs", "feedback_value": 1 if body.helpful else 0},
+    action_details={"feedback_type": "thumbs", "feedback_value": 1 if body.helpful else -1},
 )
 ```
 

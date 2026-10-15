@@ -35,7 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     and stops for explicit approval.
   - `rudder-ai-instrument` — exact-pinned install, `configure()` with the existing RudderStack
     client, client wrappers or framework integrations, one interaction per user turn, one task per
-    background run, feedback, flush, browser events on the existing JavaScript SDK, legacy events
+    background run, feedback, flush, browser events on the existing JavaScript SDK (client copies
+    of the prompt, answer and feedback sent alongside the server's by default), legacy events
     behind a flag.
   - `rudder-ai-verify` — offline capture (stub client or a mock data plane and model server),
     validation against the AI events JSON Schema and a client-event schema, join, count, identity

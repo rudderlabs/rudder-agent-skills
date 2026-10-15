@@ -80,7 +80,7 @@ spec:
       conversation_id_source: req.body.conversationId   # expression, or "minted by the SDK"
       interaction_id_source: client  # sdk | client (browser-minted, validated) | app (an existing per-answer ID)
       flush: shutdown                # shutdown | task (aiTask flushes itself) | per-run (scripts, Lambda)
-      feedback:                      # actions that already hit a server endpoint (sender: server)
+      feedback:                      # actions that already hit a server endpoint: the server's trackAction copy
         - path: src/routes/feedback.ts
           symbol: POST /api/feedback
           action_type: feedback_given
@@ -134,12 +134,24 @@ spec:
     sdk_path: public/app.js
     interaction_id_minted_by: client # same as the chat surface's interaction_id_source: client (crypto.randomUUID()
                                      # per prompt, sent to the server) | app | sdk (read from the chat response)
-    events:                          # every browser-sent event, including browser-sent ai_user_action
-      - event: ai_assistant_opened
-        handler: public/app.js (launcher click)
+    events:                          # every browser-sent event; all carry source: client, never sampled
+      - event: ai_user_prompt_created  # client copies of the prompt and answer: on by default
+        handler: public/app.js (chat form submit)
+      - event: ai_response_received
+        handler: public/app.js (answer rendered, failed or stopped)
+      - event: ai_user_action          # feedback: on by default, alongside the server's copy in surfaces[].feedback
+        action_type: feedback_given
+        handler: public/app.js (thumbs buttons)
       - event: ai_user_action
         action_type: copied_response
         handler: public/app.js (copy button)
+      - event: ai_user_action          # browser only; card_kind and target_type, never a URL
+        action_type: clicked_through
+        handler: public/app.js (source card click)
+      - event: ai_assistant_opened
+        handler: public/app.js (launcher click)
+    opt_out: []                      # copies the user turned off: client_prompt | client_response |
+                                     # client_feedback | server_feedback; [] keeps both sides
 
   legacy_events:
     - event: chatTurnCompleted
@@ -183,7 +195,8 @@ spec:
 - `surfaces[].feedback[].request_changes`: `trackAction` needs `interaction_id` and `conversation_id`; when the endpoint does not receive them today, list them here so the plan states that the client request and the endpoint change.
 - `surfaces[].status`: `skipped` (user chose not to, or no browser SDK), `blocked` (runtime or library version), `unsupported` (no SDK for the language), `discovered-only` (MCP).
 - Background `child_tasks`: one entry per nested step that should report its own usage. The parent task then reports only calls made outside the children (often none: an envelope with zero tokens); per-run totals come from summing the tree by `parent_interaction_id`. Children default to `trigger_source: agent`; set it in the child only when the user wants otherwise.
-- `client_events.events[].event`: only names from the client-event schema in the `rudder-ai-instrument` skill (`references/client-events.md`). Browser-sent actions live here, not under `surfaces[].feedback`.
+- `client_events.events[].event`: only names from the client-event schema in the `rudder-ai-instrument` skill (`references/client-events.md`). Browser-sent actions live here; server-sent ones under `surfaces[].feedback`.
+- Client copies: with a `client` surface to instrument, the browser sends its own `ai_user_prompt_created` and `ai_response_received` (`source: client`) alongside the server's, and feedback goes from both sides: the server endpoint under `surfaces[].feedback` and the browser handler under `client_events.events`. They measure the client/server gap per `interaction_id` and are never sampled. Either side opts out only when the user asks: record it in `client_events.opt_out` and drop that side's entry. Feedback with no server endpoint is browser-only; do not add an endpoint for it. Click-through (`clicked_through`) is browser-only.
 - `legacy_events[].migration`: the old event keeps sending behind a flag that defaults on until `remove_after`, so dashboards and destinations can move first. Removing it is a separate, later change.
 
 ## Mapping hand-built events
@@ -195,6 +208,7 @@ spec:
 | one event per model call | `ai_llm_response_received` only if the user needs per-call rows (`emit_llm_calls: true`); otherwise `ai_response_received` totals |
 | "user sent a message" | `ai_user_prompt_created` |
 | thumbs/rating/copy/share/report/retry | `ai_user_action` with `action_type` `feedback_given`, `feedback_retracted`, `copied_response`, `shared`, `reported`, `regenerated` |
+| a card, resource or doc opened from an answer | browser `ai_user_action` with `action_type: clicked_through` (`card_kind`, `target_type`; never the URL) |
 | tool-specific product events ("ticket created by bot") | a declared tool event in `config.event_rules` |
 | chat opened/closed, new/switched/renamed/deleted conversation | client events (`ai_assistant_opened`, ...) |
 

@@ -76,7 +76,8 @@ Background granularity: note what one run is (the whole cron invocation, one que
 | Legacy browser SDK v1.1 | `rudder-sdk-js`, `cdn.rudderlabs.com/v1.1` (cookies unsupported by the server SDKs: note it, suggest a v3 upgrade, do not do it) |
 | Other analytics | `analytics.load(` (Segment), `posthog.init(`, `mixpanel.init(`, `amplitude.init(`, `gtag(` |
 | Chat UI | components or templates with `chat`, `assistant`, `copilot`, `message`, `prompt` in names; `useChat(` (Vercel AI SDK UI); `fetch('/api/chat'` / EventSource / WebSocket calls to the chat route |
-| Feedback and actions | thumbs up/down, `rating`, `feedback`, copy-to-clipboard (`navigator.clipboard.writeText`), share, report, regenerate/retry buttons, and the endpoints they call; for each endpoint, whether its request already carries the answer's ID and the conversation ID (`trackAction` needs both) |
+| Feedback and actions | thumbs up/down, `rating`, `feedback`, copy-to-clipboard (`navigator.clipboard.writeText`), share, report, regenerate/retry buttons, cards, sources or links opened from an answer (click-through), and the endpoints they call; for each endpoint, whether its request already carries the answer's ID and the conversation ID (`trackAction` needs both) |
+| Browser event sampling | a sample rate or `Math.random()` gate around `rudderanalytics.track` in the app's analytics module; client copies of AI events must bypass it |
 | Assistant open/close, conversation list | launcher/toggle handlers, new-chat, switch, rename, delete conversation handlers |
 
 No RudderStack JavaScript SDK on the page: the `client` surface is `status: skipped` with the reason. Do not add a browser SDK; server events still work.

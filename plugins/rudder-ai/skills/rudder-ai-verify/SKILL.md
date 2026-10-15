@@ -19,7 +19,7 @@ Proves the instrumentation sends what `ai-events.yaml` promises, before any real
    - **C. Live Events**, after A or B passes: a development source in RudderStack, inspected in Live Events or through `rudder-mcp-workflow`.
    - Browser events: a recorder in place of `rudderanalytics`, appended to the same capture.
 5. **Run the app's own tests** too: instrumentation must not break them.
-6. **Validate** with `check_events.py` and the flags that match the plan: schema per event, one `ai_response_received` per `interaction_id`, joins on `interaction_id` and `conversation_id`, feature, user ID and session, no content unless the plan turns capture on, system runs without a user ID, legacy events still sent. Compare the printed background runs with the plan's task fields.
+6. **Validate** with `check_events.py` and the flags that match the plan: schema per event, one server `ai_response_received` per `interaction_id` (and at most one client copy), client copies of the prompt, answer and feedback unless the plan opts out, joins on `interaction_id` and `conversation_id`, feature, user ID and session, no content unless the plan turns capture on, system runs without a user ID, legacy events still sent. Compare the printed background runs with the plan's task fields.
 7. **Fix and repeat.** A failure in app wiring goes back to `rudder-ai-instrument`; a wrong plan assumption goes back to `rudder-ai-setup` (plan back to `draft`).
 8. **Report.**
 
@@ -48,6 +48,8 @@ Next: <fixes, or: point the app at a dev source and watch Live Events>
 | No events from a script or job | missing `flush()` before exit |
 | No `total_cost_usd` | expected unless the plan registers prices or the provider reports cost |
 | Legacy event missing | flag defaulting to off, or the old call was removed |
+| Server answer with no client copy | the answer copy is not sent on every final state (error, stop), or a sampling wrapper or ad blocker dropped it; in production it can also mean the user left (the spec's `client_disconnected`, not sent by SDK 0.4.0) |
+| Feedback on one side only | the browser handler or the endpoint's `trackAction` is missing, and the plan does not opt that side out |
 | Mock data plane captures nothing, app logs connection resets | the mock cannot read the gzip batch (use the reference mock as written), or the app exited before its batch was sent |
 | No `anonymousId` / `context.sessionId` from test cookies | cookie values not in the JavaScript SDK's encoding (`RUDDERSTACK_AI_DEBUG=1` logs "unreadable cookie") |
 

@@ -159,7 +159,9 @@ res.end();
 
 Claude Agent SDK with resumed sessions: store `usageSnapshot(resultMessage)` with the session and pass it back as `usageBaseline`, or each resumed turn re-counts the whole session.
 
-## 5. Feedback and other actions (server sender)
+## 5. Feedback and other actions (server copy)
+
+The server copy of each action in `surfaces[].feedback`. By default the browser sends its own copy of feedback too (`references/client-events.md`); dashboards use the client row per `interaction_id` and fall back to this one.
 
 ```ts
 import { trackAction } from '@rudderstack/ai';
@@ -171,7 +173,7 @@ app.post('/api/feedback', (req, res) => {
     interactionId,
     conversationId,
     actionType: 'feedback_given', // feedback_retracted | copied_response | shared | reported | regenerated
-    actionDetails: { feedback_type: 'thumbs', feedback_value: helpful ? 1 : 0 },
+    actionDetails: { feedback_type: 'thumbs', feedback_value: helpful ? 1 : -1 },
   });
   // ...the endpoint's existing work
   res.sendStatus(204);

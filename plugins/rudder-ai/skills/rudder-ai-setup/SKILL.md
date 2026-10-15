@@ -42,7 +42,7 @@ Show the user a short table: surface, entry point, library and version, proposed
    - Identity: the user ID when there are several candidates; the account/tenant ID; whether to rely on cookie identity alone where a route has no authenticated user; a browser that never calls `identify()`.
    - Background: what one run is, and whether per-item steps become child tasks; `task_name`; a stable `conversation_id` per run or item; `account_id` and `on_behalf_of` per run or item; a per-tenant `anonymous_id` for multi-tenant jobs.
    - IDs: whether the app already has a per-answer ID the client holds (use it as `interaction_id`), else whether the browser mints one; feedback endpoints that must start receiving `interaction_id` / `conversation_id`.
-   - Senders: for each action, the server endpoint (`trackAction`) or the browser (`ai_user_action` with `source: client`), never both.
+   - Client copies: with a browser SDK, the browser sends its own prompt, answer and feedback copies (`source: client`) alongside the server's by default, never sampled. Say so, and ask only whether the user wants to opt either side out (`client_events.opt_out`).
    - Event rules: `when: always` or `result_seen`, after checking the app runs the tool loop.
    - Legacy events: the mapping, the flag name and the date to stop sending the old event.
    - Intents: confirm the draft list. Tracing: confirm the trace ID source.
@@ -71,7 +71,7 @@ Hand off to `rudder-ai-instrument` with the approved plan, then to `rudder-ai-ve
 ## Rules
 
 - One `aiInteraction` / `ai_interaction` per user turn, one `aiTask` / `ai_task` per background run or planned child step; never one per conversation or per process.
-- One integration per call path; a browser event never duplicates a server event for the same `interaction_id`.
+- One integration per call path. Browser copies of the prompt, answer and feedback carry `source: client` and only what the browser saw; dashboards count answers from the server rows, so counts never double.
 - Keep existing analytics working: legacy events stay behind a flag that defaults on.
 - Exact version pins only; no `^`, `~` or ranges.
 - No browser SDK is added where none exists; the `client` surface is then skipped.
