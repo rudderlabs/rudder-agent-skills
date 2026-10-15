@@ -288,6 +288,7 @@ With tracking plan applied, implement the feature with instrumentation.
 - [ ] Events documented for developers
 - [ ] Instrumentation added at correct points in code
 - [ ] Context middleware configured (workspace_id)
+- [ ] Events verified locally with `rudder-cli sources listen` (`rudder-cli-sources-listen` skill)
 - [ ] Tested in dev environment
 - [ ] Verified events reach destination
 

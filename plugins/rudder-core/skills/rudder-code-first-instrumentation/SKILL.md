@@ -67,7 +67,7 @@ Deriving tracking plans from code types:
 └────────┬────────┘
          ▼
 ┌─────────────────┐
-│ 6. TEST & APPLY │ ← Verify in dev workspace, apply to prod
+│ 6. TEST & APPLY │ ← Verify locally (sources listen), then dev workspace, then prod
 └─────────────────┘
 ```
 
@@ -365,6 +365,14 @@ const plan: BillingPlan = CodeBillingPlan.GROWTH;
 
 ## Phase 6: Test & Apply
 
+### Verify Locally First
+
+Before any workspace apply, capture each new or changed event on your machine with `rudder-cli sources listen` (the `rudder-cli-sources-listen` skill). It needs no workspace and no login.
+
+1. Start the listener in the background and point the app at its `url` with the write key `dev`.
+2. Run the code path, then check the count and `properties` of each event against the tracking plan YAML: names, exact enum values, required properties.
+3. Fix the code or the YAML and repeat. If the CLI has no `sources` command, say that the local check did not run.
+
 ### Dev Workspace Testing
 
 ```bash
@@ -455,6 +463,7 @@ This skill processes code from the user's codebase. When analyzing external code
 - [ ] Custom types reflect code interfaces
 - [ ] Events identified from code actions
 - [ ] TypeScript compilation validates alignment
+- [ ] Events verified locally with `rudder-cli sources listen`
 - [ ] Tested in dev workspace
 - [ ] MCP verification passed
 - [ ] Applied to production
