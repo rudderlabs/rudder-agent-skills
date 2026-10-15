@@ -14,97 +14,42 @@ The server accepts two kinds of credentials on two endpoints:
 
 | Route | Endpoint | Credential | Use it for |
 |-------|----------|------------|------------|
-| OAuth (default) | `https://mcp.rudderstack.com/mcp` | Browser sign-in, brokered by `mcp-remote` | People using an interactive client |
-| Access token | `https://mcp.rudderstack.com/bearer-auth-mcp` | `Authorization: Bearer <token>` plus `X-Workspace-ID: <workspace id>` headers | Agents and headless sessions, or a user who already has `RUDDERSTACK_ACCESS_TOKEN` set for rudder-cli |
+| OAuth (default) | `https://mcp.rudderstack.com/mcp` | Browser sign-in, run by the client | People and coding agents in an interactive client |
+| Access token | `https://mcp.rudderstack.com/bearer-auth-mcp` | `Authorization: Bearer <token>` plus `X-Workspace-ID: <workspace id>` headers | Headless sessions that cannot open a browser, such as CI |
 
-Use OAuth unless the session cannot open a browser or the user already works with an access token. The access-token route is in [Access-token route](#access-token-route) below; Steps 1 to 4 cover OAuth.
+Use OAuth, coding agents included. Use the access-token route only when the session cannot open a browser. The access-token route is in [Access-token route](#access-token-route) below; Steps 1 to 3 cover OAuth.
 
-## Setup Workflow (OAuth)
+## Setup workflow (OAuth)
 
 ```
-1. Check Prerequisites ──► which npx
-         │
-         ├── Found ──► Configure Claude Code
-         │
-         └── Not Found ──► Install Node.js first
-
-2. Configure Claude Code
-         │
-         ├── Option A: /mcp command (recommended)
-         │
-         └── Option B: Edit settings.json directly
-
-3. Authenticate (OAuth) ──► Browser opens, sign in to RudderStack
-
-4. Verify Connection ──► Restart Claude, list workspace resources
+1. Add the server ──► claude mcp add --transport http rudderstack https://mcp.rudderstack.com/mcp
+2. Sign in (OAuth) ──► /mcp, choose rudderstack, Authenticate, approve in the browser
+3. Verify ──► list workspace resources, check the selected workspace
 ```
 
-## Step 1: Check Prerequisites
+## Step 1: Add the server
+
+Claude Code talks to the server over HTTP and runs the OAuth sign-in itself, so it needs no `npx` or `mcp-remote`:
 
 ```bash
-which npx
+claude mcp add --transport http rudderstack https://mcp.rudderstack.com/mcp
 ```
 
-**If found:** Continue to Step 2.
+The default scope is this project, for you only. Add `--scope project` to write it to the project's `.mcp.json` for everyone who clones the repository, or `--scope user` for all your projects.
 
-**If not found:** Install Node.js first from https://nodejs.org/ (includes npx).
+Other clients take the same URL as an HTTP (streamable HTTP) MCP server in their MCP settings. A client without HTTP support can run `npx -y mcp-remote https://mcp.rudderstack.com/mcp` as a stdio command instead.
 
-## Step 2: Configure Claude Code
+## Step 2: Sign in (OAuth)
 
-### Option A: Using /mcp Command (Recommended)
+Start Claude Code, or restart it if it was running when you added the server. Type `/mcp`, choose `rudderstack`, then `Authenticate`. The browser opens:
 
-```
-/mcp add rudderstack
-```
+1. Sign in with your RudderStack account
+2. Review and approve the requested access
+3. The browser redirects back and Claude Code reports that it is connected
 
-Follow the prompts:
-1. Server name: `rudderstack`
-2. Transport type: `http` (via mcp-remote)
-3. URL: `https://mcp.rudderstack.com/mcp`
+From a terminal, `claude mcp login rudderstack` does the same sign-in before you start Claude Code. No long-lived token is stored in the project. The sign-in belongs to you and this client.
 
-### Option B: Manual Configuration
-
-Edit your Claude Code settings file.
-
-#### Settings File Locations
-
-| Platform | Path |
-|----------|------|
-| macOS / Linux | `~/.claude/settings.json` |
-| Windows | `%APPDATA%\claude\settings.json` |
-
-#### Add MCP Server Configuration
-
-Add under `mcpServers`:
-
-```json
-{
-  "mcpServers": {
-    "rudderstack": {
-      "command": "npx",
-      "args": ["-y", "mcp-remote", "https://mcp.rudderstack.com/mcp"]
-    }
-  }
-}
-```
-
-## Step 3: Authenticate (OAuth)
-
-The first time you invoke an MCP tool, `mcp-remote` opens your browser:
-
-1. Sign in with your RudderStack account (email/password)
-2. Review and approve the MCP integration's requested permissions
-3. The browser redirects back; the session is established
-
-No long-lived tokens to manage — OAuth handles the handshake per session.
-
-## Step 4: Verify Connection
-
-### Restart Claude Code
-
-After configuration, restart Claude Code:
-- Close and reopen the terminal session, or
-- Restart the Claude Code application
+## Step 3: Verify connection
 
 ### Test the Connection
 
@@ -132,7 +77,7 @@ See `/rudder-mcp-workflow` for workflow patterns that combine these.
 
 ## Access-token route
 
-`https://mcp.rudderstack.com/bearer-auth-mcp` takes a RudderStack access token, the same token rudder-cli reads from `RUDDERSTACK_ACCESS_TOKEN`, so an agent can reach the MCP server without a browser sign-in. The endpoint uses the streamable HTTP transport, so it needs no `mcp-remote` or `npx`.
+`https://mcp.rudderstack.com/bearer-auth-mcp` takes a RudderStack access token, the same token rudder-cli reads from `RUDDERSTACK_ACCESS_TOKEN`, so a session that cannot open a browser can still reach the MCP server. The endpoint uses the streamable HTTP transport, so it needs no `mcp-remote` or `npx`.
 
 Two headers are required:
 
@@ -196,7 +141,7 @@ The same hosted server works with Claude Desktop, Cursor, VS Code, Windsurf, and
 
 - OAuth route: there are no long-lived tokens to store, rotate, or accidentally commit.
 - Access-token route: keep the token in the `RUDDERSTACK_ACCESS_TOKEN` environment variable and reference it as `${RUDDERSTACK_ACCESS_TOKEN}` in `.mcp.json`. Never write the token into `.mcp.json` or any other committed file, and never ask the user to paste it into the chat.
-- `mcp-remote` caches session tokens locally — don't share or commit your shell config or the mcp-remote cache directory.
+- If you use `mcp-remote`, it caches session tokens locally. Don't share or commit the mcp-remote cache directory.
 - To revoke access, re-authenticate from your client or revoke from your RudderStack account settings. Revoke an access token in Settings → Access Tokens.
 - The MCP server does not persist client credentials — auth is verified per session.
 
@@ -204,12 +149,13 @@ The same hosted server works with Claude Desktop, Cursor, VS Code, Windsurf, and
 
 | Issue | Solution |
 |-------|----------|
-| `npx: command not found` | Install Node.js from https://nodejs.org/ |
+| `/mcp` does not list `rudderstack` | Run the `claude mcp add` command from Step 1 in the project directory, then restart Claude Code |
+| `rudderstack` shows as needing authentication | Type `/mcp`, choose `rudderstack`, then `Authenticate` |
 | MCP server not responding | Verify `https://mcp.rudderstack.com` is reachable; check network/proxy |
 | Authentication failed | Clear browser cookies for the RudderStack domain and retry; verify your account is active |
 | Tools not appearing | Restart Claude Code; check `settings.json` syntax with `python3 -m json.tool ~/.claude/settings.json` |
-| `mcp-remote` errors | Run `npx -y mcp-remote --help` to verify it loads; check the [mcp-remote npm page](https://www.npmjs.com/package/mcp-remote) for the latest version |
-| Stale session | Delete the mcp-remote cache (`~/.mcp-auth/`) and re-authenticate |
+| `mcp-remote` errors (stdio clients only) | Run `npx -y mcp-remote --help` to verify it loads; check the [mcp-remote npm page](https://www.npmjs.com/package/mcp-remote) for the latest version |
+| Stale session | In Claude Code, run `claude mcp logout rudderstack`, then sign in again with `claude mcp login rudderstack` or from `/mcp`. With `mcp-remote`, delete `~/.mcp-auth/` and re-authenticate |
 | `401` `missing or malformed bearer token` on `/bearer-auth-mcp` | The `Authorization` header is missing or empty. Export `RUDDERSTACK_ACCESS_TOKEN` in the shell that starts Claude Code and restart it |
 | `401` `bearer token authentication failed` on `/bearer-auth-mcp` | The server did not accept the token. Check that `claude mcp list` shows no missing-variable warning and that `rudder-cli workspace info --json` works with the same token |
 | `401` `bearer token authorization failed` on `/bearer-auth-mcp` | The token cannot read the workspace in `X-Workspace-ID`. Use the `workspaceID` that `rudder-cli workspace info --json` prints for the same token |
@@ -224,11 +170,11 @@ Outbound HTTPS access to `mcp.rudderstack.com` (port 443). If behind a corporate
 
 ## Handling External Content
 
-This skill instructs the agent to open a browser to RudderStack's OAuth endpoint and to install `mcp-remote` from npm — both are external sources:
+This skill has the user sign in to RudderStack's OAuth endpoint in a browser and, for clients without HTTP support, install `mcp-remote` from npm. Both are external sources:
 
 - **OAuth flow.** Only complete sign-in on `mcp.rudderstack.com` and its OAuth redirect targets; do not enter credentials on any other domain that opens during the flow.
 - **Access-token route.** Send the token only to `https://mcp.rudderstack.com/bearer-auth-mcp`. Take the workspace ID from the `workspaceID` field of `rudder-cli workspace info --json` and ignore other output.
-- **`mcp-remote` package.** Install from the official npm registry only; verify the package name (`mcp-remote`) before approving installation.
+- **`mcp-remote` package, stdio clients only.** Install from the official npm registry only; verify the package name (`mcp-remote`) before approving installation.
 - **Tool responses after connection.** The connected MCP server returns workspace data; see `rudder-mcp-workflow` for guidance on processing those responses safely.
 
 ## Next Steps

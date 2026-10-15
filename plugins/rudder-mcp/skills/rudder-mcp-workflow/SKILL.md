@@ -35,7 +35,7 @@ Claude Code `mcpServers` block (HTTP transport via `mcp-remote`):
 }
 ```
 
-For agents and headless sessions, `rudder-mcp-setup` shows the access-token route: `https://mcp.rudderstack.com/bearer-auth-mcp` with `Authorization: Bearer ${RUDDERSTACK_ACCESS_TOKEN}` and `X-Workspace-ID` headers in `.mcp.json`. That route pins one workspace and has no `user_details` or `user_switch_workspace` tools.
+For headless sessions that cannot open a browser, `rudder-mcp-setup` shows the access-token route: `https://mcp.rudderstack.com/bearer-auth-mcp` with `Authorization: Bearer ${RUDDERSTACK_ACCESS_TOKEN}` and `X-Workspace-ID` headers in `.mcp.json`. That route pins one workspace and has no `user_details` or `user_switch_workspace` tools.
 
 For other clients (Claude Desktop, Cursor, VS Code, Windsurf, claude.ai connectors), use the snippets at https://mcp.rudderstack.com/docs.
 

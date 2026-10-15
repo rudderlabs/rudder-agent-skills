@@ -65,13 +65,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   substitution is on by default only from rudder-cli 0.25.0.
   rudder-transformations says `transformations test` needs the same
   `--var-file` flags.
-- **`rudder-mcp` / `rudder-mcp-setup`, `rudder-mcp-workflow`.** The access-token
-  route: `https://mcp.rudderstack.com/bearer-auth-mcp` with
-  `Authorization: Bearer <token>` and `X-Workspace-ID` headers, configured in
-  `.mcp.json` as `${RUDDERSTACK_ACCESS_TOKEN}` so the token is never written to
-  disk, or with `claude mcp add --scope project --transport http`. The skills
-  note that `user_details` and `user_switch_workspace` exist only on the OAuth
-  route. OAuth stays the default for interactive users.
+- **`rudder-mcp` / `rudder-mcp-setup`, `rudder-mcp-workflow`.** OAuth setup
+  uses Claude Code's native HTTP transport:
+  `claude mcp add --transport http rudderstack https://mcp.rudderstack.com/mcp`,
+  then `/mcp` and Authenticate, with no `npx` or `mcp-remote`. OAuth is the
+  route for people and coding agents alike. The access-token route,
+  `https://mcp.rudderstack.com/bearer-auth-mcp` with `Authorization: Bearer
+  <token>` and `X-Workspace-ID` headers referenced as
+  `${RUDDERSTACK_ACCESS_TOKEN}` in `.mcp.json`, is documented for sessions that
+  cannot open a browser. The skills note that `user_details` and
+  `user_switch_workspace` exist only on the OAuth route.
 
 - **CI / dev tooling** — both directory crawlers now run as gates against the
   working tree: cursor.directory's real `parse.ts` (vendored, pinned) via
