@@ -4,6 +4,8 @@ Python 3.12+. The package has no dependencies of its own; the extra for each lib
 
 `<VERSION>` below is the release that ships spec v0.3: the first `rudderstack-ai` version on PyPI after 0.4.0 whose changelog names spec v0.3 (and, for MCP servers, has the `mcp` extra). 0.4.0 ships spec v0.2 and has no `rudderstack.ai.mcp`; if no v0.3 release exists yet, stop and tell the user instead of installing 0.4.0 or a branch build.
 
+Runnable references in the SDK repository's `examples/`: `openai-quickstart`, `anthropic-quickstart`, `google-genai-quickstart`, `bedrock-converse-tools-streaming`, `langchain-agent`, `openai-agents`, `claude-agent-sdk-quickstart`, `litellm-quickstart`, `background-agent`, `scores-evaluator`, `cost-estimation`, `mcp-server`, `mcp-server-lowlevel`, `mcp-server-fastmcp-v1`, `openai-agents-mcp`.
+
 ## 1. Install (exact pins)
 
 | Manager | Command or line |
@@ -13,7 +15,7 @@ Python 3.12+. The package has no dependencies of its own; the extra for each lib
 | pip + requirements file | add `rudderstack-ai[openai]==<VERSION>` to `requirements.txt`, then `pip install -r requirements.txt` |
 | pyproject without a lock tool | add `"rudderstack-ai[openai]==<VERSION>"` to `[project] dependencies` |
 
-Replace `openai` with the plan's `extras`, comma-separated (`rudderstack-ai[anthropic,langchain]==<VERSION>`). The `mcp` extra pins the `mcp` package exactly (v2): an MCP server on `mcp` 1.x or the standalone `fastmcp` package is `blocked` in the plan, not upgraded here. Only when the plan says `rudderstack.client: new`, also add `rudder-sdk-python==2.1.9`. If the resolver tries to move an existing library (for example LiteLLM needs `openai<3`), stop and ask.
+Replace `openai` with the plan's `extras`, comma-separated (`rudderstack-ai[anthropic,langchain]==<VERSION>`). The `mcp` extra declares `mcp>=1.30.0,<3` (1.x and 2.x); an MCP server on the standalone `fastmcp` package is `blocked` in the plan, not migrated here. Only when the plan says `rudderstack.client: new`, also add `rudder-sdk-python==2.1.9`. If the resolver tries to move an existing library (for example LiteLLM needs `openai<3`), stop and ask.
 
 ## 2. Configure once at startup
 
@@ -105,9 +107,9 @@ def chat(body: ChatRequest, request: Request, user: User = Depends(current_user)
 - Exceptions propagate unchanged and fail the answer; keep the route's error handling.
 - `surface` (`web`, `mobile`, `slack`, `teams`, `email`, `chatgpt_app`, `claude_app`, `ide`, `api`, `other`) comes from the plan; `ai_context(surface=...)` sets it for a whole request.
 - Attachments: `attachment_count=` and `attachment_types=[...]` (`image`, `audio`, `video`, `pdf`, `file`); never names or content.
-- `trace_id` is never set automatically in spec v0.3: pass `trace_id=` (or `interaction.set_trace_id(...)`) only when the plan has a tracing source, or `register_tracing(link_trace_id=True)` with the SDK's span export. Extras via `interaction.end(extra_properties={...})`.
+- `trace_id`: when the app registers the SDK's OpenTelemetry span processor (`register_tracing()` / `create_span_processor()` from `rudderstack.ai.tracing`, `tracing` extra), it is filled from the first span started inside the interaction; nothing to add. Another tracing tool (`tracing.trace_id_source`): pass `trace_id=` or `interaction.set_trace_id(...)`; a value the app sets always wins. Extras via `interaction.end(extra_properties={...})`.
 - `client_disconnected: true` comes from `AIContextMiddleware` (ASGI: FastAPI, Starlette) or a bound stream closed early. Django and Flask (WSGI) report no disconnect: only a bound streaming generator closed by the server sets it; pass `interaction.end(client_disconnected=True)` where the app detects it itself.
-- Statuses need no code: the integrations report `paused` with `pause_reason`, `incomplete` with `max_turns`, `max_budget_usd` or `length`, and `content_filter` as an error. A run the app pauses itself: `interaction.end(pause_reason="approval")`.
+- Statuses need no code: the integrations report `paused` with `pause_reason`, `incomplete` with `max_turns`, `max_budget_usd` or `length` (a last call cut off at the token limit, including Anthropic `stop_reason: max_tokens`), and `content_filter` as an error. A run the app pauses itself: `interaction.end(pause_reason="approval")`.
 - Async routes: `async with ai_interaction(...)` works the same.
 
 Streaming responses keep the interaction open until the stream ends:
@@ -200,7 +202,7 @@ def main() -> None:
 | Web app, long-lived worker | `rudderstack.ai.flush()` once at shutdown (FastAPI lifespan exit, `atexit.register(rudderstack.ai.flush)`) |
 | Script, cron, Lambda | `rudderstack.ai.flush()` in a `finally` before exit (a top-level `ai_task` already does it); inside an event loop `await rudderstack.ai.aflush()` |
 
-The client's own `shutdown()` blocks until its queue drains, retries included: in a daemon, bound it (run it in a thread and join with a timeout) so an outage cannot hold up exit.
+`flush(timeout=None)` is bounded: classifications wait up to the classifier timeout plus 1 s, each client flush up to 10 s; it never raises and returns `False` when something did not finish in time. The client's own `shutdown()` is not bounded (it blocks until its queue drains, retries included): in a daemon, run it in a thread and join with a timeout so an outage cannot hold up exit.
 
 ## 8. Declared tool events, classifier, scores, prices
 
@@ -227,7 +229,7 @@ rudderstack.ai.configure(
 )
 ```
 
-Only the keys the plan enables. Event names starting with `ai_` or `mcp_` are reserved. Price options the plan may list, through `rudderstack.ai.register_price(model, ...)`: `tier_multipliers={"batch": 0.5, "flex": 0.5, "fast": 2}`, `long_context={"threshold_tokens": 200_000, "input_per_mtok": ..., "output_per_mtok": ...}`, `server_tool_per_call={"web_search": 0.01}`, `cache_write_1h_per_mtok=`. Service tier, 1-hour cache writes and hosted tool calls are read from responses automatically.
+Only the keys the plan enables. Event names starting with `ai_` or `mcp_` are reserved. Price options the plan may list, through `rudderstack.ai.register_price(model, ...)`: `tier_multipliers={"batch": 0.5, "flex": 0.5, "fast": 2}`, `long_context={"threshold_tokens": 200_000, "input_per_mtok": ..., "output_per_mtok": ...}`, `server_tool_per_call={"web_search": 0.01}`, `cache_write_1h_per_mtok=`. Service tier, 1-hour cache writes and hosted tool calls are read from responses automatically. Gemini API calls report provider `google`, Vertex AI calls `google.vertex`: when their rates differ, register each with `provider=` (the call's own provider wins; a price for either label otherwise covers both). Examples `cost-estimation` (`register_prices`, `estimate_cost`) and `scores-evaluator` (`evaluator=`, `track_score`).
 
 A score computed elsewhere (a human review, an offline judge):
 
@@ -249,7 +251,15 @@ if os.environ.get("AI_EVENTS_LEGACY_EVENT", "true").lower() != "false":
 
 ## 10. MCP server: `wrap_mcp_server`
 
-Needs the `mcp` extra and an `mcp` v2 server (`mcp.server.mcpserver.MCPServer` or the low-level `mcp.server.lowlevel.Server`). One call, before serving:
+Needs the `mcp` extra. One call, before serving, on any of:
+
+| `mcp` | Server | Example |
+|---|---|---|
+| 2.x | `MCPServer` from `mcp.server.mcpserver`, low-level `Server` from `mcp.server.lowlevel` | `mcp-server`, `mcp-server-lowlevel` |
+| 1.x (`>=1.30.0`) | `FastMCP` from `mcp.server.fastmcp`, the 1.x low-level `Server` | `mcp-server-fastmcp-v1` |
+
+The line is detected from the server object; anything else (the standalone `fastmcp` package) raises `TypeError`. Protocol 2026-07-28 (stateless) is served on 2.x only; 1.x serves up to 2025-11-25.
+
 
 ```python
 from rudderstack.ai.mcp import wrap_mcp_server
@@ -271,9 +281,9 @@ server.run("stdio")
 rudder_client.flush()  # after run() returns; HTTP apps flush in the lifespan shutdown
 ```
 
-`identify` defaults to the token's `subject`, `client_id` and `scopes`; if it raises, the request goes out as `ai_system`. `call_reason` and `capability_detail` are sent only with `capture_content`. MCP Events helpers (`mcp_events=True`, `track_mcp_event_subscription`, `wrap_mcp_event_sender`) only when the plan turns them on: experimental.
+`identify` defaults to the token's `subject`, `client_id` and `scopes`; if it raises, the request goes out as `ai_system`. State (`mcp_client_seen` window, call counters, retry hashes, pending `input_required` items) is in memory per server name, per process: servers wrapped under one name share it, so give each distinct server a unique name; each replica reports its own `mcp_client_seen`. `call_reason` and `capability_detail` are sent only with `capture_content`. MCP Events helpers (`mcp_events=True`, `track_mcp_event_subscription`, `wrap_mcp_event_sender`) only when the plan turns them on: experimental.
 
-An agent on the OpenAI Agents SDK passes its `interaction_id` to MCP servers with `tool_meta_resolver=rudderstack_mcp_tool_meta()` (from `rudderstack.ai.openai_agents`) on `MCPServerStdio` / `MCPServerStreamableHttp` / `MCPServerSse`, so `mcp_tool_called` joins the answer that made it.
+An agent on the OpenAI Agents SDK passes its `interaction_id` to MCP servers with `tool_meta_resolver=rudderstack_mcp_tool_meta()` (from `rudderstack.ai.openai_agents`) on `MCPServerStdio` / `MCPServerStreamableHttp` / `MCPServerSse`, so `mcp_tool_called` joins the answer that made it (example `openai-agents-mcp`).
 
 ## Troubleshooting
 
@@ -284,3 +294,4 @@ Logs: `logging.getLogger("rudderstack.ai").setLevel(logging.DEBUG)`.
 | Warning "no RudderStack client" | `configure(analytics=...)` did not run before the first event |
 | Every model call is its own answer | calls outside `ai_interaction`, in a thread pool without `propagate`, a stream without `bind()`, or a LangChain handler on a model |
 | Events missing in a script | `flush()` before exit |
+| `response_text` / `tool_breakdown` entries missing on a large answer | the event was over 30,000 bytes of properties: captured text is dropped first, then breakdown entries from the end |

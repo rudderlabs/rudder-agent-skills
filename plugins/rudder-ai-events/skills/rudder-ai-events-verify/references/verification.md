@@ -4,13 +4,14 @@ Everything here runs locally, without provider keys and without sending anything
 
 ## 1. Schemas
 
-The AI events schema ships inside the npm package (the Python wheel and the Go module do not include it). Read it as a file; it is not an importable export. It covers the chat, background and `mcp_*` events and the client copies' fields.
+The AI events schema ships inside the npm package and the Go module (the Python wheel does not include it). Read it as a file; it is not an importable export. It covers the chat, background and `mcp_*` events and the client copies' fields.
 
 `<VERSION>` is the `@rudderstack/ai` release that ships spec v0.3, the same one the plan pins for Node.js (any language's app can use it here). 0.4.0 ships `ai-events-v0.2.schema.json` only; a missing v0.3 file means that version is too old.
 
 | App | Get `ai-events-v0.3.schema.json` |
 |---|---|
 | Node.js, after install | copy `node_modules/@rudderstack/ai/spec/ai-events-v0.3.schema.json` |
+| Go, after `go get` | copy `$(go env GOMODCACHE)/github.com/rudderlabs/ai-sdk-go@<VERSION>/spec/ai-events-v0.3.schema.json` |
 | Any (no Node.js needed; one download from the npm registry) | `curl -sSLo ai.tgz https://registry.npmjs.org/@rudderstack/ai/-/ai-<VERSION>.tgz`, then `tar -xzf ai.tgz package/spec/ai-events-v0.3.schema.json` |
 
 Client events: copy the JSON block under "Schema" in the `rudder-ai-events-instrument` skill's `references/client-events.md` into `ai-client-events.schema.json`.
@@ -70,6 +71,8 @@ with open("events.jsonl", "w") as f:
     for e in stub.events:
         f.write(json.dumps(e, default=str) + "\n")
 ```
+
+Go: implement `analytics.Client` (`Enqueue(msg analytics.Message) error` collecting `analytics.Track` values, `Close() error`) and pass it to `rudderstackai.Configure(rudderstackai.WithAnalytics(stub))` or the MCP wrapper's `Analytics`; write each `Track` as JSON with `userId`, `anonymousId`, `event`, `properties` and `context`. Easier for most Go apps: option B, since `analytics-go` posts to the mock data plane unchanged.
 
 Stub messages use `user_id` / `anonymous_id` (Python) or the SDK's message shape (Node.js); `check_events.py` reads both, and the data plane shape.
 
@@ -183,7 +186,7 @@ await client.callTool({ name: tools[0].name, arguments: {} }); // invalid argume
 await client.close();
 ```
 
-Python servers: the same with `mcp.ClientSession` over `stdio_client` / `streamablehttp_client`, passing `meta=` on `call_tool`. Go servers: either client against the built binary or the HTTP endpoint. Drive: one `tools/list`, one valid call per planned declared tool event, one invalid call, a second client name if the plan expects several, and (when planned) a `request_capability` call, a resource read, a prompt get and an elicitation. Stop the server so it flushes. The 2026-07-28 protocol needs a client that speaks it; with Node.js `@modelcontextprotocol/sdk` 1.x on either side, only the handshake revisions (2025-06-18 era) can be checked (setup skill, Known limits).
+Python servers: the same with `mcp.ClientSession` over `stdio_client` / `streamablehttp_client`, passing `meta=` on `call_tool`. Go servers (go-sdk or mcp-go): either client against the built binary or the HTTP endpoint. Drive: one `tools/list`, one valid call per planned declared tool event, one invalid call, a second client name if the plan expects several, and (when planned) a `request_capability` call, a resource read, a prompt get and an elicitation. Stop the server so it flushes. The 2026-07-28 protocol needs a client and a server that speak it: Node.js `@modelcontextprotocol/server` 2.x, Python `mcp` 2.x, go-sdk v1.8 or mcp-go v1.x; with Node.js `@modelcontextprotocol/sdk` 1.x or Python `mcp` 1.x on either side, only the handshake revisions (2025-06-18, 2025-11-25) can be checked (setup skill, Known limits). On 2026-07-28 `mcp_client_seen` follows the first successful request, and there is no `mcp_session_id`.
 
 ### Browser events
 
@@ -213,6 +216,7 @@ from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
 
 SPEC_VERSION = "0.3.0"
+SDK_NAMES = {"@rudderstack/ai", "rudderstack-ai", "ai-sdk-go"}  # context.wrapperLibrary.name: Node.js, Python, Go
 SPEC_EVENTS = {"ai_user_prompt_created", "ai_response_received", "ai_user_action", "ai_interaction_classified",
                "ai_interaction_scored", "ai_llm_response_received"}
 CLIENT_COPIES = {"ai_user_prompt_created", "ai_response_received", "ai_user_action"}
@@ -283,6 +287,8 @@ for i, m in enumerate(tracks):
         problems += [f"{where} (spec): {e.message}" for e in validator(spec, definition).iter_errors(props)]
         if not is_client and w.get("specVersion") != SPEC_VERSION:
             problems.append(f"{where}: context.wrapperLibrary.specVersion is {w.get('specVersion')!r}")
+        if not is_client and w.get("name") not in SDK_NAMES:
+            problems.append(f"{where}: context.wrapperLibrary.name is {w.get('name')!r}, not one of {sorted(SDK_NAMES)}")
     # trackAction takes no feature, so server ai_user_action has none; MCP events have none either
     if args.feature and not is_mcp and (is_client or name != "ai_user_action") and props.get("feature") not in args.feature:
         problems.append(f"{where}: feature {props.get('feature')!r} not in {args.feature}")
@@ -368,6 +374,8 @@ for legacy in args.expect_legacy:
         problems.append(f"legacy event {legacy} was not sent (it must keep sending during migration)")
 
 print("events:", dict(names))
+print("sdks:", dict(collections.Counter((m.get("context") or {}).get("wrapperLibrary", {}).get("name") for m in tracks
+                                       if (m.get("properties") or {}).get("source") != "client" and (m.get("context") or {}).get("wrapperLibrary"))))
 print("interactions:", len(by_interaction))
 for n in notes:
     print("note:", n)
@@ -392,7 +400,7 @@ Pass only the flags that apply: `--capture-content` when the plan turns capture 
 
 | Check | Pass when |
 |---|---|
-| Schema | every AI and MCP event passes its v0.3 definition and carries `specVersion: 0.3.0`; client events also pass the client schema |
+| Schema | every AI and MCP event passes its v0.3 definition and carries `specVersion: 0.3.0` and a `context.wrapperLibrary.name` of `@rudderstack/ai`, `rudderstack-ai` or `ai-sdk-go`; client events also pass the client schema |
 | One answer per turn | each `interaction_id` has exactly one server `ai_response_received` and at most one server `ai_user_prompt_created`; with a client surface, at most one client copy of each |
 | Joins | prompt, answer, actions and declared tool events of a turn share `interaction_id` and `conversation_id`; the ID the client uses for actions equals the server's (`client`: the browser-minted one, an invalid one replaced by the returned ID; `app`: the app's per-answer ID; `sdk`: the returned ID) |
 | Identity | chat events carry the planned `userId` and, with cookies, `anonymousId` and `context.sessionId`; background events have no `userId` and carry `account_id` / `on_behalf_of` where planned |
@@ -405,6 +413,6 @@ Pass only the flags that apply: `--capture-content` when the plan turns capture 
 | Scoping | `surface` on chat and client events matches the plan; `feature` too, except server `ai_user_action` |
 | MCP | one `mcp_client_seen` per client per run; one `mcp_tool_called` per call with `server_name`, `tool_status` and, on errors, `error_type`; `request_context` in each listed tool schema but never in `argument_keys`; `intent` from the plan's list or `other`; no argument values, results, URIs or tokens; `identify` puts the OAuth subject in `userId` and the workspace in `account_id` (stdio without auth: `ai_system`); a call sent with `_meta` `com.rudderstack/interaction_id` carries that ID; declared tool events per the server's `event_rules` |
 | Statuses | a stopped or cut-off run reports `cancelled`, `paused` with `pause_reason`, or `incomplete` with `error_type` as planned; a closed request reports `client_disconnected: true` where the plan's `client_disconnect` is not `none` |
-| Optional | `trace_id` only when tracing is planned (never automatic); declared tool events per `event_rules`; `ai_interaction_classified` when the classifier is on; `ai_interaction_scored` when scores are planned |
+| Optional | `trace_id` only when tracing is planned (span processor in Node.js/Python, `rudderotel` in Go, or the app's own value); declared tool events per `event_rules`; `ai_interaction_classified` when the classifier is on; `ai_interaction_scored` when scores are planned |
 
 Rows for surfaces the app does not have are `n/a` in the report.

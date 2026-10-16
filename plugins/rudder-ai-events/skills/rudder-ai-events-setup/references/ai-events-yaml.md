@@ -29,12 +29,13 @@ metadata:
 
 spec:
   sdks:                              # one entry per package root that gets the SDK
-    - language: node                 # node | python | go (go: MCP servers only)
+    - language: node                 # node | python | go
       path: .                        # directory holding package.json / pyproject.toml / go.mod
       package: "@rudderstack/ai"     # or rudderstack-ai, github.com/rudderlabs/ai-sdk-go
       version: null                  # exact release that ships spec v0.3, looked up in setup step 2.3;
                                      # null until it is published (never 0.4.0, which is spec v0.2)
-      extras: []                     # Python extras, e.g. [anthropic, langchain, mcp]
+      extras: []                     # Python extras, e.g. [anthropic, langchain, mcp];
+                                     # Go integration modules, e.g. [rudderopenai, rudderotel]
       package_manager: npm           # npm | pnpm | yarn | bun | uv | poetry | pip | go
       runtime: ">=24 (package.json engines)"   # where the runtime version came from
 
@@ -93,13 +94,14 @@ spec:
           version: "7.34.0"
       integration: wrapOpenAI        # wrapOpenAI | wrapAnthropic | wrapGoogleGenAI | wrapBedrock |
                                      # rudderstackMiddleware | RudderStackCallbackHandler | trackedQuery |
-                                     # trackedRun | recordCall | instrument_litellm | (Python: snake_case names)
+                                     # trackedRun | recordCall | instrument_litellm | (Python: snake_case names) |
+                                     # Go: rudderopenai | rudderanthropic | ruddergenai | rudderbedrock | RecordCall
       unit: interaction              # interaction (one per user turn) | task (one per run)
       streaming: false
       conversation_id_source: req.body.conversationId   # expression, or "minted by the SDK"
       interaction_id_source: client  # sdk | client (browser-minted, validated) | app (an existing per-answer ID)
       flush: shutdown                # shutdown | task (aiTask flushes itself) | per-run (scripts, Lambda)
-      client_disconnect: middleware  # middleware (Node.js, Python ASGI) | bound-stream | none (Django/Flask: known limit)
+      client_disconnect: middleware  # middleware (Node.js, Python ASGI) | bound-stream | none (Django/Flask, Go: known limit)
       feedback:                      # actions that already hit a server endpoint: the server's trackAction copy
         - path: src/routes/feedback.ts
           symbol: POST /api/feedback
@@ -155,9 +157,10 @@ spec:
     background_actor: ai_system      # background runs: userId unset; see each surface's *_source fields
     open_questions: []               # must be empty before approval
 
-  tracing:                           # optional link to an existing tracing tool; never set automatically
+  tracing:                           # optional link to an existing tracing tool
     tool: none                       # none | langfuse | langsmith | opentelemetry
-    trace_id_source: null            # e.g. "langfuse.getCurrentTraceId() (src/tracing.ts)" 
+    trace_id_source: null            # e.g. "langfuse.getCurrentTraceId() (src/tracing.ts)"; opentelemetry:
+                                     # "SDK span processor" (Node.js/Python) or "rudderotel.TraceID" (Go)
 
   client_events:                     # browser, through the existing RudderStack JavaScript SDK
     sdk_path: public/app.js
@@ -209,12 +212,13 @@ spec:
         path: src/mcp/server.ts
         symbol: 'new McpServer({ name: "docs-server" })'
         name: docs-server            # sent as server_name
-        sdk: "@modelcontextprotocol/sdk"
+        sdk: "@modelcontextprotocol/sdk"   # or @modelcontextprotocol/server, mcp, github.com/modelcontextprotocol/go-sdk,
+                                     # github.com/mark3labs/mcp-go
         sdk_version: "1.31.0"        # checked against the supported range
         language: node               # node | python | go
-        integration: wrapMcpServer   # wrapMcpServer | wrap_mcp_server | WrapMCPServer
+        integration: wrapMcpServer   # wrapMcpServer | wrap_mcp_server | WrapMCPServer | ruddermcpgo.WrapServer
         transport: streamable_http   # stdio | streamable_http | sse
-        processes: several           # one | several (per-process state: known limit)
+        processes: several           # one | several (per-process state: known limit); name must be unique per distinct server
         identify:                    # from the server's auth; empty for stdio without auth (ai_system)
           auth: "requireBearerAuth (src/mcp/auth.ts)"
           user_id: "auth.extra.sub"  # the OAuth subject
@@ -256,7 +260,7 @@ spec:
   - `app`: an ID the app already mints per answer and the client already holds (a turn or message ID). Prefer it when it exists: a legacy event's per-answer ID (`messageId`, `turnId`) then maps to `interaction_id`.
   - In every case the server returns the ID it used (response field or `x-interaction-id` header), so the client always references the right answer.
 - `surfaces[].feedback[].request_changes`: `trackAction` needs `interaction_id` and `conversation_id`; when the endpoint does not receive them today, list them here so the plan states that the client request and the endpoint change.
-- `surfaces[].status`: `skipped` (user chose not to, or no browser SDK), `blocked` (runtime or library version, or an MCP SDK the wrapper does not support), `unsupported` (no SDK for the language, e.g. Go model calls).
+- `surfaces[].status`: `skipped` (user chose not to, or no browser SDK), `blocked` (runtime or library version, or an MCP SDK the wrapper does not support), `unsupported` (no SDK for the language or framework, e.g. a Rust service, or a Go agent framework with no `RecordCall` hook).
 - `surfaces[]` with `type: mcp` carry only `id`, `type`, `status`, `reason`, `feature` and `entry_points`; the rest is under `mcp.servers[]` with the same `surface_id`.
 - `mcp.servers[].request_context.intents`: drafted like chat intents, from tool names and descriptions, ending with `other`; instrumentation passes the list without `other`. The list is published in every tool's schema, so a rename changes what agents send: keep it short and free of sensitive categories.
 - `mcp.servers[].identify`: expressions over the verified token, never a token value. Without auth the server's events go out as `ai_system`.
@@ -286,4 +290,4 @@ Properties with no standard counterpart either ride on `ai_response_received` as
 
 ## Syncing later
 
-`spec.config` uses snake_case. Node.js instrumentation translates to camelCase (`capture_content` -> `captureContent`, `identity_from_cookies` -> `identityFromCookies`, `event_rules` -> `eventRules`, `tool_breakdown` -> `toolBreakdown`, `intent_summary` -> `intentSummary`, `timeout_ms` -> `timeoutMs`, `server_feedback` -> `serverFeedback`, `input_per_mtok` -> `inputPerMtok`, `tier_multipliers` -> `tierMultipliers`, `long_context` -> `longContext`, `server_tool_per_call` -> `serverToolPerCall`); Go uses the exported field names (`RequestContext`, `CapabilityRequests`). Keep values literal (no env interpolation) so a sync job can read the block as is.
+`spec.config` uses snake_case. Node.js instrumentation translates to camelCase (`capture_content` -> `captureContent`, `identity_from_cookies` -> `identityFromCookies`, `event_rules` -> `eventRules`, `tool_breakdown` -> `toolBreakdown`, `intent_summary` -> `intentSummary`, `timeout_ms` -> `timeoutMs`, `server_feedback` -> `serverFeedback`, `input_per_mtok` -> `inputPerMtok`, `tier_multipliers` -> `tierMultipliers`, `long_context` -> `longContext`, `server_tool_per_call` -> `serverToolPerCall`); Go uses `With*` options for `Configure` (`WithCaptureContent`, `WithToolBreakdown`, `WithServerFeedback`, `WithEventRules`, `WithPrices`) and exported field names for MCP (`RequestContext`, `CapabilityRequests`). Keep values literal (no env interpolation) so a sync job can read the block as is.

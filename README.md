@@ -25,7 +25,7 @@ One marketplace (`rudder-agent-skills`) bundling six plugins. Install the ones y
 | [`rudder-mcp`](plugins/rudder-mcp/) | ✅ Available | Workflows for [RudderStack's hosted MCP server](https://mcp.rudderstack.com/docs) at `mcp.rudderstack.com` |
 | [`rudder-terraform`](plugins/rudder-terraform/) | ✅ Available | Workflows for the [Terraform provider](https://github.com/rudderlabs/terraform-provider-rudderstack) |
 | [`rudder-profiles`](plugins/rudder-profiles/) | ✅ Available | Workflows for [RudderStack Profiles](https://github.com/rudderlabs/profiles-mcp): setup, project creation, analysis, updates, and debugging |
-| [`rudder-ai-events`](plugins/rudder-ai-events/) | ✅ Available | Onboard an existing app to RudderStack AI events with [`@rudderstack/ai`](https://www.npmjs.com/package/@rudderstack/ai) (Node.js), [`rudderstack-ai`](https://pypi.org/project/rudderstack-ai/) (Python) and `ai-sdk-go` (Go MCP servers): discover, plan, instrument, verify |
+| [`rudder-ai-events`](plugins/rudder-ai-events/) | ✅ Available | Onboard an existing app to RudderStack AI events with [`@rudderstack/ai`](https://www.npmjs.com/package/@rudderstack/ai) (Node.js), [`rudderstack-ai`](https://pypi.org/project/rudderstack-ai/) (Python) and `ai-sdk-go` (Go): discover, plan, instrument, verify |
 
 Most users drive RudderStack with more than one tool. Install `rudder-core` plus whichever tool plugins you use; the domain knowledge lives in `rudder-core` so it never duplicates across tool-specific plugins.
 

@@ -1,12 +1,12 @@
 ---
 name: rudder-ai-events-setup
-description: "Onboards an existing app to RudderStack AI events: discovers chat, background-agent, browser and MCP surfaces, then drafts ai-events.yaml for approval. Use when adding AI events, @rudderstack/ai or rudderstack-ai to an app, or tracking LLM or agent usage in RudderStack."
+description: "Onboards an existing app to RudderStack AI events: discovers chat, background-agent, browser and MCP surfaces, then drafts ai-events.yaml for approval. Use when adding AI events, @rudderstack/ai, rudderstack-ai or ai-sdk-go to an app, or tracking LLM or agent usage in RudderStack."
 allowed-tools: "Bash(rg *), Bash(grep *), Bash(node --version), Bash(python3 --version), Bash(uv run python --version), Bash(go version), Bash(npm view *), Bash(go list -m *), Bash(date *), Bash(git status), Read, Write, Edit, Glob, Grep"
 ---
 
 # RudderStack AI Events Setup
 
-Takes an existing app with LLM features to the standard RudderStack AI events (spec v0.3): one `ai_user_prompt_created` and one `ai_response_received` per answer, `ai_user_action` for feedback, and `mcp_*` events for MCP servers, through the app's existing RudderStack client. SDKs: `@rudderstack/ai` (Node.js 24+) and `rudderstack-ai` (Python 3.12+) for chat, background agents and MCP servers; `github.com/rudderlabs/ai-sdk-go` (Go 1.27+) for MCP servers only. Every SDK version is the release that ships spec v0.3 (0.4.0 is spec v0.2): look it up in step 2 and never invent one.
+Takes an existing app with LLM features to the standard RudderStack AI events (spec v0.3): one `ai_user_prompt_created` and one `ai_response_received` per answer, `ai_user_action` for feedback, and `mcp_*` events for MCP servers, through the app's existing RudderStack client. SDKs, each for chat, background agents and MCP servers: `@rudderstack/ai` (Node.js 24+), `rudderstack-ai` (Python 3.12+) and `github.com/rudderlabs/ai-sdk-go` (Go 1.26+, one module per provider integration). Every SDK version is the release that ships spec v0.3 (0.4.0 is spec v0.2): look it up in step 2 and never invent one.
 
 ## Workflow
 
@@ -24,11 +24,11 @@ Resuming: if `ai-events.yaml` already exists at the repo root, read it first. `s
 Change nothing. Use Glob, Grep, Read and the read-only commands allowed above; do not run the app, install packages or read `.env` files. Patterns for every check: `references/discovery.md`.
 
 0. **Start the clock.** Record the current time (`date -u +%Y-%m-%dT%H:%MZ`) as `metadata.time_to_integrate.started_at` when you first write the plan; keep an existing value on resume.
-1. **Runtimes and libraries.** Node.js, Python and Go versions in use; every LLM, agent and MCP library with its resolved version, checked against the supported ranges. A runtime below Node.js 24 / Python 3.12 / Go 1.27, or a library outside its range, blocks that surface: record it, do not upgrade anything.
+1. **Runtimes and libraries.** Node.js, Python and Go versions in use; every LLM, agent and MCP library with its resolved version, checked against the supported ranges. A runtime below Node.js 24 / Python 3.12 / Go 1.26, or a library outside its range, blocks that surface: record it, do not upgrade anything.
 2. **Surfaces.** Trace each LLM call site to its entry point and classify it: `chat` (a person waits for the answer: HTTP, SSE, WebSocket routes), `background` (cron, queue, webhook, Lambda, CLI script, Slack bot, a run started by an MCP Events update), `client` (browser chat UI on the existing RudderStack JavaScript SDK), `mcp` (each MCP server the repo serves, with its SDK, transport, auth, tools, resources and prompts). Note the channel each chat surface serves (`surface`: web, mobile, Slack, ...), attachments, streaming routes, thread pools, tool loops, and per-item fan-out in jobs.
 3. **RudderStack.** The server client (`@rudderstack/rudder-sdk-node`, `rudder-sdk-python`) and where it is created, the env var NAMES it reads, and the browser SDK (v3 `rudderanalytics`) and whether it calls `identify()`.
 4. **Existing AI events and feedback.** Hand-built `track()` calls about chats, prompts, answers, tokens or feedback, with their properties; feedback/copy/retry handlers and whether their requests carry the answer's ID and the conversation ID.
-5. **Tracing (optional).** Only if the app already uses Langfuse, LangSmith, OpenTelemetry or similar: how the current trace ID is read. Spec v0.3 never sets `trace_id` on its own; it is a link the app passes in, not a requirement.
+5. **Tracing (optional).** Only if the app already uses Langfuse, LangSmith, OpenTelemetry or similar: how the current trace ID is read. With OpenTelemetry, Node.js and Python fill `trace_id` from the first span inside the interaction once the SDK's span processor is registered; Go needs `WithTraceIDFrom(rudderotel.TraceID)`; other tools pass it in. A value the app passes always wins. It is a link, not a requirement.
 6. **Identity.** Where the server gets the user ID, tenant/account ID, and whether browser cookies (`rl_anonymous_id`, `rl_session`) reach the chat routes.
 7. **Intent inputs.** System prompts, tool names and descriptions, route names, in-repo docs.
 
@@ -38,7 +38,7 @@ Show the user a short table: surface, entry point, library and version, proposed
 
 1. **Draft `ai-events.yaml`** at the repo root with `metadata.status: draft`, following `references/ai-events-yaml.md` exactly. One `surfaces` entry per surface found, including skipped, blocked and MCP ones; reference code by `path` plus `symbol`.
 2. **Defaults.** `capture_content: false`. Classifier off unless the user asks (it calls their own model with their own key). `event_rules` only for tools whose call is itself a product action (ticket created, memory saved). `prices: []` unless the user gives rates. `identity_from_cookies: false` when there is no browser. Scores off unless the app already computes them. MCP servers: `request_context` on with the server's intents, capability requests and MCP Events off. Tracing: `none` unless step 1.5 found a tool the user wants linked.
-3. **SDK versions.** Look up the release that ships spec v0.3 for each language (`npm view @rudderstack/ai version`, PyPI `rudderstack-ai`, `go list -m -versions github.com/rudderlabs/ai-sdk-go`) and confirm it ships the v0.3 schema (its npm tarball has `spec/ai-events-v0.3.schema.json`; see `rudder-ai-events-verify`, "Schemas"). Write the exact version into `sdks[].version`. If none is out yet, write `null`, tell the user the plan cannot be instrumented until it is, and never fall back to 0.4.0.
+3. **SDK versions.** Look up the release that ships spec v0.3 for each language (`npm view @rudderstack/ai version`, PyPI `rudderstack-ai`, `go list -m -versions github.com/rudderlabs/ai-sdk-go`; Go provider modules such as `.../rudderopenai` share its version) and confirm it ships the v0.3 schema (its npm tarball has `spec/ai-events-v0.3.schema.json`; see `rudder-ai-events-verify`, "Schemas"). Write the exact version into `sdks[].version`. If none is out yet, write `null`, tell the user the plan cannot be instrumented until it is, and never fall back to 0.4.0.
 4. **Intents.** For chat surfaces, draft 3 to 10 snake_case intents from step 1.7, never from production data, logs or transcripts, and always end the list with `other`. Background-only apps with the classifier off: `[other]`. Outcomes: the SDK default `resolved, partial, unresolved, escalated, unclear`. MCP servers get their own list (`mcp.servers[].request_context.intents`) from tool names and descriptions; it is published in every tool's schema, so keep sensitive categories out. Intent lists are fixed in code: tell the user they need a manual review now and after launch (see Known limits).
 5. **Ask, do not guess.** Ask one question at a time, only about what applies, and write each answer into the draft:
    - Identity: the user ID when there are several candidates; the account/tenant ID; whether to rely on cookie identity alone where a route has no authenticated user; a browser that never calls `identify()`.
@@ -57,16 +57,16 @@ Show the user a short table: surface, entry point, library and version, proposed
 
 Files the instrumentation typically touches:
 
-| Change | Node.js | Python | Go (MCP only) |
+| Change | Node.js | Python | Go |
 |---|---|---|---|
 | Install | `package.json`, lockfile | `pyproject.toml` or `requirements*.txt`, lockfile | `go.mod`, `go.sum` |
-| `configure()` | the module that creates the RudderStack client | the same, or app startup (lifespan, `AppConfig.ready`) | |
-| Wrapper / integration | where the model client or agent is constructed | the same | |
-| MCP server | where the server is built: `wrapMcpServer` | the same: `wrap_mcp_server` | the same: `WrapMCPServer` |
-| Identity middleware | the app/server setup file | ASGI app, Django settings, Flask factory | |
-| Interaction or task | each chat route / job entry point | the same | |
-| Feedback | each feedback endpoint, and the client request that calls it | the same | |
-| Flush | the shutdown hook, or the end of a script/handler | the same | `client.Close()` at shutdown |
+| `configure()` | the module that creates the RudderStack client | the same, or app startup (lifespan, `AppConfig.ready`) | `rudderstackai.Configure` where the analytics-go client is built |
+| Wrapper / integration | where the model client or agent is constructed | the same | the same: `rudderopenai.WithTracking()`, ... |
+| MCP server | where the server is built: `wrapMcpServer` | the same: `wrap_mcp_server` | the same: `WrapMCPServer` / `ruddermcpgo.WrapServer` |
+| Identity middleware | the app/server setup file | ASGI app, Django settings, Flask factory | `WithValues` in each handler |
+| Interaction or task | each chat route / job entry point | the same | the same: `RunInteraction` / `RunTask` |
+| Feedback | each feedback endpoint, and the client request that calls it | the same | the same: `TrackAction` |
+| Flush | the shutdown hook, or the end of a script/handler | the same | `rudderstackai.Flush(0)`, then `client.Close()` |
 | Browser | the page script that renders the chat and its buttons | | |
 
 ## Steps 3 and 4
@@ -92,11 +92,13 @@ Tell the user the ones that apply before approval; record them in `known_limits`
 
 - **Intent lists are fixed in code.** Intents and outcomes (and MCP `request_context` intents) are a static list set in `configure()` / `wrapMcpServer`, not learned from traffic. They need a manual review before launch and again once `other` grows; changes need a deploy, and past answers are never relabelled.
 - **Client disconnect.** `client_disconnected` is detected under the Node.js middleware, Python ASGI middleware (FastAPI, Starlette) and bound streams. Django and Flask (WSGI) cannot see a disconnect, so a server answer without a client copy stays ambiguous there.
-- **MCP SDKs.** Node.js: `@modelcontextprotocol/sdk` 1.x (`>=1.31.0`) only; it negotiates up to protocol 2025-11-25, and its Streamable HTTP transport rejects 2026-07-28 requests before the wrapper sees them; the 2.x `@modelcontextprotocol/server` packages are not supported yet. Python: `mcp` v2 only (no `mcp` 1.x, no standalone `fastmcp`). Go: the official go-sdk v1.8 only (no `mcp-go`).
-- **MCP state is per process.** Client-seen windows, call counters, retry hashes and pending elicitations live in memory: several processes each report a client once per window, counters reset on restart, and a 2026-07-28 elicitation retry served by another process loses `request_id` and `duration_ms`.
+- **MCP SDKs and protocol 2026-07-28.** Supported: Node.js `@modelcontextprotocol/sdk` 1.x (`>=1.31.0`) and `@modelcontextprotocol/server` 2.x; Python `mcp` 1.x (`>=1.30.0`: `FastMCP`, low-level `Server`) and 2.x (`MCPServer`, low-level `Server`); Go the official go-sdk v1.8 and `mark3labs/mcp-go` v0.55.1 to v1.1.1. The stateless 2026-07-28 revision is tracked only on Node.js 2.x, Python 2.x, go-sdk v1.8 and mcp-go v1.x; the others serve up to 2025-11-25. The standalone `fastmcp` package is not supported.
+- **MCP state is per server name, per process.** Client-seen windows, call counters, retry hashes and pending elicitations live in memory, keyed by server name: distinct servers need distinct names, servers rebuilt per request under one name share it, each replica reports a client once per window, counters reset on restart, and a 2026-07-28 elicitation retry served by another process loses `request_id` and `duration_ms`.
 - **MCP clients are not tracked.** Only servers send `mcp_*`. An agent's outbound MCP calls are joined by `interaction_id` only from integrations that can set `_meta` (OpenAI Agents SDK); hosted MCP tools (Anthropic `mcp_servers`, OpenAI Responses `mcp`, Claude Agent SDK) cannot.
-- **No chat SDK for Go.** Go apps that call models directly stay `unsupported`.
-- **`trace_id` is opt-in.** Spec v0.3 never sets it automatically; without a tracing source it is absent.
+- **Go integrations.** OpenAI, Anthropic, Google Gen AI and Bedrock clients plus `RecordCall`; no LangChain, agent-framework or Vercel AI SDK integrations, no HTTP middleware (identity through `WithValues`), no disconnect detection, retries recorded per attempt, and streams must be read inside the interaction.
+- **`trace_id` needs a source.** Node.js and Python fill it only with the SDK's OpenTelemetry span processor registered, Go only with `WithTraceIDFrom(rudderotel.TraceID)`; otherwise the app passes it, or it is absent.
+- **Large events are trimmed.** Event properties are capped at 30,000 bytes: captured text goes first, then `tool_breakdown` / `usage_breakdown` entries.
+- **Masking catches fixed shapes only.** Captured text is masked (emails, phones, cards, IPs, US SSNs, IBANs, keys, tokens, PEM keys, passwords); names and postal addresses are not caught.
 
 ## Credential Security
 

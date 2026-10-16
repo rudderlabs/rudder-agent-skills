@@ -82,7 +82,7 @@
     {
       "name": "rudder-ai-events",
       "source": "plugins/rudder-ai-events",
-      "description": "Onboard an existing app to RudderStack AI events (spec v0.3) with the @rudderstack/ai (Node.js), rudderstack-ai (Python) and ai-sdk-go (Go, MCP servers) SDKs: discover AI surfaces, plan ai-events.yaml, instrument, and verify.",
+      "description": "Onboard an existing app to RudderStack AI events (spec v0.3) with the @rudderstack/ai (Node.js), rudderstack-ai (Python) and ai-sdk-go (Go) SDKs: discover AI surfaces, plan ai-events.yaml, instrument, and verify.",
       "author": {
         "name": "RudderStack"
       },
