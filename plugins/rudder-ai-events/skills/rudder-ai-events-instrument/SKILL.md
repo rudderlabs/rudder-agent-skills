@@ -1,5 +1,5 @@
 ---
-name: rudder-ai-instrument
+name: rudder-ai-events-instrument
 description: "Adds RudderStack AI events code from an approved ai-events.yaml: installs @rudderstack/ai or rudderstack-ai, wraps model clients, opens interactions and tasks, wires feedback and browser events. Use when implementing or changing AI event tracking in an app."
 allowed-tools: "Bash(npm *), Bash(npx *), Bash(pnpm *), Bash(yarn *), Bash(bun *), Bash(node *), Bash(uv *), Bash(poetry *), Bash(pip *), Bash(python *), Bash(python3 *), Bash(pytest *), Bash(git status), Bash(git diff *), Read, Write, Edit, Glob, Grep"
 ---
@@ -10,7 +10,7 @@ Turns the approved plan into the smallest reviewable diff. Recipes with exact co
 
 ## Preconditions
 
-1. `ai-events.yaml` exists at the repo root with `metadata.status: approved`. Missing or `draft`: stop and run `rudder-ai-setup`; never instrument from an unapproved plan.
+1. `ai-events.yaml` exists at the repo root with `metadata.status: approved`. Missing or `draft`: stop and run `rudder-ai-events-setup`; never instrument from an unapproved plan.
 2. Every surface you are about to change has `status: instrument`. Skip the rest (`skipped`, `blocked`, `unsupported`, MCP `discovered-only`).
 3. Apart from `ai-events.yaml`, the working tree is clean, or the user agreed to mix changes. Work on a branch if the user uses them.
 
@@ -42,7 +42,7 @@ Do one surface at a time; after each, run the app's type check or tests if it ha
 - Minimal diffs: touch only the files the plan lists plus manifests and lockfiles; match the file's style; no refactors.
 - One integration per call path; one interaction per user turn; one task per background run.
 - Tracking must never break a request: no new `await` on delivery in request paths, no new error paths. The SDKs never throw into app code.
-- Do not invent identity: use only the sources recorded in `identity`. If code disagrees with the plan, stop, update the plan to `draft`, and go back to `rudder-ai-setup` for approval.
+- Do not invent identity: use only the sources recorded in `identity`. If code disagrees with the plan, stop, update the plan to `draft`, and go back to `rudder-ai-events-setup` for approval.
 - Keep existing analytics calls and their payloads unchanged.
 - MCP servers: no changes; MCP instrumentation comes later.
 
@@ -52,7 +52,7 @@ Do one surface at a time; after each, run the app's type check or tests if it ha
 - The diff contains, per surface, only: install, configure, wrap/integration, interaction or task, feedback, flush, client helper and handlers, legacy flag.
 - The final message to the user lists the environment variable names to set per environment (write key, data plane URL, legacy flag), never their values, ready to paste into a PR description.
 
-Then run `rudder-ai-verify`.
+Then run `rudder-ai-events-verify`.
 
 ## Credential Security
 

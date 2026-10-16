@@ -11,7 +11,7 @@ The AI events schema ships inside the npm package (the Python wheel does not inc
 | Node.js, after install | copy `node_modules/@rudderstack/ai/spec/ai-events-v0.2.schema.json` |
 | Any (no Node.js needed; one download from the npm registry) | `curl -sSLo ai-0.4.0.tgz https://registry.npmjs.org/@rudderstack/ai/-/ai-0.4.0.tgz`, then `tar -xzf ai-0.4.0.tgz package/spec/ai-events-v0.2.schema.json` |
 
-Client events: copy the JSON block under "Schema" in the `rudder-ai-instrument` skill's `references/client-events.md` into `ai-client-events.schema.json`.
+Client events: copy the JSON block under "Schema" in the `rudder-ai-events-instrument` skill's `references/client-events.md` into `ai-client-events.schema.json`.
 
 ## 2. Capture events
 

@@ -80,8 +80,8 @@
       "tags": ["rudderstack", "profiles"]
     },
     {
-      "name": "rudder-ai",
-      "source": "plugins/rudder-ai",
+      "name": "rudder-ai-events",
+      "source": "plugins/rudder-ai-events",
       "description": "Onboard an existing app to RudderStack AI events with the @rudderstack/ai (Node.js) and rudderstack-ai (Python) SDKs: discover AI surfaces, plan ai-events.yaml, instrument, and verify.",
       "author": {
         "name": "RudderStack"

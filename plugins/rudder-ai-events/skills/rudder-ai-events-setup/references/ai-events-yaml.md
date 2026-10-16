@@ -1,6 +1,6 @@
 # ai-events.yaml
 
-The plan the setup writes at the repository root and the user commits. `rudder-ai-instrument` implements only what it says, and `rudder-ai-verify` checks against it.
+The plan the setup writes at the repository root and the user commits. `rudder-ai-events-instrument` implements only what it says, and `rudder-ai-events-verify` checks against it.
 
 Two halves:
 
@@ -195,7 +195,7 @@ spec:
 - `surfaces[].feedback[].request_changes`: `trackAction` needs `interaction_id` and `conversation_id`; when the endpoint does not receive them today, list them here so the plan states that the client request and the endpoint change.
 - `surfaces[].status`: `skipped` (user chose not to, or no browser SDK), `blocked` (runtime or library version), `unsupported` (no SDK for the language), `discovered-only` (MCP).
 - Background `child_tasks`: one entry per nested step that should report its own usage. The parent task then reports only calls made outside the children (often none: an envelope with zero tokens); per-run totals come from summing the tree by `parent_interaction_id`. Children default to `trigger_source: agent`; set it in the child only when the user wants otherwise.
-- `client_events.events[].event`: only names from the client-event schema in the `rudder-ai-instrument` skill (`references/client-events.md`). Browser-sent actions live here; server-sent ones under `surfaces[].feedback`.
+- `client_events.events[].event`: only names from the client-event schema in the `rudder-ai-events-instrument` skill (`references/client-events.md`). Browser-sent actions live here; server-sent ones under `surfaces[].feedback`.
 - Client copies: with a `client` surface to instrument, the browser sends its own `ai_user_prompt_created` and `ai_response_received` (`source: client`) alongside the server's, and feedback goes from both sides: the server endpoint under `surfaces[].feedback` and the browser handler under `client_events.events`. They measure the client/server gap per `interaction_id` and are never sampled. Either side opts out only when the user asks: record it in `client_events.opt_out` and drop that side's entry. Feedback with no server endpoint is browser-only; do not add an endpoint for it. Click-through (`clicked_through`) is browser-only.
 - `legacy_events[].migration`: the old event keeps sending behind a flag that defaults on until `remove_after`, so dashboards and destinations can move first. Removing it is a separate, later change.
 

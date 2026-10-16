@@ -1,5 +1,5 @@
 ---
-name: rudder-ai-setup
+name: rudder-ai-events-setup
 description: "Onboards an existing app to RudderStack AI events: discovers chat, background-agent, browser and MCP surfaces, then drafts ai-events.yaml for approval. Use when adding AI events, @rudderstack/ai or rudderstack-ai to an app, or tracking LLM or agent usage in RudderStack."
 allowed-tools: "Bash(rg *), Bash(grep *), Bash(node --version), Bash(python3 --version), Bash(uv run python --version), Bash(git status), Read, Write, Edit, Glob, Grep"
 ---
@@ -14,8 +14,8 @@ Takes an existing app with LLM features to the standard RudderStack AI events (s
 |---|---|---|
 | 1. Discover | Find every AI surface, read-only | this skill |
 | 2. Plan | Write `ai-events.yaml`, ask, then **stop for approval** | this skill |
-| 3. Instrument | Minimal code changes from the approved plan | `rudder-ai-instrument` |
-| 4. Verify | Capture events locally, validate against the spec | `rudder-ai-verify` |
+| 3. Instrument | Minimal code changes from the approved plan | `rudder-ai-events-instrument` |
+| 4. Verify | Capture events locally, validate against the spec | `rudder-ai-events-verify` |
 
 Resuming: if `ai-events.yaml` already exists at the repo root, read it first. `status: approved` goes straight to step 3; `status: draft` re-presents the plan (step 2.5).
 
@@ -66,7 +66,7 @@ Files the instrumentation typically touches:
 
 ## Steps 3 and 4
 
-Hand off to `rudder-ai-instrument` with the approved plan, then to `rudder-ai-verify`. If either finds that something to instrument differs from the plan (a surface is unsupported, identity differs, a new endpoint change is needed), update `ai-events.yaml`, set it back to `draft` and return to step 2.5. Refreshing `path` / `symbol` references after code moves needs no re-approval.
+Hand off to `rudder-ai-events-instrument` with the approved plan, then to `rudder-ai-events-verify`. If either finds that something to instrument differs from the plan (a surface is unsupported, identity differs, a new endpoint change is needed), update `ai-events.yaml`, set it back to `draft` and return to step 2.5. Refreshing `path` / `symbol` references after code moves needs no re-approval.
 
 ## Rules
 

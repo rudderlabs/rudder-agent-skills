@@ -1,5 +1,5 @@
 {
-  "name": "rudder-ai",
+  "name": "rudder-ai-events",
   "description": "Onboard an existing app to RudderStack AI events with the @rudderstack/ai (Node.js) and rudderstack-ai (Python) SDKs: discover AI surfaces, plan ai-events.yaml, instrument chat, background agents and browser clients, and verify the events.",
   "version": "0.0.1",
   "author": {
