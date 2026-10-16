@@ -82,7 +82,7 @@
     {
       "name": "rudder-ai-events",
       "source": "./plugins/rudder-ai-events",
-      "description": "Onboard an existing app to RudderStack AI events with the @rudderstack/ai (Node.js) and rudderstack-ai (Python) SDKs: discover AI surfaces, plan ai-events.yaml, instrument, and verify.",
+      "description": "Onboard an existing app to RudderStack AI events (spec v0.3) with the @rudderstack/ai (Node.js), rudderstack-ai (Python) and ai-sdk-go (Go, MCP servers) SDKs: discover AI surfaces, plan ai-events.yaml, instrument, and verify.",
       "author": {
         "name": "RudderStack"
       },
@@ -90,7 +90,7 @@
       "repository": "https://github.com/rudderlabs/rudder-agent-skills",
       "license": "MIT",
       "category": "devtools",
-      "keywords": ["rudderstack", "ai-events", "llm", "agents", "instrumentation", "product-analytics"],
+      "keywords": ["rudderstack", "ai-events", "llm", "agents", "mcp", "instrumentation", "product-analytics"],
       "tags": ["rudderstack", "ai"]
     }
   ]

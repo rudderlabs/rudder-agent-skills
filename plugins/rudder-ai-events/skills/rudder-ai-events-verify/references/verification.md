@@ -4,12 +4,14 @@ Everything here runs locally, without provider keys and without sending anything
 
 ## 1. Schemas
 
-The AI events schema ships inside the npm package (the Python wheel does not include it). Read it as a file; it is not an importable export.
+The AI events schema ships inside the npm package (the Python wheel and the Go module do not include it). Read it as a file; it is not an importable export. It covers the chat, background and `mcp_*` events and the client copies' fields.
 
-| App | Get `ai-events-v0.2.schema.json` |
+`<VERSION>` is the `@rudderstack/ai` release that ships spec v0.3, the same one the plan pins for Node.js (any language's app can use it here). 0.4.0 ships `ai-events-v0.2.schema.json` only; a missing v0.3 file means that version is too old.
+
+| App | Get `ai-events-v0.3.schema.json` |
 |---|---|
-| Node.js, after install | copy `node_modules/@rudderstack/ai/spec/ai-events-v0.2.schema.json` |
-| Any (no Node.js needed; one download from the npm registry) | `curl -sSLo ai-0.4.0.tgz https://registry.npmjs.org/@rudderstack/ai/-/ai-0.4.0.tgz`, then `tar -xzf ai-0.4.0.tgz package/spec/ai-events-v0.2.schema.json` |
+| Node.js, after install | copy `node_modules/@rudderstack/ai/spec/ai-events-v0.3.schema.json` |
+| Any (no Node.js needed; one download from the npm registry) | `curl -sSLo ai.tgz https://registry.npmjs.org/@rudderstack/ai/-/ai-<VERSION>.tgz`, then `tar -xzf ai.tgz package/spec/ai-events-v0.3.schema.json` |
 
 Client events: copy the JSON block under "Schema" in the `rudder-ai-events-instrument` skill's `references/client-events.md` into `ai-client-events.schema.json`.
 
@@ -23,7 +25,7 @@ Choose one and record it in the report:
 | No tests, or a script/cron job, or routes that are hard to call in-process | B |
 | A RudderStack development source and permission to use it | C, after A or B passes |
 
-What to drive, per planned surface: chat: one turn (and a second turn in the same conversation), one feedback action, and with `interaction_id_source: client` one turn with an invalid `x-interaction-id`; background: one full run; client: the planned browser events, including the client copies of a turn and its feedback; event rules: one turn that calls each ruled tool. Skip what the app does not have.
+What to drive, per planned surface: chat: one turn (and a second turn in the same conversation), one feedback action, and with `interaction_id_source: client` one turn with an invalid `x-interaction-id`; background: one full run; client: the planned browser events, including the client copies of a turn and its feedback; event rules: one turn that calls each ruled tool; scores: one `trackScore` / `track_score` or an evaluator run; MCP servers: section D. Skip what the app does not have.
 
 ### A. Stub client
 
@@ -160,6 +162,29 @@ To exercise an OpenAI event rule, send a prompt containing `call:<tool name>` (f
 
 Point the app at a development source, trigger the same requests, and inspect them in the source's Live Events view, or through the RudderStack MCP server (`rudder-mcp-workflow`). Use a dev workspace or source, never production.
 
+### D. MCP servers
+
+Capture with A (pass the stub as `analytics` to `wrapMcpServer` / `wrap_mcp_server`) or B (the server's real RudderStack client pointed at the mock; Go's `analytics-go` posts gzip batches to `/v1/batch` like the others). Then drive the server with an MCP client from the SDK the repo already has, in the scratch directory:
+
+```ts
+// Node.js, @modelcontextprotocol/sdk client; stdio shown, StreamableHTTPClientTransport for HTTP servers
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+
+const client = new Client({ name: 'ai-events-verify', version: '0.0.0' });
+await client.connect(new StdioClientTransport({ command: 'node', args: ['<repo>/dist/mcp/server.js'], env: { ...process.env } }));
+const { tools } = await client.listTools(); // request_context must appear in each tool's input schema
+await client.callTool({
+  name: tools[0].name,
+  arguments: { /* valid arguments */ request_context: { intent: 'other', user_sentiment: 'neutral' } },
+  _meta: { 'com.rudderstack/interaction_id': '3b9e5d0a-7c2f-4e18-9a6b-2c4d6e8f0a1b' }, // joins a captured answer
+});
+await client.callTool({ name: tools[0].name, arguments: {} }); // invalid arguments: error, invalid_arguments names only
+await client.close();
+```
+
+Python servers: the same with `mcp.ClientSession` over `stdio_client` / `streamablehttp_client`, passing `meta=` on `call_tool`. Go servers: either client against the built binary or the HTTP endpoint. Drive: one `tools/list`, one valid call per planned declared tool event, one invalid call, a second client name if the plan expects several, and (when planned) a `request_capability` call, a resource read, a prompt get and an elicitation. Stop the server so it flushes. The 2026-07-28 protocol needs a client that speaks it; with Node.js `@modelcontextprotocol/sdk` 1.x on either side, only the handshake revisions (2025-06-18 era) can be checked (setup skill, Known limits).
+
 ### Browser events
 
 Record what the page sends by replacing the SDK with a recorder before the page script runs (a browser test, or Node.js with stubbed `window`/`document` globals importing the page script):
@@ -178,7 +203,7 @@ In Node.js the page's `fetch` sends no browser cookies: either stub `fetch` (the
 Save as `check_events.py`; run it in a throwaway virtualenv that has `jsonschema==4.26.0`:
 
 ```python
-"""Check captured AI events: spec schema, client schema, joins, counts, identity, background fields and content."""
+"""Check captured AI events: spec schema, client schema, joins, counts, identity, background, MCP and content."""
 import argparse
 import collections
 import json
@@ -187,21 +212,29 @@ import sys
 from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
 
-SPEC_EVENTS = {"ai_user_prompt_created", "ai_response_received", "ai_user_action",
-               "ai_interaction_classified", "ai_llm_response_received"}
+SPEC_VERSION = "0.3.0"
+SPEC_EVENTS = {"ai_user_prompt_created", "ai_response_received", "ai_user_action", "ai_interaction_classified",
+               "ai_interaction_scored", "ai_llm_response_received"}
+CLIENT_COPIES = {"ai_user_prompt_created", "ai_response_received", "ai_user_action"}
 CLIENT_ONLY = {"ai_assistant_opened", "ai_assistant_closed", "ai_conversation_started",
                "ai_conversation_switched", "ai_conversation_renamed", "ai_conversation_deleted"}
-CONTENT = {"prompt_text", "response_text", "intent_summary"}
+MCP_EVENTS = {"mcp_client_seen", "mcp_tool_called", "mcp_elicitation_completed", "mcp_capability_requested",
+              "mcp_resource_read", "mcp_prompt_used", "mcp_event_subscription_changed", "mcp_event_delivered"}
+CONTENT = {"prompt_text", "response_text", "intent_summary", "explanation", "call_reason", "capability_detail"}
+RAW_MCP = {"arguments", "args", "params", "result", "results", "content", "structuredContent", "uri", "request"}
 
 p = argparse.ArgumentParser()
 p.add_argument("events")
-p.add_argument("--spec", required=True)
+p.add_argument("--spec", required=True, help="ai-events-v0.3.schema.json")
 p.add_argument("--client-schema")
 p.add_argument("--capture-content", action="store_true", help="the plan sets capture_content: true")
 p.add_argument("--expect-legacy", action="append", default=[], help="legacy event that must still be sent")
 p.add_argument("--feature", action="append", default=[], help="allowed feature values (the plan's surfaces)")
+p.add_argument("--surface", action="append", default=[], help="allowed surface values (the plan's surfaces)")
 p.add_argument("--user-id", help="userId expected on user-triggered server events that carry one")
 p.add_argument("--expect-session", action="store_true", help="user-triggered server events carry context.sessionId")
+p.add_argument("--mcp-server", action="append", default=[], help="allowed server_name values (the plan's MCP servers)")
+p.add_argument("--mcp-intent", action="append", default=[], help="allowed request_context intents (other is implied)")
 args = p.parse_args()
 
 spec = json.load(open(args.spec))
@@ -221,17 +254,20 @@ tracks = [m for m in messages if m.get("type", "track") == "track" and m.get("ev
 by_interaction = collections.defaultdict(collections.Counter)
 conversations = collections.defaultdict(set)
 names = collections.Counter(m["event"] for m in tracks)
-runs = []
+clients_seen = collections.Counter()
+runs, tool_calls = [], []
 
 for i, m in enumerate(tracks):
     name, props = m["event"], m.get("properties") or {}
     user = m.get("userId") or m.get("user_id")
     anon = m.get("anonymousId") or m.get("anonymous_id")
     context = m.get("context") or {}
+    w = context.get("wrapperLibrary") or {}
     is_client = props.get("source") == "client"
-    is_declared = not name.startswith("ai_") and "tool_status" in props
+    is_mcp = name in MCP_EVENTS or w.get("integration") == "mcp"
+    is_declared = not name.startswith(("ai_", "mcp_")) and "tool_status" in props
     where = f"#{i} {name}"
-    if not (name.startswith("ai_") or is_declared):
+    if not (name.startswith(("ai_", "mcp_")) or is_declared):
         continue  # not an AI event (legacy or other analytics)
     if not user and not anon and not is_client:
         problems.append(f"{where}: no userId or anonymousId")
@@ -240,20 +276,23 @@ for i, m in enumerate(tracks):
     if is_client and client:
         problems += [f"{where} (client schema): {e.message}" for e in validator(client, name).iter_errors(props)] \
             if name in client["$defs"] else [f"{where}: not a client event name"]
-    if (name in SPEC_EVENTS and not is_client) or is_declared:  # client copies: client schema only
-        problems += [f"{where} (spec): {e.message}" for e in
-                     validator(spec, "declared_tool_event" if is_declared else name).iter_errors(props)]
-        w = context.get("wrapperLibrary") or {}
-        if w.get("specVersion") != "0.2.0":
+    definition = ("mcp_declared_tool_event" if is_mcp else "declared_tool_event") if is_declared else name
+    if name in SPEC_EVENTS | MCP_EVENTS or is_declared:  # client copies: spec and client schema
+        if is_client and name not in CLIENT_COPIES:
+            problems.append(f"{where}: source: client on an event the browser never sends")
+        problems += [f"{where} (spec): {e.message}" for e in validator(spec, definition).iter_errors(props)]
+        if not is_client and w.get("specVersion") != SPEC_VERSION:
             problems.append(f"{where}: context.wrapperLibrary.specVersion is {w.get('specVersion')!r}")
-    # trackAction takes no feature, so server ai_user_action has none
-    if args.feature and not (name == "ai_user_action" and not is_client) and props.get("feature") not in args.feature:
+    # trackAction takes no feature, so server ai_user_action has none; MCP events have none either
+    if args.feature and not is_mcp and (is_client or name != "ai_user_action") and props.get("feature") not in args.feature:
         problems.append(f"{where}: feature {props.get('feature')!r} not in {args.feature}")
+    system = props.get("trigger") == "system"
+    if args.surface and not system and (is_client or name in CLIENT_COPIES) and props.get("surface") not in args.surface:
+        problems.append(f"{where}: surface {props.get('surface')!r} not in {args.surface}")
     if not args.capture_content:
         leaked = CONTENT & props.keys() | ({"feedback_text"} & (props.get("action_details") or {}).keys())
         if leaked:
             problems.append(f"{where}: content sent with capture off: {sorted(leaked)}")
-    system = props.get("trigger") == "system"
     if system and user:
         problems.append(f"{where}: system-triggered event carries userId {user!r}")
     if not system and not is_client and name in {"ai_user_prompt_created", "ai_response_received"}:
@@ -265,6 +304,21 @@ for i, m in enumerate(tracks):
         if not props.get("task_name"):
             notes.append(f"{where}: system answer without task_name (a call outside any interaction or task?)")
         runs.append(props)
+    if is_mcp:
+        leaked = RAW_MCP & props.keys()
+        if leaked:
+            problems.append(f"{where}: raw MCP payload keys {sorted(leaked)}")
+        if args.mcp_server and props.get("server_name") not in args.mcp_server:
+            problems.append(f"{where}: server_name {props.get('server_name')!r} not in {args.mcp_server}")
+        if "request_context" in (props.get("argument_keys") or []):
+            problems.append(f"{where}: request_context reached the tool (argument_keys)")
+        if args.mcp_intent and "intent" in props and props["intent"] not in args.mcp_intent + ["other"]:
+            problems.append(f"{where}: intent {props['intent']!r} not in the server's list")
+        if name == "mcp_client_seen":
+            clients_seen[(props.get("server_name"), props.get("client_name"), props.get("oauth_client_id"), user)] += 1
+        if name == "mcp_tool_called":
+            tool_calls.append(props)
+        continue  # MCP interaction_id joins the calling answer; it is not an answer of its own
     iid = props.get("interaction_id")
     if iid:
         by_interaction[iid][(name, "client" if is_client else "server")] += 1
@@ -282,14 +336,15 @@ for iid, c in by_interaction.items():
             problems.append(f"interaction {iid}: {c[('ai_user_prompt_created', side)]} {side} ai_user_prompt_created (expected at most 1)")
     if c[("ai_user_prompt_created", "server")] and not c[("ai_response_received", "server")]:
         problems.append(f"interaction {iid}: server prompt without a server ai_response_received")
-    if has_client_copies:  # gaps: expected only where the harness skipped a side, else a lost event
+    if has_client_copies and iid not in {r.get("interaction_id") for r in runs}:  # gaps: expected only where the harness skipped a side, else a lost event
         if c[("ai_user_prompt_created", "client")] and not c[("ai_user_prompt_created", "server")]:
             notes.append(f"interaction {iid}: client prompt with no server prompt (request never reached the SDK)")
         if c[("ai_response_received", "server")] and not c[("ai_response_received", "client")]:
-            notes.append(f"interaction {iid}: server answer with no client copy (not shown, or client event lost)")
+            notes.append(f"interaction {iid}: server answer with no client copy (not shown, client left, or client event lost)")
     responses = c[("ai_response_received", "server")] + c[("ai_response_received", "client")]
-    if (c[("ai_user_action", "server")] or c[("ai_user_action", "client")]) and not responses:
-        notes.append(f"interaction {iid}: ai_user_action for an answer not in this capture")
+    for event in ("ai_user_action", "ai_interaction_scored"):
+        if (c[(event, "server")] or c[(event, "client")]) and not responses:
+            notes.append(f"interaction {iid}: {event} for an answer not in this capture")
     if len(conversations[iid]) > 1:
         problems.append(f"interaction {iid}: several conversation_id values {sorted(conversations[iid])}")
 
@@ -297,8 +352,16 @@ for r in runs:
     parent = r.get("parent_interaction_id")
     if parent and parent not in by_interaction:
         notes.append(f"task {r.get('task_name')}: parent_interaction_id {parent} not in this capture")
-    print("run:", {k: r.get(k) for k in ("task_name", "trigger_source", "conversation_id", "account_id",
+    print("run:", {k: r.get(k) for k in ("task_name", "trigger_source", "trigger_event_id", "conversation_id", "account_id",
                                           "on_behalf_of", "parent_interaction_id", "llm_call_count", "total_tokens")})
+
+for key, count in clients_seen.items():
+    if count > 1:
+        notes.append(f"mcp_client_seen {key}: {count} times in one window (several processes, or a restart?)")
+for t in tool_calls:
+    joined = t.get("interaction_id") in by_interaction
+    print("mcp call:", {k: t.get(k) for k in ("server_name", "client_name", "protocol_version", "tool_name", "tool_status",
+                                               "error_type", "intent", "user_sentiment")}, "joined" if joined else "")
 
 for legacy in args.expect_legacy:
     if not names[legacy]:
@@ -318,17 +381,18 @@ sys.exit(1 if problems else 0)
 <python3.10+> -m venv $TMPDIR/ai-events-verify/.venv
 $TMPDIR/ai-events-verify/.venv/bin/pip install jsonschema==4.26.0
 $TMPDIR/ai-events-verify/.venv/bin/python check_events.py events.jsonl \
-  --spec ai-events-v0.2.schema.json --client-schema ai-client-events.schema.json \
-  --feature support_bot --user-id demo_user_1 --expect-session --expect-legacy chatTurnCompleted
+  --spec ai-events-v0.3.schema.json --client-schema ai-client-events.schema.json \
+  --feature support_bot --surface web --user-id demo_user_1 --expect-session --expect-legacy chatTurnCompleted \
+  --mcp-server docs-server --mcp-intent search_docs --mcp-intent read_page
 ```
 
-Pass only the flags that apply: `--capture-content` when the plan turns capture on; `--feature` once per planned feature; `--user-id` / `--expect-session` when the test requests carried a user and cookies; `--expect-legacy` per planned legacy event. The `run:` lines list each background answer; compare them with the plan's `task_name`, `trigger_source`, `conversation_id_source`, `account_id_source`, `on_behalf_of_source` and `child_tasks`.
+Pass only the flags that apply: `--capture-content` when the plan turns capture on; `--feature` once per planned feature; `--surface` once per planned channel; `--mcp-server` per planned server name and `--mcp-intent` per entry of its `request_context.intents` (without `other`); `--user-id` / `--expect-session` when the test requests carried a user and cookies; `--expect-legacy` per planned legacy event. The `run:` lines list each background answer; compare them with the plan's `task_name`, `trigger_source`, `conversation_id_source`, `account_id_source`, `on_behalf_of_source` and `child_tasks`. The `mcp call:` lines list each tool call, marked `joined` when its `interaction_id` matches a captured answer.
 
 ## 4. Checklist
 
 | Check | Pass when |
 |---|---|
-| Schema | every AI event passes its spec definition; client events pass the client schema |
+| Schema | every AI and MCP event passes its v0.3 definition and carries `specVersion: 0.3.0`; client events also pass the client schema |
 | One answer per turn | each `interaction_id` has exactly one server `ai_response_received` and at most one server `ai_user_prompt_created`; with a client surface, at most one client copy of each |
 | Joins | prompt, answer, actions and declared tool events of a turn share `interaction_id` and `conversation_id`; the ID the client uses for actions equals the server's (`client`: the browser-minted one, an invalid one replaced by the returned ID; `app`: the app's per-answer ID; `sdk`: the returned ID) |
 | Identity | chat events carry the planned `userId` and, with cookies, `anonymousId` and `context.sessionId`; background events have no `userId` and carry `account_id` / `on_behalf_of` where planned |
@@ -338,6 +402,9 @@ Pass only the flags that apply: `--capture-content` when the plan turns capture 
 | Background | one `ai_response_received` per run and per planned child task, with `trigger: system`, `task_name`, `trigger_source`; children carry the parent's ID as `parent_interaction_id`; a parent with zero tokens is expected when all calls happen in children |
 | Flush | a script or job run delivers its events before exit |
 | Legacy | each legacy event still sends, unchanged, while its flag is on |
-| Optional | `trace_id` when tracing is planned; declared tool events per `event_rules`; `ai_interaction_classified` when the classifier is on |
+| Scoping | `surface` on chat and client events matches the plan; `feature` too, except server `ai_user_action` |
+| MCP | one `mcp_client_seen` per client per run; one `mcp_tool_called` per call with `server_name`, `tool_status` and, on errors, `error_type`; `request_context` in each listed tool schema but never in `argument_keys`; `intent` from the plan's list or `other`; no argument values, results, URIs or tokens; `identify` puts the OAuth subject in `userId` and the workspace in `account_id` (stdio without auth: `ai_system`); a call sent with `_meta` `com.rudderstack/interaction_id` carries that ID; declared tool events per the server's `event_rules` |
+| Statuses | a stopped or cut-off run reports `cancelled`, `paused` with `pause_reason`, or `incomplete` with `error_type` as planned; a closed request reports `client_disconnected: true` where the plan's `client_disconnect` is not `none` |
+| Optional | `trace_id` only when tracing is planned (never automatic); declared tool events per `event_rules`; `ai_interaction_classified` when the classifier is on; `ai_interaction_scored` when scores are planned |
 
 Rows for surfaces the app does not have are `n/a` in the report.

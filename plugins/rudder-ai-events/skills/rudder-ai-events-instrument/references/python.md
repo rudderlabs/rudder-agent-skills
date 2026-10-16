@@ -1,17 +1,19 @@
-# Python recipes (`rudderstack-ai` 0.4.0)
+# Python recipes (`rudderstack-ai`, spec v0.3)
 
-Python 3.12+. The package has no dependencies of its own; the extra for each library the app uses (`openai`, `anthropic`, `google-genai`, `bedrock`, `langchain`, `openai-agents`, `claude-agent-sdk`, `litellm`, `tracing`) only declares the supported version range of that library, which the app already has.
+Python 3.12+. The package has no dependencies of its own; the extra for each library the app uses (`openai`, `anthropic`, `google-genai`, `bedrock`, `langchain`, `openai-agents`, `claude-agent-sdk`, `litellm`, `mcp`, `tracing`) only declares the supported version of that library, which the app already has. `tracing` is only for exporting OpenTelemetry spans; AI events do not need it.
+
+`<VERSION>` below is the release that ships spec v0.3: the first `rudderstack-ai` version on PyPI after 0.4.0 whose changelog names spec v0.3 (and, for MCP servers, has the `mcp` extra). 0.4.0 ships spec v0.2 and has no `rudderstack.ai.mcp`; if no v0.3 release exists yet, stop and tell the user instead of installing 0.4.0 or a branch build.
 
 ## 1. Install (exact pins)
 
 | Manager | Command or line |
 |---|---|
-| uv | `uv add "rudderstack-ai[openai]==0.4.0"` |
-| poetry | `poetry add "rudderstack-ai[openai]==0.4.0"` |
-| pip + requirements file | add `rudderstack-ai[openai]==0.4.0` to `requirements.txt`, then `pip install -r requirements.txt` |
-| pyproject without a lock tool | add `"rudderstack-ai[openai]==0.4.0"` to `[project] dependencies` |
+| uv | `uv add "rudderstack-ai[openai]==<VERSION>"` |
+| poetry | `poetry add "rudderstack-ai[openai]==<VERSION>"` |
+| pip + requirements file | add `rudderstack-ai[openai]==<VERSION>` to `requirements.txt`, then `pip install -r requirements.txt` |
+| pyproject without a lock tool | add `"rudderstack-ai[openai]==<VERSION>"` to `[project] dependencies` |
 
-Replace `openai` with the plan's `extras`, comma-separated (`rudderstack-ai[anthropic,langchain]==0.4.0`). Only when the plan says `rudderstack.client: new`, also add `rudder-sdk-python==2.1.9`. If the resolver tries to move an existing library (for example LiteLLM needs `openai<3`), stop and ask.
+Replace `openai` with the plan's `extras`, comma-separated (`rudderstack-ai[anthropic,langchain]==<VERSION>`). The `mcp` extra pins the `mcp` package exactly (v2): an MCP server on `mcp` 1.x or the standalone `fastmcp` package is `blocked` in the plan, not upgraded here. Only when the plan says `rudderstack.client: new`, also add `rudder-sdk-python==2.1.9`. If the resolver tries to move an existing library (for example LiteLLM needs `openai<3`), stop and ask.
 
 ## 2. Configure once at startup
 
@@ -26,6 +28,7 @@ rudderstack.ai.configure(
     analytics=rudder_client,
     capture_content=False,  # spec.config.capture_content
     # tool_breakdown=True,  # spec.config.tool_breakdown
+    # server_feedback=False,  # only when client_events.opt_out lists server_feedback
 )
 ```
 
@@ -90,6 +93,7 @@ def chat(body: ChatRequest, request: Request, user: User = Depends(current_user)
         conversation_id=body.conversation_id,
         interaction_id=_client_interaction_id(request.headers.get("x-interaction-id")),
         feature="support_bot",
+        surface="web",  # the surface's channel from the plan
         input_method="text",
         prompt_text=body.message,  # sent only when capture_content is on
     ) as interaction:
@@ -99,7 +103,11 @@ def chat(body: ChatRequest, request: Request, user: User = Depends(current_user)
 
 - `interaction_id_source: app`: mint or read the app's per-answer ID before `ai_interaction` (move it up if it is minted after the model call) and pass it as `interaction_id`.
 - Exceptions propagate unchanged and fail the answer; keep the route's error handling.
-- `trace_id=` (or `interaction.set_trace_id(...)`) when the plan has a tracing source; extras via `interaction.end(extra_properties={...})`.
+- `surface` (`web`, `mobile`, `slack`, `teams`, `email`, `chatgpt_app`, `claude_app`, `ide`, `api`, `other`) comes from the plan; `ai_context(surface=...)` sets it for a whole request.
+- Attachments: `attachment_count=` and `attachment_types=[...]` (`image`, `audio`, `video`, `pdf`, `file`); never names or content.
+- `trace_id` is never set automatically in spec v0.3: pass `trace_id=` (or `interaction.set_trace_id(...)`) only when the plan has a tracing source, or `register_tracing(link_trace_id=True)` with the SDK's span export. Extras via `interaction.end(extra_properties={...})`.
+- `client_disconnected: true` comes from `AIContextMiddleware` (ASGI: FastAPI, Starlette) or a bound stream closed early. Django and Flask (WSGI) report no disconnect: only a bound streaming generator closed by the server sets it; pass `interaction.end(client_disconnected=True)` where the app detects it itself.
+- Statuses need no code: the integrations report `paused` with `pause_reason`, `incomplete` with `max_turns`, `max_budget_usd` or `length`, and `content_filter` as an error. A run the app pauses itself: `interaction.end(pause_reason="approval")`.
 - Async routes: `async with ai_interaction(...)` works the same.
 
 Streaming responses keep the interaction open until the stream ends:
@@ -123,13 +131,16 @@ The server copy of each action in `surfaces[].feedback`. By default the browser 
 from rudderstack.ai import track_action
 
 track_action(
-    "feedback_given",  # feedback_retracted | copied_response | shared | reported | regenerated
+    "feedback_given",  # feedback_retracted | copied_response | shared | reported | regenerated | accepted | rejected | edited
     interaction_id=body.interaction_id,
     conversation_id=body.conversation_id,
     user_id=user.id,
     action_details={"feedback_type": "thumbs", "feedback_value": 1 if body.helpful else -1},
+    surface="web",
 )
 ```
+
+When the plan opts the server copy out (`client_events.opt_out: [server_feedback]`), keep the call and set `configure(server_feedback=False)` once.
 
 ## 6. Background surface: one `ai_task` per run
 
@@ -178,6 +189,7 @@ def main() -> None:
 - No `user_id`: the actor is the system (`anonymousId: ai_system`). When the plan has `anonymous_id_source` (multi-tenant jobs), pass `anonymous_id=` with it.
 - A child task chains to the running task: `parent_interaction_id` is set and `trigger_source` defaults to `agent`. The parent reports only calls made outside its children, often none (zero tokens, no model): per-run totals come from summing the tree by `parent_interaction_id`.
 - Works as `with`, `async with` or a decorator (`@ai_task("nightly-digest")`).
+- A run started by an MCP Events update: `trigger_source="mcp_event"` and `trigger_event_id=` the update's `event_id`.
 - A non-chained `ai_task` flushes on exit, so a cron script or Lambda can exit; keep the app's own `flush()` call. A long-lived worker: `flush=False` and flush at shutdown, so a slow data plane never stalls the loop.
 - Thread pools: `executor.submit(rudderstack.ai.propagate(fn), ...)`; `ThreadPoolExecutor` and `run_in_executor` do not copy context (`asyncio.to_thread` does).
 
@@ -190,7 +202,7 @@ def main() -> None:
 
 The client's own `shutdown()` blocks until its queue drains, retries included: in a daemon, bound it (run it in a thread and join with a timeout) so an outage cannot hold up exit.
 
-## 8. Declared tool events, classifier, prices
+## 8. Declared tool events, classifier, scores, prices
 
 ```python
 rudderstack.ai.configure(
@@ -208,12 +220,24 @@ rudderstack.ai.configure(
         "client": anthropic.Anthropic(),  # the app's own client and key
         "model": "claude-haiku-4-5",
         "intents": ["refund_request", "order_status", "product_question"],  # without "other"
+        # default outcomes: resolved, partial, unresolved, escalated, unclear
     },
+    evaluator=judge,  # spec.config.scores.evaluator: fn(EvaluationTurn) -> score | [score] | None, after each answer, 5 s timeout
     prices={"gpt-4.1-mini": {"input_per_mtok": 0.4, "output_per_mtok": 1.6, "cached_input_per_mtok": 0.1}},
 )
 ```
 
-Only the keys the plan enables. Event names starting with `ai_` are reserved.
+Only the keys the plan enables. Event names starting with `ai_` or `mcp_` are reserved. Price options the plan may list, through `rudderstack.ai.register_price(model, ...)`: `tier_multipliers={"batch": 0.5, "flex": 0.5, "fast": 2}`, `long_context={"threshold_tokens": 200_000, "input_per_mtok": ..., "output_per_mtok": ...}`, `server_tool_per_call={"web_search": 0.01}`, `cache_write_1h_per_mtok=`. Service tier, 1-hour cache writes and hosted tool calls are read from responses automatically.
+
+A score computed elsewhere (a human review, an offline judge):
+
+```python
+from rudderstack.ai import track_score
+
+track_score(interaction_id=iid, conversation_id=cid, evaluation_name="groundedness", score_value=0.82, evaluator="model")
+```
+
+`explanation=` is content: sent only with `capture_content`.
 
 ## 9. Legacy event behind a flag
 
@@ -222,6 +246,34 @@ Only the keys the plan enables. Event names starting with `ai_` are reserved.
 if os.environ.get("AI_EVENTS_LEGACY_EVENT", "true").lower() != "false":
     rudder_client.track(user_id=user.id, event="chatTurnCompleted", properties={...})  # unchanged
 ```
+
+## 10. MCP server: `wrap_mcp_server`
+
+Needs the `mcp` extra and an `mcp` v2 server (`mcp.server.mcpserver.MCPServer` or the low-level `mcp.server.lowlevel.Server`). One call, before serving:
+
+```python
+from rudderstack.ai.mcp import wrap_mcp_server
+
+
+def identify(auth):  # verified AccessToken, or None over stdio / without auth
+    return {"user_id": auth.subject, "account_id": workspace_of(auth)} if auth else {}
+
+
+wrap_mcp_server(
+    server,
+    analytics=rudder_client,
+    identify=identify,
+    request_context={"intents": ["debug_delivery", "build_audience"]},  # without other; False turns it off
+    # event_rules={"tools": {"create_audience": "audience_created"}},
+    # capability_requests={"capabilities": ["bulk_export"]},
+)
+server.run("stdio")
+rudder_client.flush()  # after run() returns; HTTP apps flush in the lifespan shutdown
+```
+
+`identify` defaults to the token's `subject`, `client_id` and `scopes`; if it raises, the request goes out as `ai_system`. `call_reason` and `capability_detail` are sent only with `capture_content`. MCP Events helpers (`mcp_events=True`, `track_mcp_event_subscription`, `wrap_mcp_event_sender`) only when the plan turns them on: experimental.
+
+An agent on the OpenAI Agents SDK passes its `interaction_id` to MCP servers with `tool_meta_resolver=rudderstack_mcp_tool_meta()` (from `rudderstack.ai.openai_agents`) on `MCPServerStdio` / `MCPServerStreamableHttp` / `MCPServerSse`, so `mcp_tool_called` joins the answer that made it.
 
 ## Troubleshooting
 
