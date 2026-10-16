@@ -74,6 +74,7 @@ npx skills add rudderlabs/rudder-agent-skills -a cursor
 
 | Skill | When to use |
 |---|---|
+| `rudder-onboarding` | Setting up RudderStack in an app: from no analytics to one delivered event, specs in git |
 | `rudder-data-catalog` | Creating or managing events, properties, categories, or custom types |
 | `rudder-data-graphs` | Modeling entities, events, and relationships for Audiences |
 | `rudder-tracking-plans` | Creating tracking plans to group events for specific sources |

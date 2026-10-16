@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`rudder-core` / `rudder-onboarding`** — nine steps from an app with no analytics to one real
+  event delivered to a destination the user picks: start, explore, goal, destination and secrets,
+  plan and apply, instrument, verify locally, verify live, wrap up. Specs live in `rudder/`; the
+  skill carries the measured traps (silent decline without `--confirm=false`, workspace-wide
+  deletes, the write key's two-minute 401 window, MCP metrics without timestamps, hashed live
+  event values). References cover destination specs with secrets as variables, browser
+  instrumentation, and local and live verification.
+
 ### Changed
 
 - **Breaking (repo layout):** renamed the top-level `skills/` directory back to
