@@ -59,7 +59,8 @@ Measured, not guessed. Plan around them.
 - **webhook-public-url**: A webhook `webhook_url` must be a public http(s) domain. `localhost` and `*.ngrok.io` are rejected. _Source: rudder-iac definitions/webhook/definition.go._
 - **write-key-delay**: A new source's write key is refused with HTTP 401 `invalid write key` for about two minutes after apply. It is propagation, not a wrong key. Sending immediately fails. _Source: live run, 1 Oct 2026._
 - **metrics-no-timestamps**: MCP metrics tools return counts without last-seen times, so a count only means "somewhere in the window". Pass `start_time` set to the time you recorded before sending. _Source: rudder-mcp-server sdk/webapp/model.go (timestamps are json:"-")._
-- **metrics-lag**: Delivery metrics lag, and unevenly by event. On 15 Oct one event showed as delivered 2 minutes after RudderStack received it and another took between 4 and 8 minutes. A payload at a destination the user can read arrives within seconds, so check there first and treat metrics as the later confirmation. _Source: one end-to-end run against a dev workspace, 15 Oct 2026._
+- **metrics-minute-buckets**: Delivery metrics are counted in one-minute buckets, and a query keeps only buckets that start at or after `start_time`. A start time inside a minute therefore drops that whole minute, so events sent right after recording it never show. Round the start time down to the minute. _Source: rudder-mini reporting, 16 Oct 2026 (start 05:24:07Z returned nothing; 05:24:00Z returned every event)._
+- **metrics-lag**: Delivery metrics can lag, and unevenly by event. On 15 Oct one event showed as delivered 2 minutes after RudderStack received it and another took between 4 and 8 minutes; that run's start time fell inside a minute, so part of the wait may have been the bucket effect. A payload at a destination the user can read arrives within seconds, so check there first and treat metrics as the later confirmation. _Source: one end-to-end run against a dev workspace, 15 Oct 2026._
 - **mcp-hashes-values**: `get_live_events` hashes every property value, so it can confirm event names and property keys but not values or types. The destination's own copy proves the payload. _Source: rudder-mcp-server internal/pii/pii.go._
 - **local-no-types**: The local capture server counts events by name but does not check property types. Check types yourself with jq. _Source: rudder-iac#952 devlisten/api/summary.go._
 
@@ -94,7 +95,7 @@ Keep these values as you go, and restate them in the wrap-up:
 - `remote_destination_id`: the destination's id in RudderStack, from MCP list_destinations
 - `write_key`: the source's write key. Show only its first 6 characters.
 - `code_commit`: the commit that added the instrumentation
-- `started_at`: RFC 3339 UTC time recorded just before the first live send
+- `started_at`: RFC 3339 UTC time, rounded down to the minute, recorded just before the first live send
 
 ## 1. Start
 
@@ -292,7 +293,7 @@ Local is clean. Now the real pipeline, measured from a known start time.
 
 Needs: `write_key`, `data_plane_url`, `remote_destination_id`.
 
-1. Record `started_at` as the current UTC time in RFC 3339.
+1. Record `started_at` as the current UTC time rounded down to the minute: `date -u +%Y-%m-%dT%H:%M:00Z` (fact metrics-minute-buckets).
 2. Probe whether the write key is accepted yet, as the live verification reference shows, without sending an event.
 3. Start the app against the real data plane (`.env.local`) and ask the user to go through the flow once, then say done.
 4. Call MCP `get_destination_event_metrics` with the destination id and `start_time: started_at`. Delivered means the agreed events show `deliveredCount` of at least 1 and `failedCount` 0.
@@ -301,7 +302,7 @@ Needs: `write_key`, `data_plane_url`, `remote_destination_id`.
 
 **Loop.** Probe the write key every 20 seconds, then poll delivery metrics every 30 seconds until the write key is accepted, and each agreed event shows as delivered since started_at or has arrived at a destination the user can read, give up after 5 minutes for the write key, then 10 minutes for delivery. When the bound is hit: Report the last probe status and the last metrics seen, and suggest get_destinations_errors and the live events page.
 
-Facts that apply here: **write-key-delay**, **metrics-no-timestamps**, **metrics-lag**, **mcp-hashes-values**.
+Facts that apply here: **write-key-delay**, **metrics-no-timestamps**, **metrics-minute-buckets**, **metrics-lag**, **mcp-hashes-values**.
 
 Record: `started_at`.
 

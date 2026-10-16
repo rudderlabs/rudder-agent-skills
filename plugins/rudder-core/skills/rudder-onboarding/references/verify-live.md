@@ -3,7 +3,8 @@
 ## 1. Record the start time
 
 ```bash
-STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+# Rounded down to the minute: metrics count in one-minute buckets, and a start inside a minute drops it.
+STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:00Z)
 ```
 
 Every metrics call below passes it as `start_time`. The metrics tools return counts without timestamps, so
@@ -37,8 +38,9 @@ Call the MCP tool:
 get_destination_event_metrics(destination_id=<remote destination id>, start_time=<STARTED_AT>)
 ```
 
-Poll every 30 seconds for up to 10 minutes. Done when each agreed event has `deliveredCount >= 1` and
-`failedCount == 0`. Metrics lag delivery, and unevenly by event: on 15 Oct one event showed after 2 minutes
+Poll every 30 seconds for up to 10 minutes. Wait between polls without blocking the session; some agents
+refuse a long foreground `sleep`, so use a background timer where the agent has one. Done when each agreed
+event has `deliveredCount >= 1` and `failedCount == 0`. Metrics lag delivery, and unevenly by event: on 15 Oct one event showed after 2 minutes
 and another after 4 to 8. When the destination is one the user can read, check the payload (section 5)
 first; it arrives within seconds.
 
