@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`rudder-core` carries the RudderStack MCP server** — `plugins/rudder-core/.mcp.json`
+  declares `rudderstack`, an HTTP server at `https://mcp.rudderstack.com/mcp` with no headers.
+  Installing the plugin connects MCP; the client asks the user to sign in to RudderStack in the
+  browser (OAuth) the first time a tool runs. Claude Code lists it as
+  `plugin:rudder-core:rudderstack`, and cursor.directory picks up the same file.
 - **`rudder-core` / `rudder-onboarding`** — nine steps from an app with no analytics to one real
   event delivered to a destination the user picks: start, explore, goal, destination and secrets,
   plan and apply, instrument, verify locally, verify live, wrap up. Specs live in `rudder/`; the

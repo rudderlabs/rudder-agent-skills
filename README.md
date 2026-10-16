@@ -72,6 +72,9 @@ npx skills add rudderlabs/rudder-agent-skills -a cursor
 
 ### `rudder-core`
 
+`rudder-core` also connects the RudderStack MCP server (`https://mcp.rudderstack.com/mcp`). The first time an MCP
+tool runs, your agent asks you to sign in to RudderStack in the browser. No token goes in a config file.
+
 | Skill | When to use |
 |---|---|
 | `rudder-onboarding` | Setting up RudderStack in an app: from no analytics to one delivered event, specs in git |
