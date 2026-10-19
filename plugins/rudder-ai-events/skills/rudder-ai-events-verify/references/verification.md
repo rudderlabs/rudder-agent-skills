@@ -6,7 +6,7 @@ Everything here runs locally, without provider keys and without sending anything
 
 The AI events schema ships inside the npm package and the Go module (the Python wheel does not include it). Read it as a file; it is not an importable export. It covers the chat, background and `mcp_*` events and the client copies' fields.
 
-`<VERSION>` is the `@rudderstack/ai` release that ships spec v0.3, the same one the plan pins for Node.js (any language's app can use it here). 0.4.0 ships `ai-events-v0.2.schema.json` only; a missing v0.3 file means that version is too old.
+`<VERSION>` is `@rudderstack/ai` 0.5.0 or later, the same one the plan pins for Node.js (any language's app can use it here); for Go, the plan's `ai-sdk-go` version (v0.1.0 or later). The schema is byte-identical in all three SDKs' repositories. 0.4.0 ships `ai-events-v0.2.schema.json` only; a missing v0.3 file means that version is too old.
 
 | App | Get `ai-events-v0.3.schema.json` |
 |---|---|
@@ -411,8 +411,9 @@ Pass only the flags that apply: `--capture-content` when the plan turns capture 
 | Flush | a script or job run delivers its events before exit |
 | Legacy | each legacy event still sends, unchanged, while its flag is on |
 | Scoping | `surface` on chat and client events matches the plan; `feature` too, except server `ai_user_action` |
-| MCP | one `mcp_client_seen` per client per run; one `mcp_tool_called` per call with `server_name`, `tool_status` and, on errors, `error_type`; `request_context` in each listed tool schema but never in `argument_keys`; `intent` from the plan's list or `other`; no argument values, results, URIs or tokens; `identify` puts the OAuth subject in `userId` and the workspace in `account_id` (stdio without auth: `ai_system`); a call sent with `_meta` `com.rudderstack/interaction_id` carries that ID; declared tool events per the server's `event_rules` |
+| MCP | one `mcp_client_seen` per client per run; one `mcp_tool_called` per call with `server_name`, `tool_status` and, on errors, `error_type`; `call_index` from 0 with no gaps per `mcp_session_id`, else `interaction_id` (a 2026-07-28 elicitation retry keeps its leg's index); `request_context` in each listed tool schema but never in `argument_keys`, compared as a set (order is unspecified); `intent` from the plan's list or `other`; no argument values, results, URIs or tokens; `identify` puts the OAuth subject in `userId` and the workspace in `account_id` (stdio without auth: `ai_system`); a call sent with `_meta` `com.rudderstack/interaction_id` carries that ID; declared tool events per the server's `event_rules`, also for a call that failed validation (`tool_status: error`) |
 | Statuses | a stopped or cut-off run reports `cancelled`, `paused` with `pause_reason`, or `incomplete` with `error_type` as planned; a closed request reports `client_disconnected: true` where the plan's `client_disconnect` is not `none` |
-| Optional | `trace_id` only when tracing is planned (span processor in Node.js/Python, `rudderotel` in Go, or the app's own value); declared tool events per `event_rules`; `ai_interaction_classified` when the classifier is on; `ai_interaction_scored` when scores are planned |
+| Models | `primary_provider` and `usage_breakdown[].provider` use `openai`, `anthropic`, `aws.bedrock`, `gcp.gemini`, `gcp.vertex_ai`, `azure.ai.openai` or the gateway's vendor; `requested_model` only where the served model differs (a dated snapshot is the same model) and only from integrations that set it (OpenAI, Anthropic, Google Gen AI, the Vercel AI SDK, LiteLLM, manual calls); on Anthropic models through Bedrock or Vertex AI IDs it is a known false positive, not a failure |
+| Optional | `trace_id` only when tracing is planned (span processor with `linkTraceId: true` / `link_trace_id=True` in Node.js/Python, `rudderotel` in Go, or the app's own value); declared tool events per `event_rules`; `ai_interaction_classified` when the classifier is on; `ai_interaction_scored` when scores are planned |
 
 Rows for surfaces the app does not have are `n/a` in the report.

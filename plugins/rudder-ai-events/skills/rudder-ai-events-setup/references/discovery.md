@@ -40,11 +40,11 @@ Go (`github.com/rudderlabs/ai-sdk-go`, one module per integration; read the vers
 | Anthropic (also its Bedrock and Vertex AI clients) | `github.com/anthropics/anthropic-sdk-go` (v1.78.0) | `rudderanthropic.WithTracking()` |
 | Google Gen AI (Gemini API and Vertex AI) | `google.golang.org/genai` (v1.72.0) | `ruddergenai.HTTPClient()` |
 | Amazon Bedrock (`Converse`, `ConverseStream`) | `github.com/aws/aws-sdk-go-v2/service/bedrockruntime` (v1.63.1) | `rudderbedrock.WithTracking()` |
-| MCP servers, official SDK | `github.com/modelcontextprotocol/go-sdk` (v1.8) | `rudderstackai.WrapMCPServer` (section 5) |
-| MCP servers, mcp-go | `github.com/mark3labs/mcp-go` (v0.55.1 to v1.1.1) | `ruddermcpgo.WrapServer` (section 5) |
+| MCP servers, official SDK | `github.com/modelcontextprotocol/go-sdk` (v1.8.0) | `rudderstackai.WrapMCPServer` (section 5) |
+| MCP servers, mcp-go | `github.com/mark3labs/mcp-go` (v0.55.1 or later; tested to v1.2.1) | `ruddermcpgo.WrapServer` (section 5) |
 | Anything else, including the older `github.com/openai/openai-go` v1/v2, LangChainGo, agent frameworks | | `Interaction.RecordCall()` |
 
-A library outside its supported range is a blocker for that integration: record it and ask the user whether to upgrade the library or use `recordCall` / `record_call` instead. These ranges are from the spec v0.3 SDK branches; once the release is out, re-read its README compatibility table and trust it over this one.
+A library outside its supported range is a blocker for that integration: record it and ask the user whether to upgrade the library or use `recordCall` / `record_call` instead. These ranges are from `@rudderstack/ai` 0.5.0, `rudderstack-ai` 0.5.0 and `ai-sdk-go` v0.1.0; for a later release, re-read its README compatibility table and trust it over this one.
 
 ## 2. Call sites to entry points
 
@@ -108,7 +108,7 @@ No RudderStack JavaScript SDK on the page: the `client` surface is `status: skip
 
 For each hand-built AI event, record the event name, `path:line`, its properties, and propose a mapping to the standard events (see `ai-events-yaml.md`, `legacy_events`).
 
-For a tracing tool, find how the current trace ID is read (`langfuse.getCurrentTraceId()`, `get_current_trace_id()`, `trace.getActiveSpan()?.spanContext().traceId`, LangSmith run tree `trace_id`) and offer it as `tracing.trace_id_source`. It is optional. OpenTelemetry apps: Node.js and Python fill `trace_id` from the first span inside the interaction once the SDK's span processor is registered (`registerTracing` / `register_tracing`), Go with `WithTraceIDFrom(rudderotel.TraceID)`. Other tools: the app passes it (`traceId` / `trace_id` / `TraceID`), and that value always wins. No tracing tool: `tracing.tool: none`, and do not suggest adding one.
+For a tracing tool, find how the current trace ID is read (`langfuse.getCurrentTraceId()`, `get_current_trace_id()`, `trace.getActiveSpan()?.spanContext().traceId`, LangSmith run tree `trace_id`) and offer it as `tracing.trace_id_source`. It is optional and opt-in. OpenTelemetry apps: Node.js and Python fill `trace_id` from the first span inside the interaction only when the SDK's span processor is registered with `linkTraceId: true` / `link_trace_id=True` (`registerTracing` / `register_tracing`, `createSpanProcessor` / `create_span_processor`), Go with `WithTraceIDFrom(rudderotel.TraceID)`. Other tools: the app passes it (`traceId` / `trace_id` / `TraceID`), and that value always wins. No tracing tool: `tracing.tool: none`, and do not suggest adding one.
 
 ## 5. MCP servers
 
@@ -119,8 +119,8 @@ For a tracing tool, find how the current trace ID is read (`langfuse.getCurrentT
 | Python `mcp` 2.x | `MCPServer(` from `mcp.server.mcpserver`, `Server(` from `mcp.server.lowlevel` | `@server.tool()`, `@server.resource(`, `@server.prompt(` | yes; also 2026-07-28 |
 | Python `mcp` 1.x | `FastMCP(` from `mcp.server.fastmcp`, the 1.x `Server(` from `mcp.server.lowlevel` | `@mcp.tool()` (name = function name unless `name=`) | `>=1.30.0`; protocol up to 2025-11-25 |
 | Python standalone `fastmcp` | `FastMCP(` from `fastmcp` | `@mcp.tool()` | no: `blocked` |
-| Go `github.com/modelcontextprotocol/go-sdk` | `mcp.NewServer(` | `mcp.AddTool(server, &mcp.Tool{Name: "name"`, `server.AddResource(`, `server.AddPrompt(` | v1.8; also 2026-07-28 |
-| Go `github.com/mark3labs/mcp-go` | `server.NewMCPServer(` | `s.AddTool(mcp.NewTool("name"` | v0.55.1 to v1.1.1; 2026-07-28 on v1.x only |
+| Go `github.com/modelcontextprotocol/go-sdk` | `mcp.NewServer(` | `mcp.AddTool(server, &mcp.Tool{Name: "name"`, `server.AddResource(`, `server.AddPrompt(` | v1.8.0; also 2026-07-28 |
+| Go `github.com/mark3labs/mcp-go` | `server.NewMCPServer(` | `s.AddTool(mcp.NewTool("name"` | v0.55.1 or later; 2026-07-28 on v1.x only |
 
 For each server record, as `path` plus `symbol`:
 
@@ -132,7 +132,7 @@ For each server record, as `path` plus `symbol`:
 - hand-built analytics already sent from handlers (`mcp_<method>_success`, raw request or result properties): legacy events to map and flag.
 - elicitation calls (`elicitInput(`, `ctx.elicit(`, `session.Elicit(`, mcp-go `RequestElicitation(`), and MCP Events subscription or webhook code (experimental, off unless asked).
 
-An app that is an MCP *client* (an agent calling MCP tools) is covered by its chat or background integration: those calls appear in `tool_breakdown` with `mcp_server`. When the agent uses the OpenAI Agents SDK and the server is also tracked, plan `rudderStackMcpToolMeta()` / `rudderstack_mcp_tool_meta()` so `mcp_tool_called` joins the calling answer. A Go agent sends `Interaction.ID()` as `com.rudderstack/interaction_id` in the request `_meta` itself.
+An app that is an MCP *client* (an agent calling MCP tools) is covered by its chat or background integration: those calls appear in `tool_breakdown` with `mcp_server` (OpenAI Agents SDK: only with its tracing on). When the agent uses the OpenAI Agents SDK and the server is also tracked, plan `rudderStackMcpToolMeta()` / `rudderstack_mcp_tool_meta()` so `mcp_tool_called` joins the calling answer. A Go agent sends `Interaction.ID()` as `com.rudderstack/interaction_id` in the request `_meta` itself.
 
 ## 6. Identity
 

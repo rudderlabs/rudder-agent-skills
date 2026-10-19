@@ -4,7 +4,7 @@ The plan the setup writes at the repository root and the user commits. `rudder-a
 
 Two halves:
 
-- `spec.config` holds source-level settings with no file paths, so it can later be synced to RudderStack source settings and read by both SDKs. Most keys are `configure()` options; `intents` and `outcomes` are the label lists the classifier uses (and the vocabulary for app-set `intent` / `outcome`): with the classifier off they only document the taxonomy.
+- `spec.config` holds source-level settings with no file paths, so it can later be synced to RudderStack source settings and read by every SDK. Most keys are `configure()` options; `intents` and `outcomes` are the label lists the classifier uses (and the vocabulary for app-set `intent` / `outcome`): with the classifier off they only document the taxonomy.
 - Everything else (`surfaces`, `identity`, `tracing`, `legacy_events`, `client_events`, `mcp`, `known_limits`) is repo-local: where things are and how they are wired.
 
 Never put secrets in this file: environment variable names only, never values. Omit a section that does not apply (no browser: no `client_events`; no MCP server: no `mcp`; no hand-built events: `legacy_events: []`).
@@ -32,8 +32,8 @@ spec:
     - language: node                 # node | python | go
       path: .                        # directory holding package.json / pyproject.toml / go.mod
       package: "@rudderstack/ai"     # or rudderstack-ai, github.com/rudderlabs/ai-sdk-go
-      version: null                  # exact release that ships spec v0.3, looked up in setup step 2.3;
-                                     # null until it is published (never 0.4.0, which is spec v0.2)
+      version: "0.5.0"               # exact release on spec v0.3, looked up in setup step 2.3: 0.5.0 or later
+                                     # for Node.js and Python, v0.1.0 or later for Go (never 0.4.0, spec v0.2)
       extras: []                     # Python extras, e.g. [anthropic, langchain, mcp];
                                      # Go integration modules, e.g. [rudderopenai, rudderotel]
       package_manager: npm           # npm | pnpm | yarn | bun | uv | poetry | pip | go
@@ -70,10 +70,12 @@ spec:
       evaluations: []                # e.g. [groundedness]; manual: where each score comes from
     server_feedback: true            # configure serverFeedback; false only with client_events.opt_out: [server_feedback]
     prices: []                       # USD per 1M tokens, only rates the user gives:
-                                     # - { model: gpt-4.1-mini, input_per_mtok: 0.4, output_per_mtok: 1.6, cached_input_per_mtok: 0.1,
+                                     # - { model: gpt-4.1-mini, provider: null, input_per_mtok: 0.4, output_per_mtok: 1.6, cached_input_per_mtok: 0.1,
                                      #     cache_write_1h_per_mtok: null, tier_multipliers: { batch: 0.5, fast: 2 },
                                      #     long_context: { threshold_tokens: 200000, input_per_mtok: 0.8, output_per_mtok: 3.2 },
                                      #     server_tool_per_call: { web_search: 0.01 } }
+                                     # provider: only to price one provider (gcp.gemini and gcp.vertex_ai are
+                                     # priced separately; google / google.vertex are aliases)
 
   surfaces:
     - id: support-chat
@@ -101,7 +103,7 @@ spec:
       conversation_id_source: req.body.conversationId   # expression, or "minted by the SDK"
       interaction_id_source: client  # sdk | client (browser-minted, validated) | app (an existing per-answer ID)
       flush: shutdown                # shutdown | task (aiTask flushes itself) | per-run (scripts, Lambda)
-      client_disconnect: middleware  # middleware (Node.js, Python ASGI) | bound-stream | none (Django/Flask, Go: known limit)
+      client_disconnect: middleware  # middleware (Node.js, Python ASGI, Go Middleware) | bound-stream | none (Django/Flask: known limit)
       feedback:                      # actions that already hit a server endpoint: the server's trackAction copy
         - path: src/routes/feedback.ts
           symbol: POST /api/feedback
@@ -160,7 +162,8 @@ spec:
   tracing:                           # optional link to an existing tracing tool
     tool: none                       # none | langfuse | langsmith | opentelemetry
     trace_id_source: null            # e.g. "langfuse.getCurrentTraceId() (src/tracing.ts)"; opentelemetry:
-                                     # "SDK span processor" (Node.js/Python) or "rudderotel.TraceID" (Go)
+                                     # "SDK span processor, linkTraceId: true" (Node.js; Python link_trace_id=True;
+                                     # opt-in, off by default) or "rudderotel.TraceID" (Go)
 
   client_events:                     # browser, through the existing RudderStack JavaScript SDK
     sdk_path: public/app.js
@@ -244,7 +247,8 @@ spec:
                                      # - { path: src/agent.ts, symbol: MCPServerStreamableHttp, helper: rudderStackMcpToolMeta }
 
   known_limits: []                   # the setup skill's Known limits that apply, e.g.
-                                     # [intent_lists_manual_review, wsgi_no_client_disconnect, mcp_state_per_process]
+                                     # [intent_lists_manual_review, wsgi_no_client_disconnect, mcp_state_per_process,
+                                     #  go_private_install, agents_mcp_server_needs_tracing, requested_model_false_positive]
 ```
 
 ## Field rules

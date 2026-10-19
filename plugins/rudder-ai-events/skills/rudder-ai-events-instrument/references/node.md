@@ -1,8 +1,8 @@
 # Node.js recipes (`@rudderstack/ai`, spec v0.3)
 
-Node.js 24+. ESM shown; CommonJS works the same with `require('@rudderstack/ai')` and `require('@rudderstack/ai/openai')`. Every entry point: `@rudderstack/ai`, `/openai`, `/anthropic`, `/google-genai`, `/bedrock`, `/vercel-ai-sdk`, `/langchain`, `/claude-agent-sdk`, `/openai-agents`, `/middleware`, `/mcp`, and `/tracing` (advanced OpenTelemetry export, not needed for AI events).
+Node.js 24+. ESM shown; CommonJS works the same with `require('@rudderstack/ai')` and `require('@rudderstack/ai/openai')`. Every entry point: `@rudderstack/ai`, `/openai`, `/anthropic`, `/google-genai`, `/bedrock`, `/vercel-ai-sdk`, `/langchain`, `/claude-agent-sdk`, `/openai-agents`, `/middleware`, `/mcp`, `/tracing` and `/tracing/vercel-ai-sdk` (advanced OpenTelemetry export, not needed for AI events).
 
-`<VERSION>` below is the release that ships spec v0.3: the first `@rudderstack/ai` version whose tarball has `spec/ai-events-v0.3.schema.json` (check with `npm view @rudderstack/ai version` and section 1 of the verify skill's `references/verification.md`). 0.4.0 ships spec v0.2 and has no `/mcp`; if no v0.3 release exists yet, stop and tell the user instead of installing 0.4.0 or a branch build.
+`<VERSION>` below is the release that ships spec v0.3: `0.5.0`, the first `@rudderstack/ai` version whose tarball has `spec/ai-events-v0.3.schema.json` (check with `npm view @rudderstack/ai version` and section 1 of the verify skill's `references/verification.md`). 0.4.0 ships spec v0.2 and has no `/mcp`: never install it or a branch build for a v0.3 plan.
 
 Runnable references in the SDK repository's `examples/`: `openai`, `openai-responses`, `anthropic`, `google-genai`, `bedrock-converse`, `vercel-ai-sdk`, `langchain`, `claude-agent-sdk`, `openai-agents`, `background-agent`, `manual-interaction` (`recordCall`), `scores-evaluator`, `cost-estimation`, `mcp-server`, `mcp-server-lowlevel`, `mcp-server-v2`, `openai-agents-mcp`.
 
@@ -70,6 +70,8 @@ export const openai = wrapOpenAI(new OpenAI());
 | Anything else | inside the interaction: `interaction.recordCall({ provider, model, inputTokens, outputTokens, responseId })` (example `manual-interaction`) |
 
 One integration per call path: do not add a LangChain handler around a wrapped client on purpose.
+
+`requested_model` needs no code: the OpenAI, Anthropic, Google Gen AI and Vercel AI SDK integrations send it, streamed or not, when a router or fallback served another model than the one requested; a dated snapshot of the requested model (`claude-haiku-4-5` served as `claude-haiku-4-5-20251001`) is the same model and sends none.
 
 ## 4. Chat surface: one `aiInteraction` per user turn
 
@@ -151,7 +153,7 @@ app.post('/api/chat', async (req, res) => {
 - Always return the ID the interaction used (body field or `x-interaction-id` header): with `sdk` the client learns it, with `client` an invalid browser ID was replaced and the client must switch to the returned one.
 - `surface` (`web`, `mobile`, `slack`, `teams`, `email`, `chatgpt_app`, `claude_app`, `ide`, `api`, `other`) comes from the plan; the SDK cannot tell. A route used by several channels passes the one the request came from. Set it once with `aiContext({ surface })` when every event in a request shares it.
 - Attachments: when the prompt carries files, pass `attachmentCount` and `attachmentTypes` (`image`, `audio`, `video`, `pdf`, `file`); never names or content.
-- `trace_id`: when the app registers the SDK's OpenTelemetry span processor (`registerTracing()` / `createSpanProcessor()` from `@rudderstack/ai/tracing`), it is filled from the first span started inside the interaction; nothing to add. Another tracing tool (`tracing.trace_id_source`): pass `traceId` or call `interaction.setTraceId(id)`; a value the app sets always wins. Do not add tracing the plan does not list.
+- `trace_id` is opt-in: it is sent only when the app passes one or links spans. OpenTelemetry as the plan's tracing tool: register the SDK's span processor with `linkTraceId: true` (`registerTracing({ linkTraceId: true })` / `createSpanProcessor({ linkTraceId: true })` from `@rudderstack/ai/tracing`); it is then filled from the first span started inside the interaction. Without `linkTraceId` the processor still tags spans with `interaction_id` but sets no `trace_id`. Another tracing tool (`tracing.trace_id_source`): pass `traceId` or call `interaction.setTraceId(id)`; a value the app sets always wins. Do not add tracing the plan does not list.
 - `client_disconnected: true` is sent automatically when the request closes under `aiContextMiddleware()` / `withAiContext()` or a bound stream is cancelled before the answer ends; elsewhere pass `interaction.end({ clientDisconnected: true })` from the app's own close handler, if it has one.
 - Statuses need no code: the integrations report `paused` with `pause_reason` (tool approval, LangGraph `interrupt()`, Claude Agent SDK defer), `incomplete` with `error_type` (`max_turns`, `max_budget_usd`, `length`: a last call cut off at the token limit, including Anthropic `stop_reason: max_tokens`) and `content_filter` as an error.
 - Business-specific extras ride on the answer: `interaction.end({ extraProperties: { ... } })`; SDK-owned names are ignored.
@@ -182,7 +184,7 @@ app.post('/api/feedback', (req, res) => {
     userId: req.user?.id,
     interactionId,
     conversationId,
-    actionType: 'feedback_given', // feedback_retracted | copied_response | shared | reported | regenerated | accepted | rejected | edited
+    actionType: 'feedback_given', // feedback_retracted | copied_response | shared | reported | regenerated | accepted | rejected | edited | clicked_through
     surface: 'web',
     actionDetails: { feedback_type: 'thumbs', feedback_value: helpful ? 1 : -1 },
   });
@@ -232,7 +234,7 @@ process.on('SIGTERM', async () => {
 });
 ```
 
-`flush()` is bounded: classifications wait up to the classifier timeout and each client flush up to 10 s. It never throws and resolves `false` when something did not finish in time, so a slow data plane cannot hold up shutdown.
+`flush()` is bounded: pending classifications and evaluations wait up to the classifier timeout plus 1 s (or `flush({ timeoutMs })`), and each client flush up to 10 s. It never throws and resolves `false` when something did not finish in time, so a slow data plane cannot hold up shutdown.
 
 ## 8. Declared tool events (`spec.config.event_rules`)
 
@@ -251,7 +253,7 @@ configure({
 });
 ```
 
-Names starting with `ai_` throw. `when: always` needs no `when` function. Results reach a rule only when the app sends the tool result back to the model inside the same `aiInteraction`; an app that never executes the tool gets the event with `tool_status: "unknown"`.
+Names starting with `ai_` or `mcp_` throw. If `properties()` throws or its output takes the event over 30,000 bytes, the event is sent without it. `when: always` needs no `when` function. Results reach a rule only when the app sends the tool result back to the model inside the same `aiInteraction`; an app that never executes the tool gets the event with `tool_status: "unknown"`.
 
 ## 9. Classifier (`spec.config.classifier.enabled: true`)
 
@@ -293,17 +295,21 @@ configure({ evaluator: async (turn) => ({ evaluationName: 'groundedness', scoreV
 ```ts
 configure({
   prices: {
-    'gpt-4.1-mini': { inputPerMtok: 0.4, outputPerMtok: 1.6, cachedInputPerMtok: 0.1 },
-    // only the options the plan lists:
-    // tierMultipliers: { batch: 0.5, flex: 0.5, fast: 2 },
-    // longContext: { thresholdTokens: 200000, inputPerMtok: 6, outputPerMtok: 22.5 },
-    // serverToolPerCall: { web_search: 0.01 },
-    // cacheWrite1hPerMtok: 6,
+    'gpt-4.1-mini': {
+      inputPerMtok: 0.4,
+      outputPerMtok: 1.6,
+      cachedInputPerMtok: 0.1,
+      // per model, only the options the plan lists:
+      // tierMultipliers: { batch: 0.5, flex: 0.5, fast: 2 },
+      // longContext: { thresholdTokens: 200000, inputPerMtok: 6, outputPerMtok: 22.5 },
+      // serverToolPerCall: { web_search: 0.01 },
+      // cacheWrite1hPerMtok: 6,
+    },
   },
 });
 ```
 
-Register each model the app uses; a family name never prices another model (`gpt-4o` does not price `gpt-4o-mini`). Gemini API calls report provider `google`, Vertex AI calls `google.vertex`: when their rates differ, register each with its `provider` (`registerPrice(model, { ..., provider: 'google.vertex' })`), since the call's own provider wins and a price for either label otherwise covers both. Example `cost-estimation` shows `registerPrices` and `estimateCost`. Service tier, 1-hour cache writes and provider-hosted tool calls are read from responses automatically; the price options above only turn them into cost.
+Register each model the app uses; a family name never prices another model (`gpt-4o` does not price `gpt-4o-mini`). Gemini API calls report provider `gcp.gemini`, Vertex AI calls `gcp.vertex_ai`, and they are priced separately: register each one the app calls with its `provider` (`registerPrice(model, { ..., provider: 'gcp.vertex_ai' })`); a price with no `provider` covers both. `google` and `google.vertex` (the labels before 0.5.0) still work as aliases of `gcp.gemini` and `gcp.vertex_ai`. Example `cost-estimation` shows `registerPrices` and `estimateCost`. Service tier, 1-hour cache writes and provider-hosted tool calls are read from responses automatically; the price options above only turn them into cost.
 
 ## 11. Legacy event behind a flag
 
@@ -351,8 +357,10 @@ const handler = createMcpHandler(buildServer);
 - Supported: `@modelcontextprotocol/sdk` `>=1.31.0 <2.0.0` (protocol up to 2025-11-25) and `@modelcontextprotocol/server` `>=2.0.0 <3.0.0` (also the stateless 2026-07-28, with elicitation through `input_required`), on stdio, Streamable HTTP and HTTP+SSE. Examples: `mcp-server` (`McpServer`), `mcp-server-lowlevel` (low-level `Server`), `mcp-server-v2` (2.x, both protocol revisions).
 - State (`mcp_client_seen` window, call counters, retry hashes, pending elicitations) is in memory per server name, per process: servers rebuilt per request under one name share it, so give each distinct server a unique name. Each replica reports its own `mcp_client_seen`.
 - Flush when the process stops (section 7): the existing shutdown hook for HTTP servers; for stdio, the transport's `onclose`.
-- An agent built with this SDK and the OpenAI Agents SDK passes its `interaction_id` and `traceparent` to MCP servers with `toolMetaResolver: rudderStackMcpToolMeta()` (from `@rudderstack/ai/openai-agents`) on `MCPServerStdio` / `MCPServerStreamableHttp` / `MCPServerSSE`, so each `mcp_tool_called` joins the answer that made it (example `openai-agents-mcp`).
-- MCP Events (`mcpEvents: true`, `trackMcpEventSubscription`, `wrapMcpEventSender`) only when the plan turns it on: experimental.
+- `call_index` counts reported calls with no gaps: on 2026-07-28 the `input_required` leg sends no `mcp_tool_called`, and the elicitation retry keeps that leg's `call_index`.
+- A declared tool event follows its `mcp_tool_called` on success and on failure, including a call whose arguments failed validation (`tool_status: error`).
+- An agent built with this SDK and the OpenAI Agents SDK passes its `interaction_id` to MCP servers with `toolMetaResolver: rudderStackMcpToolMeta()` (from `@rudderstack/ai/openai-agents`) on `MCPServerStdio` / `MCPServerStreamableHttp` / `MCPServerSSE`, so each `mcp_tool_called` joins the answer that made it (example `openai-agents-mcp`). It adds `com.rudderstack/trace_id` only when the interaction has a `trace_id`, and `traceparent` only with `linkTraceId: true`. The agent's `tool_breakdown` entries for those tools carry `mcp_server`, read from the Agents SDK function span: keep Agents SDK tracing on (no `tracingDisabled`, no `OPENAI_AGENTS_DISABLE_TRACING`).
+- MCP Events (`mcpEvents: true`, `trackMcpEventSubscription`, `wrapMcpEventSender`) only when the plan turns it on: experimental. A delivery without `subscriptionId` or `eventId` is dropped with one warning per process; a missing `eventName` is sent as `unknown`.
 
 ## Troubleshooting
 
@@ -361,7 +369,8 @@ const handler = createMcpHandler(buildServer);
 | Warning `no RudderStack client` | `configure({ analytics })` did not run before the first call |
 | One answer split into several `ai_response_received` | calls outside `aiInteraction`, a stream read after the callback returned without `bind`, or a LangChain handler on a model constructor |
 | Events missing from a script or Lambda | `await flush()` before exit |
-| No `total_cost_usd` | no registered price for the model and no provider-reported cost |
+| No `total_cost_usd` | no registered price for the model (for Gemini, for its provider `gcp.gemini` / `gcp.vertex_ai`) and no provider-reported cost |
+| No `trace_id` | opt-in since 0.5.0: pass `traceId` / `setTraceId()`, or register the span processor with `linkTraceId: true` |
 | `response_text` / `tool_breakdown` entries missing on a large answer | the event was over 30,000 bytes of properties: captured text is dropped first, then breakdown entries from the end |
 
 `RUDDERSTACK_AI_DEBUG=1` logs everything the SDK drops or ignores.

@@ -29,12 +29,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`rudder-ai-events`** — new plugin that onboards an existing app to RudderStack AI events
   (spec v0.3) with the `@rudderstack/ai` (Node.js), `rudderstack-ai` (Python) and `ai-sdk-go` (Go)
-  SDKs, pinned to the release that ships spec v0.3.
+  SDKs, pinned to the first releases on spec v0.3: `@rudderstack/ai` 0.5.0, `rudderstack-ai` 0.5.0 and
+  `ai-sdk-go` v0.1.0 (installable with `GOPRIVATE` while the Go repository is internal).
   - `rudder-ai-events-setup` — discovers chat, background-agent, browser-client and MCP server
     surfaces (read-only), drafts the committed `ai-events.yaml` plan (surfaces with channel,
     identity, intents with `other`, MCP `identify` / `request_context` / declared tool events,
     scores, event rules, classifier, content capture, optional trace ID link, legacy-event
-    migration, time to integrate), lists the known limits that apply, and stops for explicit approval.
+    migration, time to integrate), lists the known limits that apply (static intent buckets that need
+    manual review, private Go install, opt-in `trace_id`, OpenAI Agents `mcp_server` needing tracing,
+    `requested_model` false positives on Bedrock and Vertex AI IDs, unordered `argument_keys`), and stops
+    for explicit approval.
   - `rudder-ai-events-instrument` — exact-pinned install, `configure()` with the existing RudderStack
     client, client wrappers or framework integrations, one interaction per user turn, one task per
     background run, MCP server wrappers for every supported MCP library (Node.js SDK 1.x and 2.x,
