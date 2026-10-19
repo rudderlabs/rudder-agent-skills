@@ -63,6 +63,23 @@ if err := rudderstackai.Configure(
 }
 ```
 
+A client created on first use (or events that must carry the app's own message context, such as `context.groupId`): pass an adapter that implements `analytics.Client`.
+
+```go
+type lazyClient struct{}
+
+func (lazyClient) Enqueue(m analytics.Message) error {
+	if t, ok := m.(analytics.Track); ok && t.Context != nil {
+		t.Context.Extra["groupId"] = currentGroupID() // same context the app's own Enqueue calls set
+		m = t
+	}
+	return getClient().Enqueue(m)
+}
+func (lazyClient) Close() error { return getClient().Close() }
+
+// rudderstackai.WithAnalytics(lazyClient{})
+```
+
 `Configure` changes only the options passed and returns an error for an invalid one (changing nothing). `WrapMCPServer` / `ruddermcpgo.WrapServer` take their own options; `Configure` does not apply to them.
 
 ## 3. Wrap the model client
@@ -115,6 +132,7 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 
 - `StartInteraction(ctx, opts)` returns `(ctx, *Interaction)` for code that cannot use a callback; call `in.End(rudderstackai.EndOptions{})` when the answer is out.
 - Streams: read them inside the `RunInteraction` function (`defer stream.Close()`); there is no `bind`, and a stream still open when the function returns is recorded as cancelled.
+- Stop / abort: a `context.Canceled` error returned from the function already ends the answer as `cancelled`. When the app's stop handling returns `nil` instead, use `StartInteraction` and `in.End(rudderstackai.EndOptions{Status: rudderstackai.StatusCancelled})`.
 - `client_disconnected` is detected only under `Middleware`; `paused` never is. Otherwise pass `EndOptions{ClientDisconnected: true}` or `EndOptions{Status: rudderstackai.StatusPaused, PauseReason: ...}` from the app's own handling (`StartInteraction` + `End`).
 - analytics-go gives every track call without an `anonymousId` a random one, also when `userId` is set, so with no cookie and no `AnonymousID` the `anonymousId` differs per event: join AI events to users on `userId`.
 - Statuses from the integrations: an Anthropic `max_tokens` or OpenAI/Gemini/Bedrock length stop on the last call makes the answer `incomplete` with `error_type: length`; a content filter is an `error`.
@@ -184,6 +202,7 @@ err := rudderstackai.Configure(
 )
 ```
 
+- `WithClassifier` only with `labels_set_by: classifier`. With `labels_set_by: app`, call `in.SetIntent(label)` / `in.SetOutcome(label)` inside the interaction with the app's own category or outcome, mapped to the plan's lists.
 - Scores from elsewhere: `rudderstackai.TrackScore(ctx, rudderstackai.TrackScoreOptions{Score: rudderstackai.Score{EvaluationName: "groundedness", ScoreValue: &v, Evaluator: rudderstackai.EvaluatorModel}, InteractionID: iid, ConversationID: cid})`.
 - Prices: `TierMultipliers`, `LongContext`, `ServerToolPerCall` and `CacheWrite1hPerMtok` as the plan lists. Gemini API (`gcp.gemini`) and Vertex AI (`gcp.vertex_ai`, also Anthropic on Vertex AI) are priced separately: a price with `Provider` covers that one only, a price without covers both (`google` and `google.vertex` still work as aliases). Azure deployments: `WithAzureDeploymentModels`.
 
@@ -262,6 +281,45 @@ if err := ruddermcpgo.WrapServer(s, ruddermcpgo.Options{
 - Elicitation: `ruddermcpgo.RequestElicitation(ctx, s, request)` in place of `s.RequestElicitation`.
 
 Both: MCP Events (`MCPEvents: true`, `TrackMCPEventSubscription`, `WrapMCPEventSender`, and the `ruddermcpgo` equivalents) only when the plan turns it on: experimental. A subscription change without `SubscriptionID` or `EventName`, or a delivery without `SubscriptionID`, `EventName` or `EventID`, is dropped with one warning per process (never sent with placeholders); the wrapped sender still runs and returns its result unchanged. Existing hand-built `mcp_<method>_success` / `mcp_<method>_error` events that carry raw requests or results are legacy events: keep them behind the flag until the plan's date. A Go agent that calls tracked MCP servers sends `in.ID()` as `com.rudderstack/interaction_id` in the request `_meta` itself; no Go integration adds it.
+
+## 13. Tests
+
+Per surface, a server-side test that drives the handler with the app's existing model mock and asserts the captured events through a stub client:
+
+```go
+type recorder struct {
+	mu     sync.Mutex
+	events []analytics.Track
+}
+
+func (r *recorder) Enqueue(m analytics.Message) error {
+	if t, ok := m.(analytics.Track); ok {
+		r.mu.Lock()
+		r.events = append(r.events, t)
+		r.mu.Unlock()
+	}
+	return nil
+}
+func (r *recorder) Close() error { return nil }
+
+func TestChatSendsOneAnswer(t *testing.T) {
+	rec := &recorder{}
+	if err := rudderstackai.Configure(rudderstackai.WithAnalytics(rec)); err != nil {
+		t.Fatal(err)
+	}
+	chatHandler(httptest.NewRecorder(), httptest.NewRequest("POST", "/chat", strings.NewReader(`{"message":"hi","conversation_id":"c1"}`)))
+	rudderstackai.Flush(0)
+	var answers []analytics.Track
+	for _, e := range rec.events {
+		if e.Event == "ai_response_received" {
+			answers = append(answers, e)
+		}
+	}
+	if len(answers) != 1 || answers[0].Properties["conversation_id"] != "c1" {
+		t.Fatalf("%+v", answers)
+	}
+}
+```
 
 ## Troubleshooting
 

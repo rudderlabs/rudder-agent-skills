@@ -46,6 +46,19 @@ export const analytics = new Analytics(process.env.RUDDERSTACK_WRITE_KEY!, {
 
 Use the env var names from the plan. Do not create or edit `.env` files: list the variable names for the user to set.
 
+A client created on first use (or events that must carry the app's own message context, such as `context.groupId`): pass an adapter. `aiTask` and `flush()` call its `flush`.
+
+```ts
+import { configure, type AnalyticsClient } from '@rudderstack/ai';
+
+const lazyAnalytics: AnalyticsClient = {
+  track: (message) =>
+    getAnalytics().track({ ...message, context: { ...message.context, groupId: currentGroupId() } }), // the app's getter; same context its own track() calls set
+  flush: (callback) => getAnalytics().flush(callback),
+};
+configure({ analytics: lazyAnalytics });
+```
+
 ## 3. Wrap the model client (or add the framework integration)
 
 Wrap where the client is constructed; the wrapped object has the same type and API, so call sites do not change:
@@ -65,11 +78,13 @@ export const openai = wrapOpenAI(new OpenAI());
 | Bedrock | `wrapBedrock(new BedrockRuntimeClient({ region }))` from `@rudderstack/ai/bedrock` |
 | Vercel AI SDK | `wrapLanguageModel({ model, middleware: rudderstackMiddleware({ agentName }) })` from `ai` + `@rudderstack/ai/vercel-ai-sdk` |
 | LangChain / LangGraph | `const handler = new RudderStackCallbackHandler({ agentName: 'support_agent' })` from `@rudderstack/ai/langchain`; pass it in the `invoke` / `stream` config (`{ callbacks: [handler] }`), never in a model constructor |
-| Claude Agent SDK | replace `query(params)` with `trackedQuery(params, { userId, conversationId })` from `@rudderstack/ai/claude-agent-sdk` (same messages) |
+| Claude Agent SDK | replace `query(params)` with `trackedQuery(params, { userId, conversationId })` from `@rudderstack/ai/claude-agent-sdk` (same messages); when the app has its own `query()` chokepoint or its tests mock `query`, wrap the stream instead: `trackMessages(query(params), { userId, conversationId, resumed })` (`trackedQuery` calls the SDK's `query()` inside the package, where a `vi.mock` of the SDK does not reach) |
 | OpenAI Agents SDK | `trackedRun(runner, agent, input, runOptions, { userId, feature })` from `@rudderstack/ai/openai-agents` |
 | Anything else | inside the interaction: `interaction.recordCall({ provider, model, inputTokens, outputTokens, responseId })` (example `manual-interaction`) |
 
 One integration per call path: do not add a LangChain handler around a wrapped client on purpose.
+
+Claude Agent SDK: construct `query()` inside the `aiInteraction` / `aiTask` callback, not before it, or in-process MCP tools and hooks are counted outside the interaction.
 
 `requested_model` needs no code: the OpenAI, Anthropic, Google Gen AI and Vercel AI SDK integrations send it, streamed or not, when a router or fallback served another model than the one requested; a dated snapshot of the requested model (`claude-haiku-4-5` served as `claude-haiku-4-5-20251001`) is the same model and sends none.
 
@@ -157,6 +172,8 @@ app.post('/api/chat', async (req, res) => {
 - `client_disconnected: true` is sent automatically when the request closes under `aiContextMiddleware()` / `withAiContext()` or a bound stream is cancelled before the answer ends; elsewhere pass `interaction.end({ clientDisconnected: true })` from the app's own close handler, if it has one.
 - Statuses need no code: the integrations report `paused` with `pause_reason` (tool approval, LangGraph `interrupt()`, Claude Agent SDK defer), `incomplete` with `error_type` (`max_turns`, `max_budget_usd`, `length`: a last call cut off at the token limit, including Anthropic `stop_reason: max_tokens`) and `content_filter` as an error.
 - Business-specific extras ride on the answer: `interaction.end({ extraProperties: { ... } })`; SDK-owned names are ignored.
+- Stop / abort: an abort error thrown out of the callback already ends the answer as `cancelled`. When the app's stop handler catches it and returns normally, call `interaction.end({ status: 'cancelled' })` there.
+- Tracing side effects: `registerTracing()` / `createSpanProcessor()` also export AI spans as `ai_otel_span` events and add `user.id`, `gen_ai.conversation.id` and the interaction ID to AI spans, which every other exporter on that provider (Langfuse, ...) then receives. When another tool owns tracing, register neither: pass `traceId: trace.getActiveSpan()?.spanContext().traceId` (from `@opentelemetry/api`).
 
 Streaming: return the stream from the callback, or bind the one you pipe after the callback returns.
 
@@ -169,7 +186,7 @@ res.end();
 // Express + Vercel AI SDK: stream: interaction.bind(toUIMessageStream({ stream: result.stream }))
 ```
 
-Claude Agent SDK with resumed sessions: store `usageSnapshot(resultMessage)` with the session and pass it back as `usageBaseline`, or each resumed turn re-counts the whole session.
+Claude Agent SDK with resumed sessions: store `usageSnapshot(resultMessage)` with the session and pass it back as `usageBaseline`, or each resumed turn re-counts the whole session. When the snapshot cannot be stored, pass `resumed: true` to `trackMessages`: tokens then come from the turn's own messages and cost only from registered prices (section 10).
 
 ## 5. Feedback and other actions (server copy)
 
@@ -255,7 +272,9 @@ configure({
 
 Names starting with `ai_` or `mcp_` throw. If `properties()` throws or its output takes the event over 30,000 bytes, the event is sent without it. `when: always` needs no `when` function. Results reach a rule only when the app sends the tool result back to the model inside the same `aiInteraction`; an app that never executes the tool gets the event with `tool_status: "unknown"`.
 
-## 9. Classifier (`spec.config.classifier.enabled: true`)
+## 9. Classifier (`spec.config.labels_set_by: classifier`)
+
+`labels_set_by: app` needs no classifier: inside the interaction, `interaction.setIntent(label)` / `interaction.setOutcome(label)` with the app's own per-turn category or outcome, mapped to the plan's lists.
 
 ```ts
 import Anthropic from '@anthropic-ai/sdk';
@@ -314,7 +333,7 @@ Register each model the app uses; a family name never prices another model (`gpt
 ## 11. Legacy event behind a flag
 
 ```ts
-// Old hand-built event, kept for the migration window (ai-events.yaml legacy_events).
+// Old hand-built event, kept for the migration window (the plan's legacy_events).
 if (process.env.AI_EVENTS_LEGACY_EVENT !== 'false') {
   analytics.track({ userId, event: 'chatTurnCompleted', properties: { ... } }); // unchanged
 }
@@ -361,6 +380,27 @@ const handler = createMcpHandler(buildServer);
 - A declared tool event follows its `mcp_tool_called` on success and on failure, including a call whose arguments failed validation (`tool_status: error`).
 - An agent built with this SDK and the OpenAI Agents SDK passes its `interaction_id` to MCP servers with `toolMetaResolver: rudderStackMcpToolMeta()` (from `@rudderstack/ai/openai-agents`) on `MCPServerStdio` / `MCPServerStreamableHttp` / `MCPServerSSE`, so each `mcp_tool_called` joins the answer that made it (example `openai-agents-mcp`). It adds `com.rudderstack/trace_id` only when the interaction has a `trace_id`, and `traceparent` only with `linkTraceId: true`. The agent's `tool_breakdown` entries for those tools carry `mcp_server`, read from the Agents SDK function span: keep Agents SDK tracing on (no `tracingDisabled`, no `OPENAI_AGENTS_DISABLE_TRACING`).
 - MCP Events (`mcpEvents: true`, `trackMcpEventSubscription`, `wrapMcpEventSender`) only when the plan turns it on: experimental. A delivery without `subscriptionId` or `eventId` is dropped with one warning per process; a missing `eventName` is sent as `unknown`.
+
+## 13. Tests
+
+Per surface, a server-side test that drives the entry point with the app's existing model mock and asserts the captured events through a stub client:
+
+```ts
+import { configure, flush, type TrackMessage } from '@rudderstack/ai';
+
+const events: TrackMessage[] = [];
+beforeEach(() => {
+  events.length = 0;
+  configure({ analytics: { track: (m) => void events.push(m) } });
+});
+
+it('sends one answer per chat turn', async () => {
+  await request(app).post('/api/chat').send({ message: 'hi', conversationId: 'c1' }); // the app's own test client
+  await flush();
+  const answer = events.find((e) => e.event === 'ai_response_received');
+  expect(answer?.properties).toMatchObject({ conversation_id: 'c1', feature: 'support_bot', response_status: 'success' });
+});
+```
 
 ## Troubleshooting
 

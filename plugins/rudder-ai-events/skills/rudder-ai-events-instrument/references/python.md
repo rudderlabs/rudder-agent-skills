@@ -49,6 +49,21 @@ rudder_client = Client(
 
 The module form also works: `import rudderstack.analytics as rudder_analytics; rudder_analytics.write_key = ...; rudder_analytics.dataPlaneUrl = ...; configure(analytics=rudder_analytics)`. Use the env var names from the plan; never create or edit `.env` files.
 
+A client created on first use (or events that must carry the app's own message context, such as `context.groupId`): pass an adapter. The SDK calls `track(**kwargs)` and, on flush, `flush()`.
+
+```python
+class LazyRudder:
+    def track(self, **kwargs):
+        context = {**(kwargs.pop("context", None) or {}), "groupId": current_group_id()}  # same context the app's own track() calls set
+        return get_rudder_client().track(context=context, **kwargs)
+
+    def flush(self):
+        return get_rudder_client().flush()
+
+
+rudderstack.ai.configure(analytics=LazyRudder())
+```
+
 ## 3. Wrap the model client (or add the framework integration)
 
 ```python
@@ -67,7 +82,7 @@ When a router or fallback serves another model than the one requested, the OpenA
 | Google Gen AI | `wrap_google_genai(genai.Client(...))` from `rudderstack.ai.google_genai` (provider `gcp.gemini`, or `gcp.vertex_ai` for a `vertexai=True` client) |
 | Bedrock | `wrap_bedrock(boto3.client("bedrock-runtime", region_name=...))` from `rudderstack.ai.bedrock` |
 | LangChain / LangGraph / Deep Agents | `handler = RudderStackCallbackHandler(agent_name="support_agent")` from `rudderstack.ai.langchain`; add it to the run's `config={"callbacks": [handler]}`, never to a model constructor; tag agents with `"tags": ["agent:<name>"]` |
-| Claude Agent SDK | `tracked_query(prompt=..., options=..., user_id=..., conversation_id=...)` from `rudderstack.ai.claude_agent_sdk` instead of `query()`; `ClaudeSDKClient`: `async for m in tracked_messages(client.receive_response())`. Resumed sessions across processes: store `usage_snapshot(result_message)` with the session and pass it back as `usage_baseline=`, or a resumed turn counts the whole session |
+| Claude Agent SDK | `tracked_query(prompt=..., options=..., user_id=..., conversation_id=...)` from `rudderstack.ai.claude_agent_sdk` instead of `query()`; `ClaudeSDKClient`, an app-owned `query()` chokepoint, or tests that patch `claude_agent_sdk.query` (`tracked_query` imported its own reference): `async for m in tracked_messages(query(...), user_id=..., conversation_id=...)`. Resumed sessions across processes: store `usage_snapshot(result_message)` with the session and pass it back as `usage_baseline=`, or a resumed turn counts the whole session; when it cannot be stored, `tracked_messages(..., resumed=True)` counts the turn from its own messages, with cost only from registered prices. Call `query()` inside the `ai_interaction` / `ai_task`, or in-process MCP tools and hooks are counted outside it |
 | OpenAI Agents SDK | `await tracked_run(agent, input, tracking={"user_id": ..., "feature": ...})` from `rudderstack.ai.openai_agents` (`tracked_run_sync`, `tracked_run_streamed` for `Runner.run_sync` / `run_streamed`); keep Agents SDK tracing on (the default): agents used as tools and `tool_breakdown`'s `mcp_server` for an agent's MCP tools come from its trace spans |
 | LiteLLM SDK | `instrument_litellm()` once at startup, from `rudderstack.ai.litellm` |
 | Anything else | inside the interaction: `interaction.record_call(provider=..., model=..., input_tokens=..., output_tokens=..., response_id=...)` |
@@ -114,6 +129,8 @@ def chat(body: ChatRequest, request: Request, user: User = Depends(current_user)
 - `client_disconnected: true` comes from `AIContextMiddleware` (ASGI: FastAPI, Starlette) or a bound stream closed early. Django and Flask (WSGI) report no disconnect: only a bound streaming generator closed by the server sets it; pass `interaction.end(client_disconnected=True)` where the app detects it itself.
 - Statuses need no code: the integrations report `paused` with `pause_reason` (`approval`, `human_input`, `deferred_tool`, `auth_required`, `other`), `incomplete` with `max_turns`, `max_budget_usd` or `length` (a last call cut off at the token limit, including Anthropic `stop_reason: max_tokens`), and `content_filter` as an error. A run the app pauses itself: `interaction.end(pause_reason="approval")`.
 - Async routes: `async with ai_interaction(...)` works the same.
+- Stop / abort: `asyncio.CancelledError` (or another cancel) raised out of the block already ends the answer as `cancelled`. When the app's stop handler catches it and returns normally, call `interaction.end(status="cancelled")` there.
+- Tracing side effects: `register_tracing()` / `create_span_processor()` also export AI spans as `ai_otel_span` events and add identity, conversation and interaction ID attributes to AI spans, which every other exporter on that provider (Langfuse, ...) then receives. When another tool owns tracing, register neither: pass `trace_id=format(trace.get_current_span().get_span_context().trace_id, "032x")` (from `opentelemetry`).
 
 Streaming responses keep the interaction open until the stream ends:
 
@@ -232,7 +249,7 @@ rudderstack.ai.configure(
 )
 ```
 
-Only the keys the plan enables. Event names starting with `ai_` or `mcp_` are reserved. Price options the plan may list, through `rudderstack.ai.register_price(model, ...)`: `tier_multipliers={"batch": 0.5, "flex": 0.5, "fast": 2}`, `long_context={"threshold_tokens": 200_000, "input_per_mtok": ..., "output_per_mtok": ...}`, `server_tool_per_call={"web_search": 0.01}`, `cache_write_1h_per_mtok=`. Service tier, 1-hour cache writes and hosted tool calls are read from responses automatically. Gemini API calls report provider `gcp.gemini`, Vertex AI calls `gcp.vertex_ai`, priced separately: register each provider the app calls with `provider=` (`google` / `google.vertex` are accepted aliases). Examples `cost-estimation` (`register_prices`, `estimate_cost`) and `scores-evaluator` (`evaluator=`, `track_score`).
+Only the keys the plan enables; `classifier` only with `labels_set_by: classifier`. With `labels_set_by: app`, call `interaction.set_intent(label)` / `interaction.set_outcome(label)` inside the interaction with the app's own category or outcome, mapped to the plan's lists. Event names starting with `ai_` or `mcp_` are reserved. Price options the plan may list, through `rudderstack.ai.register_price(model, ...)`: `tier_multipliers={"batch": 0.5, "flex": 0.5, "fast": 2}`, `long_context={"threshold_tokens": 200_000, "input_per_mtok": ..., "output_per_mtok": ...}`, `server_tool_per_call={"web_search": 0.01}`, `cache_write_1h_per_mtok=`. Service tier, 1-hour cache writes and hosted tool calls are read from responses automatically. Gemini API calls report provider `gcp.gemini`, Vertex AI calls `gcp.vertex_ai`, priced separately: register each provider the app calls with `provider=` (`google` / `google.vertex` are accepted aliases). Examples `cost-estimation` (`register_prices`, `estimate_cost`) and `scores-evaluator` (`evaluator=`, `track_score`).
 
 A score computed elsewhere (a human review, an offline judge):
 
@@ -247,7 +264,7 @@ track_score(interaction_id=iid, conversation_id=cid, evaluation_name="groundedne
 ## 9. Legacy event behind a flag
 
 ```python
-# Old hand-built event, kept for the migration window (ai-events.yaml legacy_events).
+# Old hand-built event, kept for the migration window (the plan's legacy_events).
 if os.environ.get("AI_EVENTS_LEGACY_EVENT", "true").lower() != "false":
     rudder_client.track(user_id=user.id, event="chatTurnCompleted", properties={...})  # unchanged
 ```
@@ -290,6 +307,32 @@ rudder_client.flush()  # after run() returns; HTTP apps flush in the lifespan sh
 - On 2026-07-28, an elicited call's `input_required` leg sends no `mcp_tool_called`; the retry that completes it does, keeping the leg's `call_index`.
 
 An agent on the OpenAI Agents SDK passes its `interaction_id` to MCP servers with `tool_meta_resolver=rudderstack_mcp_tool_meta()` (from `rudderstack.ai.openai_agents`) on `MCPServerStdio` / `MCPServerStreamableHttp` / `MCPServerSse`, so `mcp_tool_called` joins the answer that made it (example `openai-agents-mcp`). It also sends the interaction's `trace_id` when it has one, and the W3C `traceparent` only under a `link_trace_id=True` span processor; without a `trace_id`, neither side has one.
+
+## 11. Tests
+
+Per surface, a server-side test that drives the entry point with the app's existing model mock and asserts the captured events through a stub client:
+
+```python
+import rudderstack.ai
+
+
+class StubClient:
+    def __init__(self):
+        self.events = []
+
+    def track(self, **kwargs):
+        self.events.append(kwargs)
+
+
+def test_chat_sends_one_answer(client):  # the app's own test client fixture
+    stub = StubClient()
+    rudderstack.ai.configure(analytics=stub)
+    client.post("/chat", json={"message": "hi", "conversation_id": "c1"})
+    rudderstack.ai.flush()
+    answers = [e for e in stub.events if e["event"] == "ai_response_received"]
+    assert len(answers) == 1
+    assert answers[0]["properties"]["conversation_id"] == "c1"
+```
 
 ## Troubleshooting
 

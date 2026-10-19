@@ -30,8 +30,8 @@ Identity: the JavaScript SDK supplies `userId` / `anonymousId` itself; `userId` 
 One helper, so every client AI event carries `source`, `feature` and `surface`, and unknown IDs are left out rather than sent as `null`. Put it in the app's browser analytics module (exported), or at the top of the page script when there is none:
 
 ```js
-const AI_FEATURE = 'support_bot'; // the surface's feature from ai-events.yaml
-const AI_SURFACE = 'web'; // the surface's channel from ai-events.yaml (web | mobile | ...)
+const AI_FEATURE = 'support_bot'; // the surface's feature from the plan's ## Config
+const AI_SURFACE = 'web'; // the surface's channel from the plan's ## Config (web | mobile | ...)
 
 function trackAi(event, properties = {}) {
   const defined = Object.fromEntries(Object.entries(properties).filter(([, v]) => v != null));

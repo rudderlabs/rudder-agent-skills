@@ -1,5 +1,7 @@
 # Verification kit
 
+Plan values below (surfaces, `capture_content`, legacy events, event rules, MCP servers) come from the fenced `yaml` block under `## Config` in `ai-events.md`.
+
 Everything here runs locally, without provider keys and without sending anything to RudderStack. Put the scripts and captures in a scratch directory outside the repo (for example `$TMPDIR/ai-events-verify/`), never in the user's source tree. Python: the mock server runs on 3.9+, `check_events.py` needs 3.10+ (use any such interpreter; it does not have to be the app's).
 
 ## 1. Schemas
@@ -396,7 +398,20 @@ $TMPDIR/ai-events-verify/.venv/bin/python check_events.py events.jsonl \
 
 Pass only the flags that apply: `--capture-content` when the plan turns capture on; `--feature` once per planned feature; `--surface` once per planned channel; `--mcp-server` per planned server name and `--mcp-intent` per entry of its `request_context.intents` (without `other`); `--user-id` / `--expect-session` when the test requests carried a user and cookies; `--expect-legacy` per planned legacy event. The `run:` lines list each background answer; compare them with the plan's `task_name`, `trigger_source`, `conversation_id_source`, `account_id_source`, `on_behalf_of_source` and `child_tasks`. The `mcp call:` lines list each tool call, marked `joined` when its `interaction_id` matches a captured answer.
 
-## 4. Checklist
+## 4. Cost check
+
+When `## Cost` lists prices or legacy events carried cost: list every model ID constant the app can send (grep the source and config; include each Bedrock geo-prefixed form it builds) and call the SDK's estimator after `configure()` with the app's prices. Node.js, from the app's environment:
+
+```ts
+import { estimateCost } from '@rudderstack/ai';
+// provider as captured in usage_breakdown[].provider, e.g. aws.bedrock, anthropic, openai
+const ids: [string, string][] = [['aws.bedrock', 'us.anthropic.claude-sonnet-4-5-20250929-v1:0'] /* , ... */];
+for (const [provider, model] of ids) console.log(provider, model, estimateCost(provider, model, 1000, 100) ?? 'UNPRICED');
+```
+
+Python: `rudderstack.ai.estimate_cost(provider, model, 1000, 100)` returns `None` when unpriced; Go: `rudderstackai.EstimateCost(provider, model, 1000, 100, 0, 0)` returns `ok == false`. Any `UNPRICED` ID is a FAIL.
+
+## 5. Checklist
 
 | Check | Pass when |
 |---|---|
@@ -414,6 +429,10 @@ Pass only the flags that apply: `--capture-content` when the plan turns capture 
 | MCP | one `mcp_client_seen` per client per run; one `mcp_tool_called` per call with `server_name`, `tool_status` and, on errors, `error_type`; `call_index` from 0 with no gaps per `mcp_session_id`, else `interaction_id` (a 2026-07-28 elicitation retry keeps its leg's index); `request_context` in each listed tool schema but never in `argument_keys`, compared as a set (order is unspecified); `intent` from the plan's list or `other`; no argument values, results, URIs or tokens; `identify` puts the OAuth subject in `userId` and the workspace in `account_id` (stdio without auth: `ai_system`); a call sent with `_meta` `com.rudderstack/interaction_id` carries that ID; declared tool events per the server's `event_rules`, also for a call that failed validation (`tool_status: error`) |
 | Statuses | a stopped or cut-off run reports `cancelled`, `paused` with `pause_reason`, or `incomplete` with `error_type` as planned; a closed request reports `client_disconnected: true` where the plan's `client_disconnect` is not `none` |
 | Models | `primary_provider` and `usage_breakdown[].provider` use `openai`, `anthropic`, `aws.bedrock`, `gcp.gemini`, `gcp.vertex_ai`, `azure.ai.openai` or the gateway's vendor; `requested_model` only where the served model differs (a dated snapshot is the same model) and only from integrations that set it (OpenAI, Anthropic, Google Gen AI, the Vercel AI SDK, LiteLLM, manual calls); on Anthropic models through Bedrock or Vertex AI IDs it is a known false positive, not a failure |
+| Cost | every model ID the app can send has a price (section 4); captured answers carry `total_cost_usd` where the plan expects cost |
+| New tests | the server-side tests `rudder-ai-events-instrument` added exist, assert the captured AI events, and pass with the full suite |
+| Breaking and semantic changes | what was captured matches `## Breaking and semantic changes`: legacy events still flow with the legacy flag on, event volume and coverage (which turns emit, background vs user), casing and request or response changes as stated; anything unlisted is a FAIL |
+| Page-load calls | a call that fires on page load or render without a typed prompt is a background run (`trigger: system`, no `ai_user_prompt_created`), not a user prompt |
 | Optional | `trace_id` only when tracing is planned (span processor with `linkTraceId: true` / `link_trace_id=True` in Node.js/Python, `rudderotel` in Go, or the app's own value); declared tool events per `event_rules`; `ai_interaction_classified` when the classifier is on; `ai_interaction_scored` when scores are planned |
 
 Rows for surfaces the app does not have are `n/a` in the report.
