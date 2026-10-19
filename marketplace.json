@@ -5,8 +5,8 @@
     "email": "no-reply@rudderstack.com"
   },
   "metadata": {
-    "description": "Skills for working with RudderStack via CLI, MCP server, Terraform, and Profiles workflows.",
-    "version": "0.0.5"
+    "description": "Skills for working with RudderStack via CLI, MCP server, Terraform, Profiles, and AI events workflows.",
+    "version": "0.0.6"
   },
   "plugins": [
     {
@@ -78,6 +78,20 @@
       "category": "devtools",
       "keywords": ["rudderstack", "profiles", "profile-builder", "identity-resolution", "feature-engineering"],
       "tags": ["rudderstack", "profiles"]
+    },
+    {
+      "name": "rudder-ai-events",
+      "source": "./plugins/rudder-ai-events",
+      "description": "Onboard an existing app to RudderStack AI events (spec v0.3) with the @rudderstack/ai (Node.js), rudderstack-ai (Python) and ai-sdk-go (Go) SDKs: discover AI surfaces, plan ai-events.yaml, instrument, and verify.",
+      "author": {
+        "name": "RudderStack"
+      },
+      "homepage": "https://www.rudderstack.com/",
+      "repository": "https://github.com/rudderlabs/rudder-agent-skills",
+      "license": "MIT",
+      "category": "devtools",
+      "keywords": ["rudderstack", "ai-events", "llm", "agents", "mcp", "instrumentation", "product-analytics"],
+      "tags": ["rudderstack", "ai"]
     }
   ]
 }
