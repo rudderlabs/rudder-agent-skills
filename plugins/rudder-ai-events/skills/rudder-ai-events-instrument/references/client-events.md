@@ -17,7 +17,7 @@ The server SDK sends the prompt, the answer and feedback. The browser sends its 
 
 Either side can opt out of a copy: the plan then omits it (the browser simply does not call `track`; the server endpoint does not call `trackAction`). Client copies are never sampled: if the app samples its browser analytics, send them outside that sampling, since the per-interaction gap needs every row.
 
-Gaps, matched per `interaction_id`: a client prompt with no server prompt means the request never reached the SDK; a server answer with no client answer means it was produced but not shown, or the client event was lost (ad blocker, failed render). The server's `client_disconnected: true` on its answer separates the user leaving from a lost client event. The spec v0.3 SDKs set it when the request closes under their middleware (Node.js middleware, Python ASGI) or a bound stream is cancelled; Django and Flask (WSGI) cannot see a disconnect, so there a missing client copy stays ambiguous.
+Gaps, matched per `interaction_id`: a client prompt with no server prompt means the request never reached the SDK; a server answer with no client answer means it was produced but not shown, or the client event was lost (ad blocker, failed render). The server's `client_disconnected: true` on its answer separates the user leaving from a lost client event. The spec v0.3 SDKs set it when the request closes under their middleware (Node.js middleware, Python ASGI, Go `rudderstackai.Middleware`) or a bound stream is cancelled; Django and Flask (WSGI) cannot see a disconnect, so there a missing client copy stays ambiguous.
 
 Each side reports what it saw: never forward model, provider, tokens, cost, tool counts, `finish_reason` or `trace_id` from the server to the browser to re-send. They stay on the server event; join on `interaction_id`.
 
@@ -30,8 +30,8 @@ Identity: the JavaScript SDK supplies `userId` / `anonymousId` itself; `userId` 
 One helper, so every client AI event carries `source`, `feature` and `surface`, and unknown IDs are left out rather than sent as `null`. Put it in the app's browser analytics module (exported), or at the top of the page script when there is none:
 
 ```js
-const AI_FEATURE = 'support_bot'; // the surface's feature from ai-events.yaml
-const AI_SURFACE = 'web'; // the surface's channel from ai-events.yaml (web | mobile | ...)
+const AI_FEATURE = 'support_bot'; // the surface's feature from the plan's ## Config
+const AI_SURFACE = 'web'; // the surface's channel from the plan's ## Config (web | mobile | ...)
 
 function trackAi(event, properties = {}) {
   const defined = Object.fromEntries(Object.entries(properties).filter(([, v]) => v != null));

@@ -1,6 +1,6 @@
 # Discovery heuristics
 
-Read-only. Use Glob and Grep (or `rg` / `grep -rn`) over source files; skip `node_modules/`, `.venv/`, `venv/`, `dist/`, `build/`, `.next/`, `vendor/` and lockfiles except to read resolved versions. Never open `.env*`, `*.pem`, `*.key`, secrets files or credential stores. Every finding goes into `ai-events.yaml` as a `path` plus a `symbol` (route, function, variable).
+Read-only. Use Glob and Grep (or `rg` / `grep -rn`) over source files; skip `node_modules/`, `.venv/`, `venv/`, `dist/`, `build/`, `.next/`, `vendor/` and lockfiles except to read resolved versions. Never open `.env*`, `*.pem`, `*.key`, secrets files or credential stores. Every finding goes into `ai-events.md` (its Config block) as a `path` plus a `symbol` (route, function, variable).
 
 ## 1. Runtimes and manifests
 
@@ -40,11 +40,21 @@ Go (`github.com/rudderlabs/ai-sdk-go`, one module per integration; read the vers
 | Anthropic (also its Bedrock and Vertex AI clients) | `github.com/anthropics/anthropic-sdk-go` (v1.78.0) | `rudderanthropic.WithTracking()` |
 | Google Gen AI (Gemini API and Vertex AI) | `google.golang.org/genai` (v1.72.0) | `ruddergenai.HTTPClient()` |
 | Amazon Bedrock (`Converse`, `ConverseStream`) | `github.com/aws/aws-sdk-go-v2/service/bedrockruntime` (v1.63.1) | `rudderbedrock.WithTracking()` |
-| MCP servers, official SDK | `github.com/modelcontextprotocol/go-sdk` (v1.8) | `rudderstackai.WrapMCPServer` (section 5) |
-| MCP servers, mcp-go | `github.com/mark3labs/mcp-go` (v0.55.1 to v1.1.1) | `ruddermcpgo.WrapServer` (section 5) |
+| MCP servers, official SDK | `github.com/modelcontextprotocol/go-sdk` (v1.8.0) | `rudderstackai.WrapMCPServer` (section 5) |
+| MCP servers, mcp-go | `github.com/mark3labs/mcp-go` (v0.55.1 or later; tested to v1.2.1) | `ruddermcpgo.WrapServer` (section 5) |
 | Anything else, including the older `github.com/openai/openai-go` v1/v2, LangChainGo, agent frameworks | | `Interaction.RecordCall()` |
 
-A library outside its supported range is a blocker for that integration: record it and ask the user whether to upgrade the library or use `recordCall` / `record_call` instead. These ranges are from the spec v0.3 SDK branches; once the release is out, re-read its README compatibility table and trust it over this one.
+### Install preflight
+
+Find what would stop the install before any code is written; record each under Dependencies and blockers.
+
+| Check | Where |
+|---|---|
+| Release-age gates | pnpm `minimumReleaseAge` / `minimumReleaseAgeExclude` (`pnpm-workspace.yaml`, `.npmrc`); npm `min-release-age` / `before` (`.npmrc`); uv `exclude-newer` (`pyproject.toml` `[tool.uv]`, `uv.toml`). An SDK release newer than the gate needs an exemption with a removal date. |
+| Private registries and auth | `registry=` / `@scope:registry=` in `.npmrc`, `.yarnrc.yml` `npmRegistryServer`, `[[tool.uv.index]]`, `pip.conf` `index-url`, CodeArtifact login scripts (`aws codeartifact login`, `codeartifact` in `package.json` scripts or CI); Go `GOPRIVATE` / `GOPROXY` in CI and `go env` files. Record the registry and how auth is obtained, never a token. |
+| Peer ranges | the SDK's `peerDependencies` (`npm view @rudderstack/ai peerDependencies`) against the app's resolved versions; a conflict is a blocker. |
+
+A library outside its supported range is a blocker for that integration: record it and ask the user whether to upgrade the library or use `recordCall` / `record_call` instead. These ranges are from `@rudderstack/ai` 0.5.0, `rudderstack-ai` 0.5.0 and `ai-sdk-go` v0.1.0; for a later release, re-read its README compatibility table and trust it over this one.
 
 ## 2. Call sites to entry points
 
@@ -69,6 +79,7 @@ Then walk callers up to the entry point and classify the surface:
 |---|---|---|
 | HTTP route that a person's UI calls: `app.post(`, `router.post(`, Next.js `route.ts` `export async function POST`, Hono/Fastify routes, FastAPI `@app.post`, Django views, Flask `@app.route`, Go `http.HandleFunc(` / `mux.HandleFunc(` / chi, gin, echo routes, WebSocket/SSE handlers | `chat` | one interaction per user turn |
 | Cron or scheduler (`node-cron`, `cron.schedule`, `@Cron`, `APScheduler`, `celery beat`, `schedule.every`, GitHub Actions `schedule:`), queue consumer (`bullmq Worker`, `sqs`, `kafka` consumer, `celery @task`, `rq`), webhook route called by another system, Lambda / Cloud Function `handler`, CLI script `if __name__ == "__main__"` / `bin/` scripts / Go `cmd/` binaries, Slack bot event handlers | `background` | one task per job or run (`aiTask` / `ai_task`) |
+| A UI call that fires on page load or render without a typed prompt (suggestions, summaries, auto-titles) | `background` | one task per call (`trigger_source: user`) |
 | An HTTP route used by another service rather than a person | ask the user: chat if a person waits for the answer, else background | |
 
 One code path can serve both (a function called from a route and from a cron): record both entry points; the interaction or task is opened at the entry point, not in the shared function.
@@ -89,7 +100,7 @@ Background granularity: note what one run is (the whole cron invocation, one que
 | Legacy browser SDK v1.1 | `rudder-sdk-js`, `cdn.rudderlabs.com/v1.1` (cookies unsupported by the server SDKs: note it, suggest a v3 upgrade, do not do it) |
 | Other analytics | `analytics.load(` (Segment), `posthog.init(`, `mixpanel.init(`, `amplitude.init(`, `gtag(` |
 | Chat UI | components or templates with `chat`, `assistant`, `copilot`, `message`, `prompt` in names; `useChat(` (Vercel AI SDK UI); `fetch('/api/chat'` / EventSource / WebSocket calls to the chat route |
-| Feedback and actions | thumbs up/down, `rating`, `feedback`, copy-to-clipboard (`navigator.clipboard.writeText`), share, report, regenerate/retry buttons, cards, sources or links opened from an answer (click-through), and the endpoints they call; for each endpoint, whether its request already carries the answer's ID and the conversation ID (`trackAction` needs both) |
+| Feedback and actions | thumbs up/down, `rating`, `feedback`, copy-to-clipboard (`navigator.clipboard.writeText`), share, report, regenerate/retry buttons, approval or interactive blocks the user accepts or rejects (`ai_user_action` `accepted` / `rejected`), cards, sources or links opened from an answer (click-through), and the endpoints they call; for each endpoint, whether its request already carries the answer's ID and the conversation ID (`trackAction` needs both) |
 | Browser event sampling | a sample rate or `Math.random()` gate around `rudderanalytics.track` in the app's analytics module; client copies of AI events must bypass it |
 | Assistant open/close, conversation list | launcher/toggle handlers, new-chat, switch, rename, delete conversation handlers |
 
@@ -106,9 +117,11 @@ No RudderStack JavaScript SDK on the page: the `client` surface is `status: skip
 | Hand-built AI events | `track(` / `.track(` calls whose event name or properties mention `ai`, `llm`, `gpt`, `chat`, `prompt`, `completion`, `answer`, `assistant`, `turn`, `message`, `tokens`, `model`, `cost`, `feedback`; Segment/PostHog `capture(` calls with the same |
 | Tracing tools | `langfuse` (`@langfuse/*`, `langfuse`), `langsmith` (`LANGCHAIN_TRACING_V2`, `langsmith`), OpenTelemetry (`@opentelemetry/*`, `opentelemetry-*`, `NodeSDK`, `TracerProvider`), `traceloop`, `openinference`, `braintrust`, `helicone`, `@vercel/otel` |
 
-For each hand-built AI event, record the event name, `path:line`, its properties, and propose a mapping to the standard events (see `ai-events-yaml.md`, `legacy_events`).
+For each hand-built AI event, record the event name, `path:line`, its properties, and propose a mapping to the standard events (see `ai-events-md.md`, "Mapping hand-built events"). Then compare each field by meaning, not name, against the checks in `ai-events-md.md` ("Breaking-change checks"): cumulative vs per-turn cost, status vocabulary, requested vs served model, latency start point, which turns emit, client-only fields, and event-name casing. Read how the field is computed, not just its name. Note tracking-plan codegen (RudderTyper output, a generated `analytics` module, `ruddertyper.yml`) and the repo's event-name casing.
 
-For a tracing tool, find how the current trace ID is read (`langfuse.getCurrentTraceId()`, `get_current_trace_id()`, `trace.getActiveSpan()?.spanContext().traceId`, LangSmith run tree `trace_id`) and offer it as `tracing.trace_id_source`. It is optional. OpenTelemetry apps: Node.js and Python fill `trace_id` from the first span inside the interaction once the SDK's span processor is registered (`registerTracing` / `register_tracing`), Go with `WithTraceIDFrom(rudderotel.TraceID)`. Other tools: the app passes it (`traceId` / `trace_id` / `TraceID`), and that value always wins. No tracing tool: `tracing.tool: none`, and do not suggest adding one.
+Cost: when a legacy event carries cost, or the app calls several models in one turn, list every model ID constant the app can send (config, env defaults, constants), Bedrock cross-region IDs with their prefix (`us.`, `eu.`, `apac.`, `global.`, ...) included; each needs a price.
+
+For a tracing tool, find how the current trace ID is read (`langfuse.getCurrentTraceId()`, `get_current_trace_id()`, `trace.getActiveSpan()?.spanContext().traceId`, LangSmith run tree `trace_id`) and offer it as `tracing.trace_id_source`. It is optional and opt-in. OpenTelemetry apps: Node.js and Python fill `trace_id` from the first span inside the interaction only when the SDK's span processor is registered with `linkTraceId: true` / `link_trace_id=True` (`registerTracing` / `register_tracing`, `createSpanProcessor` / `create_span_processor`), Go with `WithTraceIDFrom(rudderotel.TraceID)`. Other tools: the app passes it (`traceId` / `trace_id` / `TraceID`), and that value always wins. No tracing tool: `tracing.tool: none`, and do not suggest adding one.
 
 ## 5. MCP servers
 
@@ -119,8 +132,8 @@ For a tracing tool, find how the current trace ID is read (`langfuse.getCurrentT
 | Python `mcp` 2.x | `MCPServer(` from `mcp.server.mcpserver`, `Server(` from `mcp.server.lowlevel` | `@server.tool()`, `@server.resource(`, `@server.prompt(` | yes; also 2026-07-28 |
 | Python `mcp` 1.x | `FastMCP(` from `mcp.server.fastmcp`, the 1.x `Server(` from `mcp.server.lowlevel` | `@mcp.tool()` (name = function name unless `name=`) | `>=1.30.0`; protocol up to 2025-11-25 |
 | Python standalone `fastmcp` | `FastMCP(` from `fastmcp` | `@mcp.tool()` | no: `blocked` |
-| Go `github.com/modelcontextprotocol/go-sdk` | `mcp.NewServer(` | `mcp.AddTool(server, &mcp.Tool{Name: "name"`, `server.AddResource(`, `server.AddPrompt(` | v1.8; also 2026-07-28 |
-| Go `github.com/mark3labs/mcp-go` | `server.NewMCPServer(` | `s.AddTool(mcp.NewTool("name"` | v0.55.1 to v1.1.1; 2026-07-28 on v1.x only |
+| Go `github.com/modelcontextprotocol/go-sdk` | `mcp.NewServer(` | `mcp.AddTool(server, &mcp.Tool{Name: "name"`, `server.AddResource(`, `server.AddPrompt(` | v1.8.0; also 2026-07-28 |
+| Go `github.com/mark3labs/mcp-go` | `server.NewMCPServer(` | `s.AddTool(mcp.NewTool("name"` | v0.55.1 or later; 2026-07-28 on v1.x only |
 
 For each server record, as `path` plus `symbol`:
 
@@ -132,7 +145,7 @@ For each server record, as `path` plus `symbol`:
 - hand-built analytics already sent from handlers (`mcp_<method>_success`, raw request or result properties): legacy events to map and flag.
 - elicitation calls (`elicitInput(`, `ctx.elicit(`, `session.Elicit(`, mcp-go `RequestElicitation(`), and MCP Events subscription or webhook code (experimental, off unless asked).
 
-An app that is an MCP *client* (an agent calling MCP tools) is covered by its chat or background integration: those calls appear in `tool_breakdown` with `mcp_server`. When the agent uses the OpenAI Agents SDK and the server is also tracked, plan `rudderStackMcpToolMeta()` / `rudderstack_mcp_tool_meta()` so `mcp_tool_called` joins the calling answer. A Go agent sends `Interaction.ID()` as `com.rudderstack/interaction_id` in the request `_meta` itself.
+An app that is an MCP *client* (an agent calling MCP tools) is covered by its chat or background integration: those calls appear in `tool_breakdown` with `mcp_server` (OpenAI Agents SDK: only with its tracing on). When the agent uses the OpenAI Agents SDK and the server is also tracked, plan `rudderStackMcpToolMeta()` / `rudderstack_mcp_tool_meta()` so `mcp_tool_called` joins the calling answer. A Go agent sends `Interaction.ID()` as `com.rudderstack/interaction_id` in the request `_meta` itself.
 
 ## 6. Identity
 
@@ -152,4 +165,4 @@ Channel (`surface`): web or mobile UI, Slack or Teams bot handlers, email ingest
 
 Attachments: upload handlers or multimodal message parts (`image_url`, `input_image`, `document`, `file` content blocks) on the chat route: plan `attachment_count` / `attachment_types`.
 
-Intents: read, never execute: system prompts (`system:` / `role: "system"` / `SystemMessage(` / prompt template files), tool and function names and their descriptions, route names, feature flags, README and docs pages describing what the assistant does, existing support categories or enums. Never query production data, logs, transcripts or analytics to infer intents.
+Intents: read, never execute: system prompts (`system:` / `role: "system"` / `SystemMessage(` / prompt template files), tool and function names and their descriptions, route names, feature flags, README and docs pages describing what the assistant does, existing support categories or enums. When the app already computes a per-turn category or outcome (a classifier call, a ticket category, a resolution flag), record where: ask whether to reuse it (`setIntent` / `setOutcome`, or `trackScore`) or turn the classifier on. Never query production data, logs, transcripts or analytics to infer intents.
