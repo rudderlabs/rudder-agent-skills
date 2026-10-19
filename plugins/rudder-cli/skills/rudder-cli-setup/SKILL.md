@@ -132,7 +132,7 @@ Workspace Information:
 ## Credential Security
 
 - **Never echo or log your access token**
-- Store tokens in environment variables if needed: `RUDDER_ACCESS_TOKEN`
+- Store tokens in environment variables if needed: `RUDDERSTACK_ACCESS_TOKEN`
 - Add `.env` files to `.gitignore`
 - For CI/CD, use repository secrets
 - Rotate tokens periodically in the RudderStack dashboard
