@@ -22,8 +22,8 @@ Done means one real event reached the destination the user chose, sent by this a
 - **rudder-cli**: check with `rudder-cli --version`. If missing, install with `curl -fsSL https://raw.githubusercontent.com/rudderlabs/rudder-iac/main/install.sh -o /tmp/install-rudder-cli.sh && sh /tmp/install-rudder-cli.sh`. Download the installer and run it as two steps; do not pipe it into a shell.
 - **git**: check with `git --version`.
 - **jq**: check with `jq --version`. Steps 3 and 7 run the jq programs shipped with this skill. If jq is missing, ask the user to install it, for example with `brew install jq` or `sudo apt-get install jq`.
-- **the rudderstack MCP server**: check that the tools list_sources, get_source and get_destination_event_metrics are available to you. It is the HTTP server at https://mcp.rudderstack.com/mcp. It signs in with the user's RudderStack login in the browser (OAuth), not with the access token. The RudderStack plugin for Claude Code brings it; otherwise the user adds it, see step 1. An MCP server added during a session loads only after a restart.
-- **RUDDERSTACK_ACCESS_TOKEN** (environment variable): A read-write access token for the workspace, exported in the shell the agent was started from. Check it with `test -n "$RUDDERSTACK_ACCESS_TOKEN"`. The user creates one on Get started or in Settings, Access tokens. It is for rudder-cli only; MCP signs in separately. Never ask the user to paste it into chat, and never echo it.
+- **the rudderstack MCP server**: check that the tools list_sources, get_source and get_destination_event_metrics are available to you. It is the HTTP server at https://mcp.rudderstack.com/mcp. It signs in with the user's RudderStack login in the browser (OAuth), not with the access token. If no plugin added it, the user adds it, see step 1. An MCP server added during a session loads only after a restart.
+- **RUDDERSTACK_ACCESS_TOKEN** (environment variable): A read-write access token for the workspace, exported in the shell the agent was started from, or saved with `rudder-cli auth login`. `rudder-cli workspace info --json` succeeds when rudder-cli has one. The user creates one on Get started or in Settings, Access tokens. It is for rudder-cli only; MCP signs in separately. Never ask the user to paste it into chat, and never echo it.
 
 ## Rules that hold in every step
 
@@ -42,7 +42,7 @@ Stop and wait for an explicit yes at these gates: step 3 (Goal and plan), step 5
 
 ## Credential Security
 
-- The access token comes from `RUDDERSTACK_ACCESS_TOKEN` and is only for rudder-cli. Never echo it, write it to a file or ask the user to paste it into chat. MCP signs in through the browser; never put the token in an MCP configuration.
+- The access token comes from `RUDDERSTACK_ACCESS_TOKEN` or `rudder-cli auth login` and is only for rudder-cli. Never echo it, write it to a file or ask the user to paste it into chat. MCP signs in through the browser; never put the token in an MCP configuration.
 - Destination secrets live in `rudder/secrets.vars.yaml`, which step 1 git-ignores. Confirm with `git check-ignore rudder/secrets.vars.yaml` before writing a value.
 - The write key goes only in `.env.local` (git-ignored) and in the app's runtime config. Print at most its first 6 characters.
 - Before each commit, run `git diff --cached` and make sure no token, write key or secret is staged.
@@ -145,13 +145,12 @@ elif git status --porcelain -- . ':!rudder' ':!.gitignore' ':!.claude' ':!.agent
 else echo clean; fi
 ```
 
-1. Act on `dir_kind` first, then on `git_state`, with the branches below. If a branch moves you to another folder, run the `git_state` command again there. Unless a branch says otherwise, `work_dir` is the folder you were started in and `sender` is `app`.
-2. Check `rudder-cli --version`. If it is missing, install it with the two-step command under Before you start.
-3. Check the token is set with `test -n "$RUDDERSTACK_ACCESS_TOKEN"`, without printing it.
-4. Run `rudder-cli workspace info --json`. Tell the user the workspace name you are about to change.
-5. If there is no `rudder/` directory, create it. Make sure `.gitignore` has the line `rudder/*.vars.yaml`, creating the file if needed.
-6. Call the MCP tool `user_details`. It answers only when the rudderstack server is connected and signed in.
-7. Compare `selectedWorkspace.id` from `user_details` with `workspaceID` from `workspace info`. If they differ, call `user_switch_workspace` with the CLI's workspace id and tell the user which workspace MCP now reads. MCP and the CLI must talk about the same workspace.
+1. Check `rudder-cli --version`. If it is missing, install it with the two-step command under Before you start.
+2. Run `rudder-cli workspace info --json`. It finds the token in `RUDDERSTACK_ACCESS_TOKEN` or in the config that `rudder-cli auth login` writes, and never prints it. Tell the user the workspace name you are about to change. If `dataPlaneURL` is empty, ask the user for the data plane URL shown in the RudderStack dashboard and keep it as `data_plane_url`.
+3. Call the MCP tool `user_details`. It answers only when the rudderstack server is connected and signed in.
+4. Make MCP read the CLI's workspace. If the MCP workspace tools take a `workspace_id` argument, pass the CLI's `workspaceID` in it on every call. Otherwise compare `selectedWorkspace.id` from `user_details` with `workspaceID` from `workspace info`. If they differ, call `user_switch_workspace` with the CLI's workspace id and tell the user which workspace MCP now reads.
+5. Items 1 to 4 change nothing in the folder. Now act on `dir_kind`, then on `git_state`, with the branches below. If a branch moves you to another folder, run the `git_state` command again there. Unless a branch says otherwise, `work_dir` is the folder you were started in and `sender` is `app`.
+6. If there is no `rudder/` directory, create it. Make sure `.gitignore` has the line `rudder/*.vars.yaml`, creating the file if needed.
 
 If `dir_kind` is `empty`, `home`, `repos` or `other`, so this folder is not an app:
 
@@ -194,15 +193,15 @@ If `dir_kind` is `resume`:
 - Otherwise work out the app's `source_type` as step 2 does and compare it with `type:` in `rudder/sources/*.yaml`. If they differ, say so and ask whether to change it. The CLI cannot change a source's type in place (fact source-type-fixed). On yes, give the source spec a new `id` and `name` with the new `type`, point `rudder/connections.yaml` at the new id, and add the new type's `connection_mode` entry to the destination (fact connection-mode). Step 5's dry run then lists the old source under `Removed resources:`; that is the one removal the user agreed to.
 - In steps 2 to 5, reuse what exists: show the plan from `rudder/plan.events.json` and ask whether to keep or change it, keep the destination unless the user wants another, and apply only what the dry run lists. Commit `rudder/` if this repository does not have it yet.
 
-If the token is not set, or workspace info answers 401:
+If `workspace info` says an access token is required, or answers 401:
 
-- Ask the user to create a read-write access token (Get started, or Settings, Access tokens), export it as RUDDERSTACK_ACCESS_TOKEN in the terminal they start you from, and restart you. Stop.
+- Ask the user to create a read-write access token (Get started, or Settings, Access tokens). Either they export it as RUDDERSTACK_ACCESS_TOKEN in the terminal they start you from and restart you, or they run `rudder-cli auth login` in a terminal and say continue. Stop until then. If `dir_kind` is not `app` or `resume`, give the advice to start again in the app in the same message.
 
 If the rudderstack MCP tools are missing, or a call says the server needs authentication:
 
-- Ask the user to connect the RudderStack MCP server and stop. In Claude Code, if `/mcp` does not list rudderstack, run `claude mcp add --transport http rudderstack https://mcp.rudderstack.com/mcp` in a terminal and start Claude Code again in this directory. Then type `/mcp`, choose rudderstack, choose Authenticate and approve in the browser. In other agents, add an HTTP MCP server with that URL in the agent's MCP settings and sign in. It uses the user's RudderStack login, not the access token. On restart, begin again at this step; it is idempotent.
+- Ask the user to connect the RudderStack MCP server and stop. In Claude Code, if `/mcp` does not list rudderstack, run `claude mcp add --scope user --transport http rudderstack https://mcp.rudderstack.com/mcp` in a terminal. User scope makes it load in every folder, including the app the user may restart in. Then start Claude Code again, type `/mcp`, choose rudderstack, choose Authenticate and approve in the browser. In other agents, add an HTTP MCP server with that URL in the agent's MCP settings and sign in. It uses the user's RudderStack login, not the access token. On restart, begin again at this step; it is idempotent. If `dir_kind` is not `app` or `resume`, give the advice to start again in the app in the same message.
 
-If `user_switch_workspace` says the workspace is not found:
+If the CLI's workspace is not among the workspaces `user_details` lists, or `user_switch_workspace` says it is not found:
 
 - The RudderStack login MCP signed in with cannot see the token's workspace. Ask the user to sign in to MCP with a login that belongs to that workspace, or to create the token in the workspace they mean. Stop.
 
@@ -218,7 +217,7 @@ Record: `work_dir`, `sender`, `workspace_id`, `workspace_name`, `data_plane_url`
 
 If it fails:
 
-- `workspace info` exits 1 naming RUDDERSTACK_ACCESS_TOKEN: the variable is not set in this shell.
+- `workspace info` exits 1 with `access token is required`: this shell has no RUDDERSTACK_ACCESS_TOKEN and `rudder-cli auth login` was never run.
 
 Not in scope yet, mention as a next step if relevant:
 
