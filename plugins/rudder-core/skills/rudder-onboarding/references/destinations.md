@@ -147,9 +147,10 @@ with no value, for the user to fill in:
 WEBHOOK_AUTH:
 ```
 
-- Until the user fills it, validate and apply fail with `key "WEBHOOK_AUTH" has a null or empty value`, which
-  says what is left to fill. Never write `WEBHOOK_AUTH: ""`: it validates clean and sends an empty secret, even
-  though that error message suggests empty quotes.
+- Until the user fills it, validate and apply fail with `key "WEBHOOK_AUTH" has a null or empty value`. The
+  error names only the first empty key, so ask the user to fill every line at once. Never write
+  `WEBHOOK_AUTH: ""`: it validates clean and sends an empty secret, even though that error message suggests empty
+  quotes.
 - Pass it with `--var-file rudder/secrets.vars.yaml` on `validate` and `apply`. An environment variable
   `RUDDER_<KEY>` overrides the file.
 - Substitution pastes the value into the raw text before YAML is parsed, so write every reference in

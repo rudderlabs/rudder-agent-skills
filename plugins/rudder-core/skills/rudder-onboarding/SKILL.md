@@ -68,7 +68,7 @@ Measured, not guessed. Plan around them.
 - **connection-mode**: A destination's config needs a `connection_mode` entry keyed by the source's connection type. A `javascript` source connects as `web`, so `connection_mode: {web: cloud}` (or device or hybrid where the type supports it). Mobile types keep their own name (`ios_swift`, `android_kotlin`, `flutter`, `react_native`) and server types connect as `cloud`. Without the entry validate fails with `event-stream/connection/semantic-valid` and names the missing key. _Source: rudder-iac destination/definitions/common/source_type_mapping.go at d8abd910, verified with validate._
 - **destination-disabled**: A destination's `enabled` defaults to false. Without `enabled: true` validate only warns, and nothing is delivered. _Source: rudder-iac providers/destination/model.go, verified with validate._
 - **webhook-public-url**: A webhook `webhook_url` must be a public http(s) domain. `localhost` and `*.ngrok.io` are rejected. _Source: rudder-iac definitions/webhook/definition.go._
-- **unfilled-secret**: In `rudder/secrets.vars.yaml`, a line `NAME:` with no value makes validate and apply fail with `key "NAME" has a null or empty value`, which tells the user what is left to fill. `NAME: ""` validates clean and sends an empty secret. Never write it, even though that error message suggests empty quotes. _Source: rudder-iac varsubst/resolver/file_resolver.go and project/importer/varfile.go at d8abd910, run 21 Oct 2026._
+- **unfilled-secret**: In `rudder/secrets.vars.yaml`, a line `NAME:` with no value makes validate and apply fail with `key "NAME" has a null or empty value`. It names only the first such key, so a run reports one per attempt. `NAME: ""` validates clean and sends an empty secret. Never write it, even though that error message suggests empty quotes. _Source: rudder-iac varsubst/resolver/file_resolver.go and project/importer/varfile.go at d8abd910, run 21 Oct 2026._
 - **source-type**: The source `type` for each kind of sender: a website or web app `javascript`; an iOS app `ios_swift`; an Android app `android_kotlin`; a Flutter app `flutter`; a React Native app `react_native`; a backend service the type of its language, `node`, `python`, `go`, `java`, `dotnet`, `php`, `ruby` or `rust`. There is no `http` or `webhook` source type. A type the CLI does not accept fails `rudder-cli validate`, which lists the valid ones. _Source: rudder-iac providers/event-stream/source/model.go at d8abd910, verified with validate._
 - **source-type-fixed**: `apply` cannot change an existing source's `type`: the update fails with `type cannot be changed`. A new type needs a source spec with a new `id`, which creates a new source with a new write key and removes the old one. _Source: rudder-iac providers/event-stream/source/handler.go (Update) at d8abd910._
 - **first-commit-adds-whole-files**: In a repository that `git init` has just created, the first commit that touches a file adds the whole file, so `git revert` of that commit deletes it. Reverting this workflow's commits in an app that was not in git deletes the app's files and its own `.gitignore`. A baseline commit of the app as it is, made first, prevents that. _Source: reproduced in scratch, 20 and 21 Oct 2026._
@@ -311,7 +311,7 @@ Visible choices, a free-text fallback, and no secrets typed into chat.
 3. Ask whether the endpoint needs an auth header. Only if it does, add the header with its value as `'{{ .WEBHOOK_AUTH }}'`.
 4. Write `rudder/destinations/<id>.yaml` from the destination reference: `definition_version: 1`, `enabled: true`, and the `connection_mode` entry for `source_type`, `{web: cloud}` for a `javascript` source (fact connection-mode).
 5. For every secret the destination needs (the destination reference lists them per type), reference it as `'{{ .NAME }}'` and add the line `NAME:`, with no value, to `rudder/secrets.vars.yaml` (fact unfilled-secret).
-6. If you created a var file, ask the user to fill it in their editor and say continue. Do not read the values back.
+6. If you created a var file, ask the user to fill every line in it in their editor and say continue. Do not read the values back.
 
 Facts that apply here: **webhook-public-url**, **connection-mode**, **destination-disabled**, **unfilled-secret**.
 
@@ -328,7 +328,7 @@ Files first, then a dry run that says exactly what changes, then apply and commi
 Needs: `source_type`, `source_id`, `destination_id`.
 
 1. Write `rudder/sources/<source_id>.yaml` with `type` set to `source_type`, and `rudder/connections.yaml`, from the destination reference.
-2. Validate: `rudder-cli validate -l rudder --json`, adding `--var-file rudder/secrets.vars.yaml` when the file exists. If this CLI has no `--json` on validate, run it without and read `error[<rule>]: <message> --> <file>:<line>:<col>`.
+2. Validate, printing only the error lines and the exit status: `{ rudder-cli validate -l rudder --var-file rudder/secrets.vars.yaml 2>&1; echo "exit $?"; } | grep -E '^(error|warning)\[|^ *-->|^(Found|Error:|exit) '`, without `--var-file` when the file does not exist. The source lines validate prints under each error show values after substitution, secrets included, so never show its output unfiltered.
 3. Dry run: `rudder-cli apply -l rudder --dry-run` with the same `--var-file`. Show the plan as N to create, N to change, N to delete.
 4. Apply: `rudder-cli apply -l rudder --confirm=false` with the same `--var-file`. Expect exit 0 and the created resources listed.
 5. Commit `rudder/` by its path alone, `git add rudder`, with the message "Add RudderStack event delivery as specs". Step 1 already committed `.gitignore`, and `.mcp.json` stays out. Tell the user that step 9 gives the undo.
@@ -350,7 +350,7 @@ If it fails:
 
 - Dry run lists `Removed resources:` other than the old source the user agreed to replace in step 1: stop (rule), show the list, and go back to step 2's branch.
 - Apply fails with 401 or 403: the token is read-only or for another workspace. Ask for a read-write token.
-- Validate fails with `key "NAME" has a null or empty value`: that secret is not filled yet. Ask the user to fill it in their editor; never write `NAME: ""` (fact unfilled-secret).
+- Validate fails with `key "NAME" has a null or empty value`: that secret is not filled yet, and others may not be either. Ask the user to fill every empty line in the var file in their editor; never write `NAME: ""` (fact unfilled-secret).
 
 ## 6. Instrument
 
