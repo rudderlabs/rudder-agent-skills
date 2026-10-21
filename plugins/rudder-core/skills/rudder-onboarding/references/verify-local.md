@@ -1,61 +1,177 @@
 # Local verification
 
-`rudder-cli local event-stream` is a capture server on your machine. No account, no write key, nothing sent
-to the cloud. It is experimental (rudder-iac#936 with the names from #952), so it needs two variables.
+`rudder-cli sources listen` is a capture server on your machine. It answers the SDK the way RudderStack
+ingestion does, needs no account and no write key, and sends nothing to the cloud. It prints each accepted
+event on stdout as one JSON line, exactly as the SDK sent it, and each refused request on stderr as a
+`refused: STATUS METHOD ROUTE: REASON` line. It checks nothing itself.
 
-## Start it
+`check-events.jq`, beside this file, compares what arrived with `rudder/plan.events.json`. Run it unchanged and
+write no jq of your own. In the commands below, `<CHECK>` is its absolute path (see "Files shipped with this
+skill" in SKILL.md).
 
-```bash
-export RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_LOCAL_EVENT_STREAM=true
-rudder-cli local event-stream serve --port 0 > /tmp/rudder-local.json &
+## Pick a recipe
+
+- **Two calls** where background processes outlive a shell call (Claude Code, Cursor): start the listener and
+  the app, the user acts, then check.
+- **One call** where the agent stops background processes when a call returns (Codex): start, wait while the
+  user acts, check and stop, all in one call.
+- Not sure: start with two calls. If the mark command says the listener is not running, the agent stopped it;
+  switch to one call.
+
+Each shell call is a new shell, so a variable set in one call is gone in the next. Each command prints the
+values the next one needs. Write them into the next command where it shows `<D>`, `<PID>`, `<URL>`, `<FROM>`,
+`<LOGFROM>` and `<CUR>`.
+
+## Exit codes
+
+| Exit | Meaning | What to do |
+|---|---|---|
+| 0 | Pass: every planned event arrived with the agreed property types | Stop the listener and the app, go to step 8 |
+| 1 | The check failed: a planned event is missing, or a property has another type | Read the table and the diagnosis under it, fix the code, run another pass |
+| 2 | The checker could not run: `rudder/plan.events.json` is missing or malformed, or `<CHECK>` is wrong | Fix that and check again. It is not a failed check |
+| 3 | The listener is not running | Read the lines printed from its log and start again. If it was running at the end of the start call and gone by the next one, this agent stops background processes: use one call |
+| 4 | This rudder-cli has no `sources listen` | Tell the user, as below |
+
+Only missing events and wrong types fail a check. Events outside the plan, refused requests and lines that are not
+JSON show in the table as "reported, not a failure", because an app may already send other events, and an SDK
+retry can leave a refused request behind.
+
+On exit 4, tell the user: "Your rudder-cli has no `sources listen`, which checks events on this machine before
+anything reaches RudderStack. I can install the newest release with the installer and try again, or skip this
+check: step 8 still checks the payload at the destination." Install only on a yes, with the two-step command
+under Before you start, and run the start command again. If it still exits 4, the newest release does not have it
+yet: skip to step 8.
+
+## Two calls
+
+### 1. Start the listener
+
+```sh
+export RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_SOURCES_LISTEN=true
+rudder-cli sources listen --help >/dev/null 2>&1 || { rudder-cli --version; echo 'this rudder-cli has no sources listen'; exit 4; }
+d=$(mktemp -d)
+rudder-cli sources listen --port 0 --store >"$d/events" 2>"$d/log" &
+pid=$!
+until grep -q '^{"ready":true' "$d/log"; do kill -0 "$pid" 2>/dev/null || { tail -n 3 "$d/log" >&2; exit 3; }; sleep 0.1; done
+echo "D=$d PID=$pid URL=$(grep -m1 '^{"ready":true' "$d/log" | jq -r .url)"
 ```
 
-The first stdout line is one JSON object:
-`{"ready":true,"url":"http://127.0.0.1:<port>","cursor":0,"serverId":"...","writeKey":"dev",...}`.
-Read `url` and `cursor` from it with jq. `--port 0` picks a free port.
+- `sources` is experimental. The export turns it on for this call, which is the only one that needs it.
+- `--port 0` takes a free port. `--store` keeps every request in memory, so the check can say why nothing arrived.
+- `<D>/events` gets the accepted events and `<D>/log` the ready line and the refused requests.
 
-If your rudder-cli has no `local` command but has `dev listen`, it is the earlier name of the same server:
-`rudder-cli dev listen` and `rudder-cli dev events summary`, gated by `RUDDERSTACK_X_DEV_LISTEN`.
+### 2. Start the app against it
 
-## Point the app at it
+Both the data plane and the config URL must be the listener, or the SDK fetches its config from the cloud, gets a
+400 for the local key and sends nothing at all. For a Vite app:
 
-Both the data plane and the config URL must be the server, or the SDK fetches its config from the cloud,
-gets a 400 for the local key and sends nothing at all:
-
-```bash
-VITE_RUDDERSTACK_WRITE_KEY=dev \
-VITE_RUDDERSTACK_DATA_PLANE_URL=$URL \
-VITE_RUDDERSTACK_CONFIG_URL=$URL \
-npm run dev
+```sh
+VITE_RUDDERSTACK_WRITE_KEY=dev VITE_RUDDERSTACK_DATA_PLANE_URL='<URL>' VITE_RUDDERSTACK_CONFIG_URL='<URL>' npm run dev >'<D>/app.log' 2>&1 &
+echo "APP=$!"
 ```
 
-Serve the app from `http://localhost`. Then ask the user to go through the flow.
+Variables set in the process environment win over `.env.local`, so nothing in the app changes. Read the local
+address from `<D>/app.log` and give it to the user. Serve the app from `http://localhost`: Chrome blocks a public
+HTTPS page from sending to a loopback address. Mobile SDKs take the URL as `controlPlaneUrl` too, and server SDKs
+must flush before the process exits.
 
-## Read what arrived
+### 3. Mark the start of each pass
 
-```bash
-rudder-cli local event-stream events summary --url $URL --since $CURSOR --json
+Run this before every pass, the first one included, and keep the three numbers it prints:
+
+```sh
+d='<D>'; url='<URL>'
+info=$(curl -fsS "$url/_dev/v1/info") || { echo 'the listener is not running'; tail -n 3 "$d/log" >&2; exit 3; }
+echo "FROM=$(( $(wc -l <"$d/events") )) LOGFROM=$(( $(wc -l <"$d/log") )) CUR=$(echo "$info" | jq .cursor)"
 ```
 
-- `.summary.byEvent` maps event name to count. Compare names exactly with the agreed list.
-- `.summary.diagnosis[]` explains empty results: `nothing_new` (no requests; check configUrl and the
-  browser console), `filtered_empty` with `all_accepted` (a filter matched nothing; drop it to see the real
-  names).
-- `.cursor` is where the next read should start.
-- `--wait 30 --min 4` blocks until at least four events arrive or 30 seconds pass.
+FROM and LOGFROM are line counts, so the check reads only what arrives after them. CUR is the listener's own
+cursor, for the diagnosis. Then ask the user to go through the flows and say done.
 
-## Check types
+### 4. Check
 
-The summary does not check property types. For each event and numeric property:
-
-```bash
-rudder-cli local event-stream events list --url $URL --since $CURSOR \
-  --event 'Order Completed' --fields properties --json \
-  | jq -e 'select(.properties.total | type != "number")' && echo "total is not a number"
+```sh
+d='<D>'; pid='<PID>'; url='<URL>'; check='<CHECK>'; from=<FROM>; logfrom=<LOGFROM>; cur=<CUR>
+kill -0 "$pid" 2>/dev/null || { echo 'the listener is not running'; tail -n 3 "$d/log" >&2; exit 3; }
+for i in $(seq 50); do
+  jq -n --slurpfile plan rudder/plan.events.json --rawfile events "$d/events" --rawfile log "$d/log" \
+     --argjson from "$from" --argjson logfrom "$logfrom" -f "$check" >"$d/report.json" || exit 2
+  jq -e .complete "$d/report.json" >/dev/null && break
+  sleep 0.2
+done
+jq -r .table "$d/report.json"
+jq -e .pass "$d/report.json" >/dev/null && exit 0
+echo; echo 'Failed requests since the mark:'
+curl -fsS "$url/_dev/v1/requests?kind=all&failed=true&since=$cur&view=compact" | jq -c '.requests[] | {seq, route, statusCode, kind, reason: .rejection.reason}'
+echo 'Diagnosis:'
+curl -fsS "$url/_dev/v1/events?view=counts&since=$cur" | jq -c '.summary.diagnosis[] | {code, message}'
+exit 1
 ```
 
-`events list --json` prints one event per line exactly as the SDK sent it.
+The loop waits up to 10 seconds for events still in flight, and stops early once every planned event has
+arrived. A last line the listener is still writing is left for the next read, never parsed half-written.
 
-## Stop
+### 5. Stop
 
-Kill the server and the dev server when the check passes. The server keeps nothing on disk.
+```sh
+kill <PID> <APP>
+```
+
+The listener exits 0. The files in `<D>` stay until you delete them.
+
+## One call
+
+Tell the user first, because they cannot answer while the call runs: "When I run the next command, open
+http://localhost:5173 and go through <the flows>. It waits up to 5 minutes and finishes as soon as every planned
+event has arrived." Give the call a timeout longer than the wait, for example 6 minutes. Replace the app line with
+the app's own start command, pointed at `$url`, on a port you named to the user.
+
+```sh
+export RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_SOURCES_LISTEN=true
+check='<CHECK>'; wait_s=300
+rudder-cli sources listen --help >/dev/null 2>&1 || { rudder-cli --version; echo 'this rudder-cli has no sources listen'; exit 4; }
+d=$(mktemp -d)
+rudder-cli sources listen --port 0 --store >"$d/events" 2>"$d/log" &
+pid=$!; app=
+trap 'kill $pid $app 2>/dev/null' EXIT
+until grep -q '^{"ready":true' "$d/log"; do kill -0 "$pid" 2>/dev/null || { tail -n 3 "$d/log" >&2; exit 3; }; sleep 0.1; done
+url=$(grep -m1 '^{"ready":true' "$d/log" | jq -r .url)
+VITE_RUDDERSTACK_WRITE_KEY=dev VITE_RUDDERSTACK_DATA_PLANE_URL="$url" VITE_RUDDERSTACK_CONFIG_URL="$url" npm run dev -- --port 5173 --strictPort >"$d/app.log" 2>&1 &
+app=$!
+end=$(( $(date +%s) + wait_s ))
+while :; do
+  kill -0 "$pid" 2>/dev/null || { tail -n 3 "$d/log" >&2; exit 3; }
+  jq -n --slurpfile plan rudder/plan.events.json --rawfile events "$d/events" --rawfile log "$d/log" \
+     --argjson from 0 --argjson logfrom 0 -f "$check" >"$d/report.json" || exit 2
+  jq -e .complete "$d/report.json" >/dev/null && break
+  [ "$(date +%s)" -lt "$end" ] || break
+  sleep 1
+done
+jq -r .table "$d/report.json"
+jq -e .pass "$d/report.json" >/dev/null && exit 0
+echo; echo 'Failed requests:'
+curl -fsS "$url/_dev/v1/requests?kind=all&failed=true&view=compact" | jq -c '.requests[] | {seq, route, statusCode, kind, reason: .rejection.reason}'
+echo 'Diagnosis:'
+curl -fsS "$url/_dev/v1/events?view=counts" | jq -c '.summary.diagnosis[] | {code, message}'
+exit 1
+```
+
+The exit codes are the same as in the two-call recipe. The listener and the app stop when the call ends. For
+another pass, fix the code and run the whole call again.
+
+## Read the result
+
+`jq -r .table` prints one row per planned event: the expected properties, how many arrived with which types, and
+`ok`, `missing` or `wrong type`. A number sent as a string, such as `"$38.00"`, is the common bug. `integer` means
+a whole number and also satisfies `number`. The report in `<D>/report.json` has the same facts as JSON: `pass`,
+`complete`, `events[]` with each property's `expected` and `received` types, `unexpected`, `refused`, `unparsed`
+and `pending` (1 while a line is half-written).
+
+The diagnosis explains an empty or short pass:
+
+- `nothing_received`: no event request reached the listener. The app is not pointed at it; check both URLs.
+- `sdk_loaded_no_events`: the SDK loaded its config and sent nothing. The action never ran, or the SDK's
+  plugins did not load.
+- `preflight_only`: only browser CORS preflights arrived.
+- `body_rejected` and `auth_rejected`: requests were refused; the failed requests above say why.
+- `nothing_new`: requests arrived, but none after the mark.

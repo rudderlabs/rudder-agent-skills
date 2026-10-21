@@ -24,11 +24,32 @@ curl -s -o /dev/null -w '%{http_code}' \
 - `401`: not active yet. Try again in 20 seconds. Give up after 5 minutes and report the last status.
 - Any other status (typically `400`): the key is accepted.
 
-Keep the write key in a shell variable read from `.env.local`; do not print it.
+Keep the write key in a shell variable read from `.env.local`; do not print it. `WRITE_KEY` and `DATA_PLANE_URL`
+above are the values of the `VITE_RUDDERSTACK_` names in a Vite app, and of `RUDDERSTACK_WRITE_KEY` and
+`RUDDERSTACK_DATA_PLANE_URL` on the curl path.
 
 ## 3. Send real events
 
 Start the app against `.env.local` (no overrides) and ask the user to go through the flow once.
+
+### No app here: send the first planned event with curl
+
+When `sender` is `curl`, send the first event in `rudder/plan.events.json` yourself, once the probe above stops
+answering `401` (it then answers `400`). Give each property a sample value of its agreed type: a string, a number with a fraction such as `42.5`, a
+whole number for `integer`, `true` for `boolean`. The property names and JSON types must match the plan exactly.
+The key and the URL come from `.env.local`, so neither appears on the command line:
+
+```bash
+set -a; . ./.env.local; set +a
+curl -sS -o /dev/null -w '%{http_code}\n' \
+  -H "Authorization: Basic $(printf '%s:' "$RUDDERSTACK_WRITE_KEY" | base64)" \
+  -H 'Content-Type: application/json' \
+  -d '{"type":"track","event":"Order Completed","anonymousId":"rudderstack-first-event","properties":{"order_id":"ORD-1001","total":42.5,"currency":"USD"}}' \
+  "$RUDDERSTACK_DATA_PLANE_URL/v1/track"
+```
+
+`200` means RudderStack accepted the event. `401` means the key is not active yet: probe again as in section 2.
+Send it once; every send is a real event at the destination.
 
 ## 4. Confirm delivery
 
