@@ -16,6 +16,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   deletes, the write key's two-minute 401 window, MCP metrics without timestamps, hashed live
   event values). References cover destination specs with secrets as variables, browser
   instrumentation, and local and live verification.
+  Step 1 looks at the folder before changing anything. Outside an app (an empty folder, the home
+  folder, a folder of several repositories) it recommends starting again in the app, and can
+  instead continue without one, in a new subfolder unless the folder is empty, and send the first
+  planned event with curl. It stops on uncommitted changes, and commits an app that was not in git
+  as it is before changing it, so a `git revert` never deletes the app's files. Every commit names
+  its paths. Step 3 writes the event names and property types to `rudder/plan.events.json`, and
+  steps 6 to 8 read them from there. Step 7 captures events with `rudder-cli sources listen` and
+  checks them against that file with a jq program shipped beside the references, in two shell
+  calls, or in one for agents that stop background processes when a call returns. The destination
+  reference leaves unfilled secrets as `NAME:` with no value, names every secret key of Amplitude
+  and Mixpanel, and lists the 24 verified destination types.
 
 ### Changed
 
