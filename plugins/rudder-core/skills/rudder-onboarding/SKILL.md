@@ -19,7 +19,7 @@ Done means one real event reached the destination the user chose, sent by this a
 
 ## Before you start
 
-- **rudder-cli**: check with `rudder-cli --version`. If missing, install with `curl -fsSL https://raw.githubusercontent.com/rudderlabs/rudder-iac/main/install.sh -o /tmp/install-rudder-cli.sh && sh /tmp/install-rudder-cli.sh`. Download the installer and run it as two steps; do not pipe it into a shell.
+- **rudder-cli**: check with `rudder-cli --version`. If missing, install with `curl -fsSL https://raw.githubusercontent.com/rudderlabs/rudder-iac/main/install.sh -o /tmp/install-rudder-cli.sh && sh /tmp/install-rudder-cli.sh`. Download the installer and run it as two steps; do not pipe it into a shell. Step 7 needs rudder-cli 0.29.0 or later, the first release with `sources listen`; with an older one, step 7 is skipped.
 - **git**: check with `git --version`.
 - **jq**: check with `jq --version`. Steps 3 and 7 run the jq programs shipped with this skill. If jq is missing, ask the user to install it, for example with `brew install jq` or `sudo apt-get install jq`.
 - **the rudderstack MCP server**: check that the tools list_sources, get_source and get_destination_event_metrics are available to you. It is the HTTP server at https://mcp.rudderstack.com/mcp. It signs in with the user's RudderStack login in the browser (OAuth), not with the access token. If no plugin added it, the user adds it, see step 1. An MCP server added during a session loads only after a restart.
@@ -79,7 +79,7 @@ Measured, not guessed. Plan around them.
 - **metrics-lag**: Delivery metrics can lag, and unevenly by event. On 15 Oct one event showed as delivered 2 minutes after RudderStack received it and another took between 4 and 8 minutes; that run's start time fell inside a minute, so part of the wait may have been the bucket effect. A payload at a destination the user can read arrives within seconds, so check there first and treat metrics as the later confirmation. _Source: one end-to-end run against a dev workspace, 15 Oct 2026._
 - **mcp-hashes-values**: `get_live_events` hashes every property value, so it can confirm event names and property keys but not values or types. The destination's own copy proves the payload. _Source: rudder-mcp-server internal/pii/pii.go._
 - **local-no-types**: `rudder-cli sources listen` checks nothing. It prints each accepted event on stdout as the SDK sent it, and with `--store` its counts view counts events by name only. The shipped `references/check-events.jq` compares names and property types with `rudder/plan.events.json`. _Source: rudder-iac devlisten/stream.go and devlisten/api/summary.go at d8abd910 (#981 removed the summary command)._
-- **sources-listen-gate**: `rudder-cli sources` is experimental and hidden. The call that starts the listener needs `RUDDERSTACK_CLI_EXPERIMENTAL=true` and `RUDDERSTACK_X_SOURCES_LISTEN=true`, or it exits 1 with `experimental_disabled`. rudder-cli 0.28.0 and earlier have no `sources` command at all. _Source: rudder-iac cmd/sources/sources.go and config/experimental.go at d8abd910; 0.24.0 run 21 Oct 2026._
+- **sources-listen-gate**: `rudder-cli sources` is experimental and hidden. The call that starts the listener needs `RUDDERSTACK_CLI_EXPERIMENTAL=true` and `RUDDERSTACK_X_SOURCES_LISTEN=true`, or it exits 1 with `experimental_disabled`. rudder-cli 0.28.0 and earlier have no `sources` command at all; 0.29.0 is the first release with it. _Source: rudder-iac cmd/sources/sources.go and config/experimental.go at d8abd910, release PR rudder-iac#954; 0.24.0 and 0.28.0 run 21 Oct 2026._
 - **background-processes**: Some agents stop the background processes a shell call started when that call returns; Codex does. Claude Code keeps them: a listener started in one call answered in the next. _Source: rudder-agent-skills#34 references/running-in-background.md; Claude Code measured 20 Oct 2026._
 
 ## The steps
@@ -145,7 +145,7 @@ elif git status --porcelain -- . ':!rudder' ':!.claude' ':!.agents' ':!.cursor' 
 else echo clean; fi
 ```
 
-1. Check `rudder-cli --version`. If it is missing, install it with the two-step command under Before you start.
+1. Check `rudder-cli --version`. If it is missing, install it with the two-step command under Before you start. If it is older than 0.29.0, say that step 7's local check will be skipped (fact sources-listen-gate).
 2. Run `rudder-cli workspace info --json`. It finds the token in `RUDDERSTACK_ACCESS_TOKEN` or in the config that `rudder-cli auth login` writes, and never prints it. Tell the user the workspace name you are about to change. If `dataPlaneURL` is empty, ask the user for the data plane URL shown in the RudderStack dashboard and keep it as `data_plane_url`.
 3. Call the MCP tool `user_details`. It answers only when the rudderstack server is connected and signed in.
 4. Make MCP read the CLI's workspace. If the MCP workspace tools take a `workspace_id` argument, pass the CLI's `workspaceID` in it on every call. Otherwise compare `selectedWorkspace.id` from `user_details` with `workspaceID` from `workspace info`. If they differ, call `user_switch_workspace` with the CLI's workspace id and tell the user which workspace MCP now reads.
@@ -254,6 +254,10 @@ If the app does not run in a browser:
 
 - Say that this workflow is written for browser apps. For a server app, propose the matching server-side source type and adapt step 6 from the SDK's docs; ask before continuing.
 
+If the app has no package manager, as with a static site of HTML files:
+
+- Say that steps 6 and 7 are written for apps built with npm. Step 6 then adds the SDK with the script snippet from RudderStack's JavaScript SDK documentation instead of a package, and step 7 is skipped, because its recipes start the app with `npm run dev`. Ask before continuing.
+
 Facts that apply here: **apply-scope**, **source-type**.
 
 Record: `app_kind`, `source_type`, `source_id`.
@@ -361,11 +365,11 @@ Consult: `rudder-code-first-instrumentation`.
 Needs: `events`, `data_plane_url`, `sender`.
 
 1. Call MCP `list_sources` and find the source by name. Record its id and write key. Call `list_destinations` and record the destination's id.
-2. Install the SDK with the app's package manager, for example `npm install @rudderstack/analytics-js`.
+2. Install the SDK with the app's package manager, for example `npm install @rudderstack/analytics-js` for a browser app.
 3. Create one module that loads the SDK once and exports one typed function per event in `rudder/plan.events.json`, with exactly its names, properties and types. Follow the browser instrumentation reference, including the development-time error when the write key is missing, so events are never dropped silently.
 4. Call those functions at the places `rudder/plan.md` lists. Change nothing else.
 5. Write the write key and data plane URL to `.env.local`, which step 1 git-ignored. Check with `git check-ignore -q .env.local` before writing, and stop if it is not ignored.
-6. Run the type check or build (`npx tsc --noEmit` or `npm run build`) and fix what it reports.
+6. Run the type check or build (`npx tsc --noEmit` where there is a `tsconfig.json`, or `npm run build`) and fix what it reports.
 7. Commit by explicit paths, the files you changed or created plus the package manifest and lockfile, without `.env.local`, as "Instrument <app> with <n> events".
 
 If `sender` is `curl`:
@@ -375,8 +379,8 @@ If `sender` is `curl`:
 Done when:
 
 - the write key is in `.env.local`, which git ignores (check: `test -s .env.local && git check-ignore -q .env.local`)
-- the SDK is a dependency, where there is a package.json (check: `[ ! -f package.json ] || jq -e '.dependencies["@rudderstack/analytics-js"]' package.json`)
-- the app type-checks, where there is a package.json (check: `[ ! -f package.json ] || npx --no-install tsc --noEmit`)
+- a RudderStack SDK is a dependency, where there is a package.json (check: `[ ! -f package.json ] || jq -e '(.dependencies // {}) | keys | any(startswith("@rudderstack/"))' package.json`)
+- the app type-checks, where it has a tsconfig.json (check: `[ ! -f tsconfig.json ] || npx --no-install tsc --noEmit`)
 - `.env.local` is not tracked (check: `! git ls-files --error-unmatch .env.local 2>/dev/null`)
 
 Record: `remote_source_id`, `remote_destination_id`, `write_key`, `code_commit`.
@@ -387,17 +391,21 @@ Check the code against the agreed events before anything touches the cloud.
 
 Needs: `events`, `sender`.
 
-1. Follow the local verification reference. Use its two-call recipe where background processes outlive a shell call (Claude Code, Cursor), and its one-call recipe where they do not (Codex) (fact background-processes). Run its commands as written, with the values earlier calls printed. Run `references/check-events.jq` unchanged and write no jq of your own (fact local-no-types).
-2. Start the listener with the reference's start command; it sets the two variables `rudder-cli sources` needs (fact sources-listen-gate). Exit 4 means this rudder-cli has no `sources listen`: tell the user what the reference says, and skip to step 8 if they do not upgrade.
+1. Follow the local verification reference. Use its two-call recipe where background processes outlive a shell call (Claude Code), its one-call recipe where they do not (Codex), and two calls when you are not sure (fact background-processes). Run its commands as written, with the values earlier calls printed. Run `references/check-events.jq` unchanged and write no jq of your own (fact local-no-types).
+2. Start the listener with the reference's start command; it sets the two variables `rudder-cli sources` needs (fact sources-listen-gate). Exit 4 means this rudder-cli is older than 0.29.0 and has no `sources listen`. Tell the user what the reference says and skip to step 8.
 3. Start the app pointed at the listener's URL (data plane and config URL both), as the reference shows.
-4. Before each pass, run the reference's mark command and keep FROM, LOGFROM and CUR. If it says the listener is not running, this agent stops background processes: use the one-call recipe.
+4. Before each pass, run the reference's mark command and keep FROM, LOGFROM and CUR. If it says the listener is not running, this agent stops background processes. Use the one-call recipe.
 5. Ask the user to open the app, go through the flows that fire every event in `rudder/plan.events.json`, and say done. With the one-call recipe, say this before the call, because the user cannot answer during it.
-6. Run the check command. Exit 0 is a pass. Exit 1 is a failed check: show the table, then the failed requests and the diagnosis printed under it. Exit 2 (the checker could not run) and exit 3 (the listener stopped) are not a failed check: fix the cause and run the pass again without counting it as an attempt.
+6. Run the check command. Exit 0 is a pass. Exit 1 is a failed check: show the table, then the failed requests and the diagnosis printed under it. Exit 2 (the checker could not run), exit 3 (the listener stopped) and exit 5 (the app did not start) are not a failed check. Fix the cause and run the pass again without counting it as an attempt.
 7. Stop the listener and the app when the check passes.
 
 If `sender` is `curl`:
 
 - Skip this step. There is no app here to check; step 8 sends the first planned event with curl.
+
+If the app has no package manager (step 2's branch):
+
+- Skip this step and say why. Its recipes start the app with `npm run dev`; step 8 still checks delivery.
 
 **Loop.** Fix the code, ask the user to repeat the flow, and run a new pass from a new mark until the check exits 0, so every planned event arrived with the agreed property types, at most 3 attempts. When the bound is hit: Show the last table of expected against received names and types, and stop.
 

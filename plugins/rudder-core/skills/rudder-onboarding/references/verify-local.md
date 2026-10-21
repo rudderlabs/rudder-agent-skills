@@ -11,16 +11,16 @@ skill" in SKILL.md).
 
 ## Pick a recipe
 
-- **Two calls** where background processes outlive a shell call (Claude Code, Cursor): start the listener and
-  the app, the user acts, then check.
+- **Two calls** where background processes outlive a shell call, as measured in Claude Code: start the listener
+  and the app, the user acts, then check.
 - **One call** where the agent stops background processes when a call returns (Codex): start, wait while the
   user acts, check and stop, all in one call.
-- Not sure: start with two calls. If the mark command says the listener is not running, the agent stopped it;
-  switch to one call.
+- Not sure, as in Cursor: start with two calls. If the mark command says the listener is not running, the agent
+  stopped it; switch to one call.
 
 Each shell call is a new shell, so a variable set in one call is gone in the next. Each command prints the
-values the next one needs. Write them into the next command where it shows `<D>`, `<PID>`, `<URL>`, `<FROM>`,
-`<LOGFROM>` and `<CUR>`.
+values the next one needs. Write them into the next command where it shows `<D>`, `<PID>`, `<URL>`, `<APP>`,
+`<FROM>`, `<LOGFROM>` and `<CUR>`.
 
 ## Exit codes
 
@@ -31,16 +31,17 @@ values the next one needs. Write them into the next command where it shows `<D>`
 | 2 | The checker could not run: `rudder/plan.events.json` is missing or malformed, or `<CHECK>` is wrong | Fix that and check again. It is not a failed check |
 | 3 | The listener is not running | Read the lines printed from its log and start again. If it was running at the end of the start call and gone by the next one, this agent stops background processes: use one call |
 | 4 | This rudder-cli has no `sources listen` | Tell the user, as below |
+| 5 | The app did not start, or the one-call recipe's port is taken | Read the lines printed from `<D>/app.log`, stop what holds the port or fix the start command, and run again. It is not a failed check |
 
 Only missing events and wrong types fail a check. Events outside the plan, refused requests and lines that are not
 JSON show in the table as "reported, not a failure", because an app may already send other events, and an SDK
 retry can leave a refused request behind.
 
-On exit 4, tell the user: "Your rudder-cli has no `sources listen`, which checks events on this machine before
-anything reaches RudderStack. I can install the newest release with the installer and try again, or skip this
-check: step 8 still checks the payload at the destination." Install only on a yes, with the two-step command
-under Before you start, and run the start command again. If it still exits 4, the newest release does not have it
-yet: skip to step 8.
+`sources listen` first ships in rudder-cli 0.29.0. On exit 4, tell the user: "Your rudder-cli has no `sources
+listen`, which checks events on this machine before anything reaches RudderStack. It needs rudder-cli 0.29.0 or
+later. I will skip this check; step 8 still checks delivery at the destination." Then skip to step 8. Do not
+install or upgrade rudder-cli during the workflow. The installer writes to `~/.local/bin`, and an older rudder-cli
+earlier on PATH would still run.
 
 ## Two calls
 
@@ -52,7 +53,7 @@ rudder-cli sources listen --help >/dev/null 2>&1 || { rudder-cli --version; echo
 d=$(mktemp -d)
 rudder-cli sources listen --port 0 --store >"$d/events" 2>"$d/log" &
 pid=$!
-until grep -q '^{"ready":true' "$d/log"; do kill -0 "$pid" 2>/dev/null || { tail -n 3 "$d/log" >&2; exit 3; }; sleep 0.1; done
+until grep -qs '^{"ready":true' "$d/log"; do kill -0 "$pid" 2>/dev/null || { tail -n 3 "$d/log" >&2; exit 3; }; sleep 0.1; done
 echo "D=$d PID=$pid URL=$(grep -m1 '^{"ready":true' "$d/log" | jq -r .url)"
 ```
 
@@ -71,7 +72,8 @@ echo "APP=$!"
 ```
 
 Variables set in the process environment win over `.env.local`, so nothing in the app changes. Read the local
-address from `<D>/app.log` and give it to the user. Serve the app from `http://localhost`: Chrome blocks a public
+address from `<D>/app.log` and give it to the user. If the log shows an error and no address, the app did not
+start: fix that before the mark. Serve the app from `http://localhost`: Chrome blocks a public
 HTTPS page from sending to a loopback address. Mobile SDKs take the URL as `controlPlaneUrl` too, and server SDKs
 must flush before the process exits.
 
@@ -122,25 +124,31 @@ The listener exits 0. The files in `<D>` stay until you delete them.
 ## One call
 
 Tell the user first, because they cannot answer while the call runs: "When I run the next command, open
-http://localhost:5173 and go through <the flows>. It waits up to 5 minutes and finishes as soon as every planned
-event has arrived." Give the call a timeout longer than the wait, for example 6 minutes. Replace the app line with
-the app's own start command, pointed at `$url`, on a port you named to the user.
+http://localhost:5199 and go through <the flows>. It waits up to 5 minutes and finishes as soon as every planned
+event has arrived." The recipe uses port 5199, not the app's usual port, so a dev server the user already runs
+cannot answer in its place. Give the call a timeout longer than the wait, for example 6 minutes. Replace the app
+line with the app's own start command, pointed at `$url`, on `$port`.
 
 ```sh
 export RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_SOURCES_LISTEN=true
-check='<CHECK>'; wait_s=300
+check='<CHECK>'; port=5199; wait_s=300
 rudder-cli sources listen --help >/dev/null 2>&1 || { rudder-cli --version; echo 'this rudder-cli has no sources listen'; exit 4; }
+! curl -s -o /dev/null --max-time 2 "http://localhost:$port" || { echo "port $port is in use. Stop what serves it, or set port to a free one and tell the user"; exit 5; }
 d=$(mktemp -d)
 rudder-cli sources listen --port 0 --store >"$d/events" 2>"$d/log" &
 pid=$!; app=
 trap 'kill $pid $app 2>/dev/null' EXIT
-until grep -q '^{"ready":true' "$d/log"; do kill -0 "$pid" 2>/dev/null || { tail -n 3 "$d/log" >&2; exit 3; }; sleep 0.1; done
+trap 'exit 143' HUP INT TERM
+echo "D=$d PID=$pid"
+until grep -qs '^{"ready":true' "$d/log"; do kill -0 "$pid" 2>/dev/null || { tail -n 3 "$d/log" >&2; exit 3; }; sleep 0.1; done
 url=$(grep -m1 '^{"ready":true' "$d/log" | jq -r .url)
-VITE_RUDDERSTACK_WRITE_KEY=dev VITE_RUDDERSTACK_DATA_PLANE_URL="$url" VITE_RUDDERSTACK_CONFIG_URL="$url" npm run dev -- --port 5173 --strictPort >"$d/app.log" 2>&1 &
+VITE_RUDDERSTACK_WRITE_KEY=dev VITE_RUDDERSTACK_DATA_PLANE_URL="$url" VITE_RUDDERSTACK_CONFIG_URL="$url" npm run dev -- --port "$port" --strictPort >"$d/app.log" 2>&1 &
 app=$!
+echo "APP=$app"
 end=$(( $(date +%s) + wait_s ))
 while :; do
   kill -0 "$pid" 2>/dev/null || { tail -n 3 "$d/log" >&2; exit 3; }
+  kill -0 "$app" 2>/dev/null || { echo 'the app stopped'; tail -n 20 "$d/app.log" >&2; exit 5; }
   jq -n --slurpfile plan rudder/plan.events.json --rawfile events "$d/events" --rawfile log "$d/log" \
      --argjson from 0 --argjson logfrom 0 -f "$check" >"$d/report.json" || exit 2
   jq -e .complete "$d/report.json" >/dev/null && break
@@ -156,8 +164,10 @@ curl -fsS "$url/_dev/v1/events?view=counts" | jq -c '.summary.diagnosis[] | {cod
 exit 1
 ```
 
-The exit codes are the same as in the two-call recipe. The listener and the app stop when the call ends. For
-another pass, fix the code and run the whole call again.
+The exit codes are the same as in the two-call recipe. The listener and the app stop when the call ends, also
+when the agent interrupts it. If the agent kills the call outright, they keep running: stop them with
+`kill <PID> <APP>`, from the numbers the call printed first. For another pass, fix the code and run the whole
+call again.
 
 ## Read the result
 
@@ -170,8 +180,16 @@ and `pending` (1 while a line is half-written).
 The diagnosis explains an empty or short pass:
 
 - `nothing_received`: no event request reached the listener. The app is not pointed at it; check both URLs.
+- `nothing_new`: requests arrived, but none after the mark.
 - `sdk_loaded_no_events`: the SDK loaded its config and sent nothing. The action never ran, or the SDK's
   plugins did not load.
+- `sdk_config_rejected`: the SDK's config request was refused, so it sent nothing. The listener was started with
+  a write-key allowlist that does not have the app's key.
 - `preflight_only`: only browser CORS preflights arrived.
 - `body_rejected` and `auth_rejected`: requests were refused; the failed requests above say why.
-- `nothing_new`: requests arrived, but none after the mark.
+- `missing_write_key`: requests arrived with no write key. The listener accepts them, but RudderStack would
+  answer 401, so the app's key is not set.
+- `no_browser_traffic`: requests arrived, none of them from a browser SDK. Expected when a server SDK or curl
+  sends; for a browser app, the page never reached the listener.
+- `all_accepted`: every request that arrived was accepted. It says nothing about events that never came; the
+  table does.
