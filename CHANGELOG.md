@@ -27,6 +27,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   calls, or in one for agents that stop background processes when a call returns. The destination
   reference leaves unfilled secrets as `NAME:` with no value, names every secret key of Amplitude
   and Mixpanel, and lists the 24 verified destination types.
+  Step 1 runs its read-only checks before it changes the folder, and commits the `.gitignore` lines
+  for the var file and `.env.local` on their own, so the undo (revert the instrumentation and specs
+  commits, then apply) never un-ignores a secret. Step 5 shows validate's errors without the source
+  lines, which print secret values. Step 7 needs rudder-cli 0.29.0 or later and is skipped on an
+  older one; its one-call recipe exits 5 when the app cannot start. Step 8 builds the curl event
+  from the plan. While the installer script is unpublished, step 1 falls back to the latest
+  release's binary.
 
 ### Changed
 
