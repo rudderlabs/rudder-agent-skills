@@ -177,29 +177,39 @@ or launched, so use the two-call recipe with the changes below. A physical devic
 machine's loopback, so step 7 is skipped for it.
 
 1. In the start command, replace `--port 0` with a fixed port, `--port 4321`, so a build keeps working when the
-   listener starts again. If it exits 1 with `port_in_use`, pick another port and use it below.
+   listener starts again. If it exits 3 and the last line it prints says `port_in_use`, pick another port and use
+   it below.
 2. Instead of section 2, install or launch the debug build with the listener's values. The write key can be any
    value, such as `dev`. The SDK fetches its config from the control plane URL, so set it to the listener too.
    - **Android emulator.** The emulator reaches this machine at `10.0.2.2`, so the URL is `http://10.0.2.2:4321`.
-     With the emulator running (`adb devices` lists it), run this from the Gradle root:
+     With the emulator running (`adb devices` lists it), run this from the Gradle root, with the application
+     module's name in place of `app`:
 
      ```sh
      ./gradlew :app:installDebug -PRUDDERSTACK_WRITE_KEY=dev -PRUDDERSTACK_DATA_PLANE_URL=http://10.0.2.2:4321 -PRUDDERSTACK_CONTROL_PLANE_URL=http://10.0.2.2:4321
      ```
 
      Gradle properties win over `.env.local`, and the debug build allows plain HTTP to `10.0.2.2` (Android
-     instrumentation reference). Ask the user to open the app on the emulator.
+     instrumentation reference). Ask the user to open the app from the emulator's app drawer, not with Run in
+     Android Studio, which builds it again with the real values from `.env.local`.
    - **iOS Simulator.** The simulator shares this machine's loopback, so the URL is `http://127.0.0.1:4321`. Build
-     and install the debug build on a booted simulator (Run in Xcode does both), then launch it with the listener's
-     values in its environment, which a debug build reads first (iOS instrumentation reference). `<bundle id>` is the
-     target's `PRODUCT_BUNDLE_IDENTIFIER`:
+     the debug build and install it on a booted simulator without launching it, for example with `xcodebuild -scheme
+     '<scheme>' -destination 'generic/platform=iOS Simulator' -derivedDataPath '<D>/xcode' build` and `xcrun simctl
+     install booted '<D>/xcode/Build/Products/Debug-iphonesimulator/<app>.app'`. Run in Xcode installs it too, but
+     launches it with the real values first, so those first events go to the live data plane. Then launch it with
+     the listener's values in its environment, which a debug build reads first (iOS instrumentation reference), and
+     ask the user to use it without pressing Run again. `<bundle id>` is the target's `PRODUCT_BUNDLE_IDENTIFIER`:
 
      ```sh
      SIMCTL_CHILD_RUDDERSTACK_WRITE_KEY=dev SIMCTL_CHILD_RUDDERSTACK_DATA_PLANE_URL=http://127.0.0.1:4321 SIMCTL_CHILD_RUDDERSTACK_CONTROL_PLANE_URL=http://127.0.0.1:4321 xcrun simctl launch --terminate-running-process booted '<bundle id>'
      ```
 
    - **Flutter and React Native.** Set the SDK's data plane and control plane URLs to the same addresses in a debug
-     build, as the SDK's documentation shows, and start the app on the emulator or simulator.
+     build, as the SDK's documentation shows, and start the app on the emulator or simulator. Both platforms refuse
+     plain HTTP unless the app allows it. A Flutter app needs the two debug files from the Android instrumentation
+     reference under `android/app/src/debug/`, and `NSAllowsLocalNetworking` in `ios/Runner/Info.plist`, or the
+     check sees `nothing_received`. React Native's templates already allow both in debug builds, for Metro; check
+     that the app still does.
 3. The mobile SDKs send in batches, every 10 seconds or every 30 events. Ask the user to wait 15 seconds after the
    last action before saying done. The check waits up to 10 seconds more.
 

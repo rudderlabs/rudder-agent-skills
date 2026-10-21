@@ -42,9 +42,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   an app, now defined once. It also lists the RudderStack and Segment SDKs the dependencies name,
   the legacy Android (Java) and iOS (Objective-C) SDKs included. New Android (Kotlin SDK) and iOS
   (Swift SDK) references add the dependency, keep the write key out of git, load the SDK once and
-  give each agreed event a typed function. Step 7 checks a mobile app on an Android emulator
-  (`10.0.2.2`) or the iOS Simulator, or is skipped without one, and step 8 runs the app against the
-  real data plane.
+  give each agreed event a typed function, in Kotlin or Java and in Swift or Objective-C. Step 7
+  checks a mobile app on an Android emulator (`10.0.2.2`) or the iOS Simulator, or is skipped without
+  one, and step 8 runs the app against the real data plane. A Capacitor or Cordova app gets the
+  JavaScript SDK, and a Unity game the Unity SDK. An app that already uses a RudderStack SDK keeps
+  its current source unless the user agrees to move it, and a legacy SDK is replaced only on a yes.
 
 ### Changed
 

@@ -43,7 +43,8 @@ Start the app against `.env.local` (no overrides) and ask the user to go through
 
 A mobile app runs with its real values, not the listener's from step 7, on an emulator, a simulator or a device:
 
-- Android: `./gradlew :app:installDebug` with no `-P` values, so the build reads `.env.local` again.
+- Android: `./gradlew :app:installDebug`, with the application module's name in place of `app`, and no `-P`
+  values, so the build reads `.env.local` again.
 - iOS: Run in Xcode, or `xcrun simctl launch --terminate-running-process booted '<bundle id>'` with no
   `SIMCTL_CHILD_` values, so the app reads `RudderStack.local.xcconfig` through `Info.plist`.
 
