@@ -15,7 +15,7 @@ without it an old count looks like a new delivery.
 A new write key is refused for about two minutes after apply. Probe it without sending an event: an empty
 batch is authenticated first and then rejected for being empty, so nothing is ingested. This call reads the key
 and the URL from `.env.local`, the `VITE_RUDDERSTACK_` names in a Vite app or the `RUDDERSTACK_` names on the curl
-path, so neither appears on the command line or in the output. It probes every 20 seconds for up to 5 minutes;
+path and in a mobile app, so neither appears on the command line or in the output. It probes every 20 seconds for up to 5 minutes;
 give the call a timeout of 6 minutes.
 
 ```bash
@@ -40,6 +40,15 @@ second line.
 ## 3. Send real events
 
 Start the app against `.env.local` (no overrides) and ask the user to go through the flow once.
+
+A mobile app runs with its real values, not the listener's from step 7, on an emulator, a simulator or a device:
+
+- Android: `./gradlew :app:installDebug` with no `-P` values, so the build reads `.env.local` again.
+- iOS: Run in Xcode, or `xcrun simctl launch --terminate-running-process booted '<bundle id>'` with no
+  `SIMCTL_CHILD_` values, so the app reads `RudderStack.local.xcconfig` through `Info.plist`.
+
+The SDK sends in batches, every 10 seconds or every 30 events, so ask the user to wait 15 seconds after the last
+action before saying done.
 
 ### No app here: send the first planned event with curl
 

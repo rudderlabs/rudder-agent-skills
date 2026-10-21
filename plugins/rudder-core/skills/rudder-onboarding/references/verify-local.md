@@ -17,6 +17,7 @@ skill" in SKILL.md).
   user acts, check and stop, all in one call.
 - When you are not sure, as in Cursor, start with two calls. If the mark command says the listener is not
   running, the agent stopped it; switch to one call.
+- A mobile app on an emulator or simulator uses two calls with the changes under "Mobile apps".
 
 Each shell call is a new shell, so a variable set in one call is gone in the next. Each command prints the
 values the next one needs. Write them into the next command where it shows `<D>`, `<PID>`, `<URL>`, `<APP>`,
@@ -74,8 +75,8 @@ echo "APP=$!"
 Variables set in the process environment win over `.env.local`, so nothing in the app changes. Read the local
 address from `<D>/app.log` and give it to the user. If the log shows an error and no address, the app did not
 start. Fix that before the mark. Serve the app from `http://localhost`: Chrome blocks a public
-HTTPS page from sending to a loopback address. Mobile SDKs take the URL as `controlPlaneUrl` too, and server SDKs
-must flush before the process exits.
+HTTPS page from sending to a loopback address. Mobile SDKs take the URL as `controlPlaneUrl` too (see "Mobile
+apps"), and server SDKs must flush before the process exits.
 
 ### 3. Mark the start of each pass
 
@@ -168,6 +169,42 @@ The exit codes are the same as in the two-call recipe. The listener and the app 
 when the agent interrupts it. If the agent kills the call outright, they keep running. Stop them with
 `kill <PID> <APP>`, from the numbers the call printed first. For another pass, fix the code and run the whole
 call again.
+
+## Mobile apps
+
+An app on an Android emulator or the iOS Simulator can send to the listener too. It reads its URLs when it is built
+or launched, so use the two-call recipe with the changes below. A physical device cannot reach a listener on this
+machine's loopback, so step 7 is skipped for it.
+
+1. In the start command, replace `--port 0` with a fixed port, `--port 4321`, so a build keeps working when the
+   listener starts again. If it exits 1 with `port_in_use`, pick another port and use it below.
+2. Instead of section 2, install or launch the debug build with the listener's values. The write key can be any
+   value, such as `dev`. The SDK fetches its config from the control plane URL, so set it to the listener too.
+   - **Android emulator.** The emulator reaches this machine at `10.0.2.2`, so the URL is `http://10.0.2.2:4321`.
+     With the emulator running (`adb devices` lists it), run this from the Gradle root:
+
+     ```sh
+     ./gradlew :app:installDebug -PRUDDERSTACK_WRITE_KEY=dev -PRUDDERSTACK_DATA_PLANE_URL=http://10.0.2.2:4321 -PRUDDERSTACK_CONTROL_PLANE_URL=http://10.0.2.2:4321
+     ```
+
+     Gradle properties win over `.env.local`, and the debug build allows plain HTTP to `10.0.2.2` (Android
+     instrumentation reference). Ask the user to open the app on the emulator.
+   - **iOS Simulator.** The simulator shares this machine's loopback, so the URL is `http://127.0.0.1:4321`. Build
+     and install the debug build on a booted simulator (Run in Xcode does both), then launch it with the listener's
+     values in its environment, which a debug build reads first (iOS instrumentation reference). `<bundle id>` is the
+     target's `PRODUCT_BUNDLE_IDENTIFIER`:
+
+     ```sh
+     SIMCTL_CHILD_RUDDERSTACK_WRITE_KEY=dev SIMCTL_CHILD_RUDDERSTACK_DATA_PLANE_URL=http://127.0.0.1:4321 SIMCTL_CHILD_RUDDERSTACK_CONTROL_PLANE_URL=http://127.0.0.1:4321 xcrun simctl launch --terminate-running-process booted '<bundle id>'
+     ```
+
+   - **Flutter and React Native.** Set the SDK's data plane and control plane URLs to the same addresses in a debug
+     build, as the SDK's documentation shows, and start the app on the emulator or simulator.
+3. The mobile SDKs send in batches, every 10 seconds or every 30 events. Ask the user to wait 15 seconds after the
+   last action before saying done. The check waits up to 10 seconds more.
+
+The mark, check and stop commands are unchanged; there is no `<APP>` to stop. `no_browser_traffic` in the diagnosis
+is expected from a mobile app.
 
 ## Read the result
 

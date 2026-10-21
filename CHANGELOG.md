@@ -34,6 +34,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   older one; its one-call recipe exits 5 when the app cannot start. Step 8 builds the curl event
   from the plan. While the installer script is unpublished, step 1 falls back to the latest
   release's binary.
+  Step 2 runs a probe that names the app's source type: Flutter and React Native first, because
+  their apps also hold `android/` and `ios/` folders, then Android (`android_kotlin`), iOS
+  (`ios_swift`, from an Xcode project, a Podfile or an iOS `Package.swift`), web, and only then
+  server languages. When it finds several apps it lists them and asks which one sends events; when
+  it finds none it asks "What will send events to RudderStack?", the question step 1 asks outside
+  an app, now defined once. It also lists the RudderStack and Segment SDKs the dependencies name,
+  the legacy Android (Java) and iOS (Objective-C) SDKs included. New Android (Kotlin SDK) and iOS
+  (Swift SDK) references add the dependency, keep the write key out of git, load the SDK once and
+  give each agreed event a typed function. Step 7 checks a mobile app on an Android emulator
+  (`10.0.2.2`) or the iOS Simulator, or is skipped without one, and step 8 runs the app against the
+  real data plane.
 
 ### Changed
 
