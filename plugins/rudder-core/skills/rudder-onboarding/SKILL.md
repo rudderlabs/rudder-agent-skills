@@ -193,6 +193,7 @@ If `dir_kind` is `resume`:
 - `rudder/` already holds specs, from an earlier run here or copied from the folder where a first event was sent. Keep them. Never start again with an empty `rudder/`: its resources are CLI-managed now, and step 2's dry run would list them for removal (fact apply-scope).
 - If this folder has no app (no manifest, as in the folder a first event came from), set `sender` to `curl`.
 - Otherwise work out the app's `source_type` as step 2 does and compare it with `type:` in `rudder/sources/*.yaml`. If they differ, say so and ask whether to change it. The CLI cannot change a source's type in place (fact source-type-fixed). On yes, give the source spec a new `id` and `name` with the new `type`, point `rudder/connections.yaml` at the new id, and add the new type's `connection_mode` entry to the destination (fact connection-mode). Step 5's dry run then lists the old source under `Removed resources:`; that is the one removal the user agreed to.
+- If a spec references a secret as `'{{ .NAME }}'` and `rudder/secrets.vars.yaml` is missing, as it is when `rudder/` came through git, write the file with one `NAME:` line per secret and no value (fact unfilled-secret). Ask the user to fill every line in their editor and say continue, because step 2's dry run needs the values. Do not read them back.
 - In steps 2 to 5, reuse what exists: show the plan from `rudder/plan.events.json` and ask whether to keep or change it, keep the destination unless the user wants another, and apply only what the dry run lists. Step 5 commits `rudder/` as usual.
 
 If `workspace info` says an access token is required, or answers 401:
@@ -234,7 +235,7 @@ Needs: `dir_kind`, `sender`.
 1. Read the manifest and entry points (package.json, vite or next config, src/). Decide where the code runs, and take `source_type` from it (fact source-type). A browser app is `javascript`.
 2. Search code and dependencies for an analytics SDK: `@rudderstack/analytics-js`, `rudder-sdk-js`, `@segment/analytics-next`, `gtag(`, `mixpanel`, `amplitude`, `posthog`.
 3. Call MCP `list_sources` (retl_type none), `list_destinations` and `list_connections` to see what the workspace holds.
-4. Find resources other projects manage: run `rudder-cli apply -l rudder --dry-run`, with `rudder/` still empty unless `dir_kind` is `resume`. Every line under `Removed resources:` is a CLI-managed resource that an apply from this project would delete, of any type (sources, destinations, tracking plans, transformations). `No changes to apply` means there are none.
+4. Find resources other projects manage: run `rudder-cli apply -l rudder --dry-run`, adding `--var-file rudder/secrets.vars.yaml` when the file exists, with `rudder/` still empty unless `dir_kind` is `resume`. Every line under `Removed resources:` is a CLI-managed resource that an apply from this project would delete, of any type (sources, destinations, tracking plans, transformations). `No changes to apply` means there are none.
 5. Report in four short lines: what the app is, analytics found in the code, what the workspace holds, the source you propose.
 6. Ask the user: "I will create a new <source_type> source called <name>. OK?"
      - Yes
@@ -245,7 +246,7 @@ If `sender` is `curl`:
 
 - There is no code to read. Skip items 1 and 2, keep the `source_type` step 1 mapped from the user's answer, and propose a source name from what the user said will send events.
 
-If that dry run lists anything under `Removed resources:`:
+If that dry run lists anything under `Removed resources:` other than the old source the user agreed to replace in step 1:
 
 - Stop. Explain that apply would delete them (fact apply-scope). Offer to continue in an empty workspace, or to bring them into this project first with `rudder-cli import workspace`.
 
@@ -347,7 +348,7 @@ Record: `specs_commit`.
 
 If it fails:
 
-- Dry run lists `Removed resources:`: stop (rule), show the list, and go back to step 2's branch.
+- Dry run lists `Removed resources:` other than the old source the user agreed to replace in step 1: stop (rule), show the list, and go back to step 2's branch.
 - Apply fails with 401 or 403: the token is read-only or for another workspace. Ask for a read-write token.
 - Validate fails with `key "NAME" has a null or empty value`: that secret is not filled yet. Ask the user to fill it in their editor; never write `NAME: ""` (fact unfilled-secret).
 
