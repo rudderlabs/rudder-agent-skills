@@ -150,12 +150,16 @@ rudder-cli workspace accounts list --type snowflake --json
 
 ## Variables and secrets
 
-Specs live in git, so they must not hold secrets. Write a secret or an environment-specific value as a `{{ .NAME }}` reference in single quotes, and supply the value when the CLI loads the project:
+Specs live in git, so they must not hold secrets. Write a secret or an environment-specific value as a `{{ .NAME }}` reference in single quotes, and supply the value when the CLI loads the project. In a webhook destination, for example, each header value (`headers[].to`) is a secret:
 
 ```yaml
 spec:
+  type: webhook
   config:
-    api_key: '{{ .WEBHOOK_API_KEY }}'
+    webhook_url: https://hooks.example.com/rudderstack
+    headers:
+      - from: X-Signing-Key
+        to: '{{ .WEBHOOK_SIGNING_KEY }}'
 ```
 
 The CLI inserts the value as is before it parses the YAML. Inside double quotes, a value with `"` or `\` breaks the YAML or silently changes the secret, so use single quotes. A `'` inside the value must be doubled, with the var file entry left unquoted, for example `DB_PASSWORD: it''s`. The CLI reports an unescaped `'` as an error. Up to rudder-cli 0.28.0 that error is a YAML parse error.
@@ -164,7 +168,7 @@ Put the values in a var file and pass it to `validate` and to both `apply` runs:
 
 ```yaml
 # secrets.vars.yaml (git-ignored)
-WEBHOOK_API_KEY: "value-goes-here"
+WEBHOOK_SIGNING_KEY: "value-goes-here"
 ```
 
 ```bash
@@ -178,9 +182,9 @@ Substitution is always on from rudder-cli 0.25.0. Before that it ran only behind
 Rules the CLI enforces:
 
 - The file name must end in `.vars.yaml` or `.vars.yml`. `--var-file` rejects any other name, and the spec loader skips these files, so the var file can sit inside the project directory. The path is relative to the current directory, not to `-l`.
-- The file is flat `KEY: value` YAML with scalar values. Use the bare name (`WEBHOOK_API_KEY:`), without a `RUDDER_` prefix.
+- The file is flat `KEY: value` YAML with scalar values. Use the bare name (`WEBHOOK_SIGNING_KEY:`), without a `RUDDER_` prefix.
 - `--var-file` is repeatable. When two files set the same key, the later file wins.
-- An environment variable `RUDDER_<NAME>` (for example `RUDDER_WEBHOOK_API_KEY`) wins over every var file. The CLI reads these even without `--var-file`.
+- An environment variable `RUDDER_<NAME>` (for example `RUDDER_WEBHOOK_SIGNING_KEY`) wins over every var file. The CLI reads these even without `--var-file`.
 - `{{ .NAME | fallback }}` supplies a value used only when no source defines `NAME`, for example `{{ .DB_PORT | 5432 }}`. Do not give a secret a fallback.
 - A reference that no source defines fails the load with `error[project/var-substitution]: undefined variable "NAME"` at the file and line of the reference. Pass the var file or set the `RUDDER_` variable; do not write the value into the spec.
 
