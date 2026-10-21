@@ -33,7 +33,7 @@ Done means one real event reached the destination the user chose, sent by this a
 - Show the dry run and get a yes before every apply. Apply as `rudder-cli apply -l rudder --confirm=false`, because without a terminal the default asks, declines on its own, and still exits 0.
 - Stop if a dry run lists `Removed resources:`. Apply deletes every CLI-managed resource in the workspace that is missing from `rudder/`, including resources another project created. The one exception is a source the user agreed to replace in step 1.
 - Secrets go in `rudder/secrets.vars.yaml` (git-ignored) and are referenced in single quotes, `'{{ .NAME }}'`, because the value is pasted in before the YAML is parsed. Never put a secret in a spec, a commit, a command line or the chat.
-- Commit by explicit paths (`git add rudder .gitignore`, then the files you changed), never `git add -A`, `git add .` or `git commit -a`, so none of the user's own work is swept in. The one exception is step 1's baseline commit of an app that was not in git.
+- Commit by explicit paths (`git add rudder`, then the files you changed), never `git add -A`, `git add .` or `git commit -a`, so none of the user's own work is swept in. The one exception is step 1's baseline commit of an app that was not in git.
 - Commit after the apply and after the instrumentation, so either can be undone with `git revert`.
 - Ask one question at a time. Offer choices, and accept a free-text answer.
 - Every retry has a bound. When it is reached, stop and report what you saw.
@@ -137,11 +137,11 @@ elif find . -mindepth 1 -maxdepth 1 ! -name .git ! -name .gitignore ! -name .DS_
 else echo empty; fi
 ```
 
-`git_state`: `clean`, `dirty` (uncommitted changes outside `rudder/`, `.gitignore` and agent files) or `none` (not in git).
+`git_state`: `clean`, `dirty` (uncommitted changes outside `rudder/` and agent files) or `none` (not in git).
 
 ```sh
 if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then echo none
-elif git status --porcelain -- . ':!rudder' ':!.gitignore' ':!.claude' ':!.agents' ':!.cursor' ':!.codex' ':!.mcp.json' ':!AGENTS.md' ':!CLAUDE.md' | grep -q .; then echo dirty
+elif git status --porcelain -- . ':!rudder' ':!.claude' ':!.agents' ':!.cursor' ':!.codex' ':!.mcp.json' ':!AGENTS.md' ':!CLAUDE.md' | grep -q .; then echo dirty
 else echo clean; fi
 ```
 
@@ -150,11 +150,12 @@ else echo clean; fi
 3. Call the MCP tool `user_details`. It answers only when the rudderstack server is connected and signed in.
 4. Make MCP read the CLI's workspace. If the MCP workspace tools take a `workspace_id` argument, pass the CLI's `workspaceID` in it on every call. Otherwise compare `selectedWorkspace.id` from `user_details` with `workspaceID` from `workspace info`. If they differ, call `user_switch_workspace` with the CLI's workspace id and tell the user which workspace MCP now reads.
 5. Items 1 to 4 change nothing in the folder. Now act on `dir_kind`, then on `git_state`, with the branches below. If a branch moves you to another folder, run the `git_state` command again there. Unless a branch says otherwise, `work_dir` is the folder you were started in and `sender` is `app`.
-6. If there is no `rudder/` directory, create it. Make sure `.gitignore` has the line `rudder/*.vars.yaml`, creating the file if needed.
+6. In `work_dir`, create `rudder/` if there is none. Check that git ignores `rudder/secrets.vars.yaml` and `.env.local` (`git check-ignore -q <path>`). For each it does not, add `rudder/*.vars.yaml` or `.env.local` to `.gitignore`, creating the file if needed. If that changed `.gitignore`, commit it alone, `git add .gitignore && git commit -m "Ignore RudderStack secrets" -- .gitignore`. No later commit touches `.gitignore`, so the undo in step 9 never un-ignores a secret.
 
 If `dir_kind` is `empty`, `home`, `repos` or `other`, so this folder is not an app:
 
 - Say in one line what the folder is: empty, the home folder, a folder of several repositories, or files without an app manifest. For `other`, look first: an app the probe does not know, such as a static site with an `index.html`, counts as `app`; say so and go on as for an app.
+- If `git_state` is not `none`, this folder is inside a git repository. Name its top level (`git rev-parse --show-toplevel`). If the top level has an app manifest, say that it is probably the app and recommend starting there.
 - Recommend starting in the app instead, and say exactly how: quit this session, `cd` into the app's folder, start the agent there, and run the same command or prompt that started this session. The first event then comes from the app's own code.
 - Ask the user: "Start again in your app (recommended), or continue here?"
     - I will start again in my app
@@ -162,6 +163,7 @@ If `dir_kind` is `empty`, `home`, `repos` or `other`, so this folder is not an a
 - If the user will start again in the app, stop.
 - To continue in an `empty` folder, work in it, and run `git init` unless it is already inside a repository.
 - In `home`, `repos` or `other`, never run `git init` in the folder itself. Say that you will work in `./rudderstack-first-event`, create it (an earlier run may have), run `git init` in it unless it has a `.git`, and set `work_dir` to it. From then on read, write and run everything inside it; start a shell call with `cd rudderstack-first-event &&` when your shell does not keep the directory. If it already holds specs in `rudder/`, it is `resume`: follow that branch.
+- Inside a git repository (`git_state` is not `none`), never create a repository in it, because the outer one records it as an embedded repository and a later `git add -A` there commits it as a gitlink. Ask the user for a folder outside any repository, and use it in place of `./rudderstack-first-event`.
 - Ask the user: "What will send events to RudderStack?"
     - A website or web app
     - An iOS app
@@ -184,14 +186,14 @@ If `git_state` is `none` and `dir_kind` is `app` or `resume`:
     - Yes
     - No
 - On no, stop. Without a baseline commit, a `git revert` of this workflow's commits would delete the app's files (fact first-commit-adds-whole-files).
-- On yes, run `git init`. If there is no `.gitignore`, create one with `node_modules/`, `.env` files, the build output folders (for example `dist/` and `build/`) and `rudder/*.vars.yaml`, and say so. Run `git add -A` and show `git status --short`. If a staged file looks like a secret (an `.env` file, a key or a credentials file), unstage it with `git rm --cached` and add it to `.gitignore`. Commit as "Baseline before RudderStack".
+- On yes, run `git init`. Before staging anything, make sure `.gitignore` has `rudder/*.vars.yaml` and `.env.local`, so a filled var file or write key is never staged. If there is no `.gitignore`, create one with those lines, `node_modules/`, `.env` files and the build output folders (for example `dist/` and `build/`), and say so. Run `git add -A` and show `git status --short`. If a staged file looks like a secret (an `.env` file, a key or a credentials file), unstage it with `git rm --cached` and add it to `.gitignore`. Commit as "Baseline before RudderStack".
 
 If `dir_kind` is `resume`:
 
 - `rudder/` already holds specs, from an earlier run here or copied from the folder where a first event was sent. Keep them. Never start again with an empty `rudder/`: its resources are CLI-managed now, and step 2's dry run would list them for removal (fact apply-scope).
 - If this folder has no app (no manifest, as in the folder a first event came from), set `sender` to `curl`.
 - Otherwise work out the app's `source_type` as step 2 does and compare it with `type:` in `rudder/sources/*.yaml`. If they differ, say so and ask whether to change it. The CLI cannot change a source's type in place (fact source-type-fixed). On yes, give the source spec a new `id` and `name` with the new `type`, point `rudder/connections.yaml` at the new id, and add the new type's `connection_mode` entry to the destination (fact connection-mode). Step 5's dry run then lists the old source under `Removed resources:`; that is the one removal the user agreed to.
-- In steps 2 to 5, reuse what exists: show the plan from `rudder/plan.events.json` and ask whether to keep or change it, keep the destination unless the user wants another, and apply only what the dry run lists. Commit `rudder/` if this repository does not have it yet.
+- In steps 2 to 5, reuse what exists: show the plan from `rudder/plan.events.json` and ask whether to keep or change it, keep the destination unless the user wants another, and apply only what the dry run lists. Step 5 commits `rudder/` as usual.
 
 If `workspace info` says an access token is required, or answers 401:
 
@@ -210,8 +212,8 @@ Facts that apply here: **first-commit-adds-whole-files**, **source-type**, **sou
 Done when:
 
 - the token reaches the workspace (check: `[ -n "$(rudder-cli workspace info --json | jq -r '.workspaceID // empty')" ]`)
-- `rudder/` exists and its var files are git-ignored (check: `test -d rudder && git check-ignore -q rudder/secrets.vars.yaml`)
-- the folder is in git, with nothing uncommitted outside `rudder/`, `.gitignore` and agent files (check: `git rev-parse --is-inside-work-tree >/dev/null 2>&1 && ! git status --porcelain -- . ':!rudder' ':!.gitignore' ':!.claude' ':!.agents' ':!.cursor' ':!.codex' ':!.mcp.json' ':!AGENTS.md' ':!CLAUDE.md' | grep -q .`)
+- `rudder/` exists, and its var files and `.env.local` are git-ignored (check: `test -d rudder && git check-ignore -q rudder/secrets.vars.yaml && git check-ignore -q .env.local`)
+- the folder is in git, with nothing uncommitted outside `rudder/` and agent files (check: `git rev-parse --is-inside-work-tree >/dev/null 2>&1 && ! git status --porcelain -- . ':!rudder' ':!.claude' ':!.agents' ':!.cursor' ':!.codex' ':!.mcp.json' ':!AGENTS.md' ':!CLAUDE.md' | grep -q .`)
 
 Record: `work_dir`, `sender`, `workspace_id`, `workspace_name`, `data_plane_url`.
 
@@ -328,7 +330,7 @@ Needs: `source_type`, `source_id`, `destination_id`.
 2. Validate: `rudder-cli validate -l rudder --json`, adding `--var-file rudder/secrets.vars.yaml` when the file exists. If this CLI has no `--json` on validate, run it without and read `error[<rule>]: <message> --> <file>:<line>:<col>`.
 3. Dry run: `rudder-cli apply -l rudder --dry-run` with the same `--var-file`. Show the plan as N to create, N to change, N to delete.
 4. Apply: `rudder-cli apply -l rudder --confirm=false` with the same `--var-file`. Expect exit 0 and the created resources listed.
-5. Commit by explicit paths, `rudder/` and `.gitignore`, plus `.mcp.json` if it exists and holds no secret, with the message "Add RudderStack event delivery as specs". Tell the user the undo: `git revert <sha>`, then a dry run and an apply.
+5. Commit `rudder/` by its path alone, `git add rudder`, with the message "Add RudderStack event delivery as specs". Step 1 already committed `.gitignore`, and `.mcp.json` stays out. Tell the user that step 9 gives the undo.
 
 **Loop.** Fix the reported file and line, then validate again until validate exits 0 with no errors, at most 5 attempts. When the bound is hit: Show the remaining errors and their files to the user and stop.
 
@@ -361,13 +363,13 @@ Needs: `events`, `data_plane_url`, `sender`.
 2. Install the SDK with the app's package manager, for example `npm install @rudderstack/analytics-js`.
 3. Create one module that loads the SDK once and exports one typed function per event in `rudder/plan.events.json`, with exactly its names, properties and types. Follow the browser instrumentation reference, including the development-time error when the write key is missing, so events are never dropped silently.
 4. Call those functions at the places `rudder/plan.md` lists. Change nothing else.
-5. Write the write key and data plane URL to `.env.local`. Confirm it is git-ignored with `git check-ignore .env.local`; add it to `.gitignore` if not.
+5. Write the write key and data plane URL to `.env.local`, which step 1 git-ignored. Check with `git check-ignore -q .env.local` before writing, and stop if it is not ignored.
 6. Run the type check or build (`npx tsc --noEmit` or `npm run build`) and fix what it reports.
 7. Commit by explicit paths, the files you changed or created plus the package manifest and lockfile, without `.env.local`, as "Instrument <app> with <n> events".
 
 If `sender` is `curl`:
 
-- Install no SDK and change no code: do item 1 only. Write the write key and data plane URL to `.env.local` as `RUDDERSTACK_WRITE_KEY` and `RUDDERSTACK_DATA_PLANE_URL`, make sure `.gitignore` lists `.env.local`, and commit `.gitignore` by its path if it changed.
+- Install no SDK and change no code. Do item 1 only, then write the write key and data plane URL to `.env.local` as `RUDDERSTACK_WRITE_KEY` and `RUDDERSTACK_DATA_PLANE_URL`, after the same `git check-ignore` check. There is nothing to commit, so there is no `code_commit`.
 
 Done when:
 
@@ -435,13 +437,13 @@ What changed, how to undo it, what to try next.
 Needs: `sender`.
 
 1. Summarise in a table: workspace resources (as specs in git), code changes (files and events), evidence (delivered and failed counts since started_at), the commits, and the undo.
-2. Undo is `git revert <specs_commit>`, then `rudder-cli apply -l rudder --dry-run` and `--confirm=false`. Say that it removes what this project created, and that apply's scope is the whole workspace (fact apply-scope). Never revert step 1's baseline commit.
+2. Undo is `git revert <code_commit> <specs_commit>`, newest first, without `code_commit` where there is none. Git removes `rudder/` when no untracked file such as the var file is left in it, so run `mkdir -p rudder`. Then run `rudder-cli apply -l rudder --dry-run`, with `--var-file rudder/secrets.vars.yaml` if the file exists, show it, and on a yes apply with `--confirm=false`. Say that it removes what this project created, and that apply's scope is the whole workspace (fact apply-scope). Never revert step 1's commits, the baseline and the `.gitignore` lines.
 3. If the repository has a remote, offer to push a branch and open a pull request.
 
 If `sender` is `curl`:
 
 - Say that the pipeline is real and the event came from curl, not from an app.
-- To send events from the app later: copy `rudder/` into the app's repository, for example `cp -R rudder <path to the app>/`. If it travels through git instead, recreate `rudder/secrets.vars.yaml` there, because git ignores it; the destination spec names each variable.
+- To send events from the app later: copy `rudder/` into the app's repository, for example `cp -R rudder <path to the app>/`, and make no commit there yourself. The app may not ignore `rudder/secrets.vars.yaml` yet; step 1 there git-ignores it before its first commit. If `rudder/` travels through git instead, the var file stays behind, because git ignores it.
 - Then start the agent in the app and run the same command. Step 1 finds the specs (`resume`), works out the app's source type and offers to change the source if it differs. Starting there with an empty `rudder/` would stop at step 2, because these resources are CLI-managed now (fact apply-scope).
 
 Facts that apply here: **apply-scope**.
