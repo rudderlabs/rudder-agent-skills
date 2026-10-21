@@ -12,11 +12,11 @@
 [![License: MIT](https://img.shields.io/github/license/rudderlabs/rudder-agent-skills)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/rudderlabs/rudder-agent-skills?style=flat)](https://github.com/rudderlabs/rudder-agent-skills/stargazers)
 
-A Claude Code plugin **marketplace** and [Agent Skills](https://agentskills.io) collection that teaches your AI coding agent how to drive every programmatic [RudderStack](https://www.rudderstack.com/) surface — CLI, MCP server, Terraform, and Profiles — with the right preflight checks, commands, and recovery paths. Works with Claude Code, Cursor, and 40+ agents.
+A Claude Code plugin **marketplace** and [Agent Skills](https://agentskills.io) collection that teaches your AI coding agent how to drive every programmatic [RudderStack](https://www.rudderstack.com/) surface — CLI, MCP server, Terraform, Profiles, and AI events — with the right preflight checks, commands, and recovery paths. Works with Claude Code, Cursor, and 40+ agents.
 
 ## What's inside
 
-One marketplace (`rudder-agent-skills`) bundling five plugins. Install the ones you use.
+One marketplace (`rudder-agent-skills`) bundling six plugins. Install the ones you use.
 
 | Plugin | Status | Scope |
 |---|---|---|
@@ -25,6 +25,7 @@ One marketplace (`rudder-agent-skills`) bundling five plugins. Install the ones 
 | [`rudder-mcp`](plugins/rudder-mcp/) | ✅ Available | Workflows for [RudderStack's hosted MCP server](https://mcp.rudderstack.com/docs) at `mcp.rudderstack.com` |
 | [`rudder-terraform`](plugins/rudder-terraform/) | ✅ Available | Workflows for the [Terraform provider](https://github.com/rudderlabs/terraform-provider-rudderstack) |
 | [`rudder-profiles`](plugins/rudder-profiles/) | ✅ Available | Workflows for [RudderStack Profiles](https://github.com/rudderlabs/profiles-mcp): setup, project creation, analysis, updates, and debugging |
+| [`rudder-ai-events`](plugins/rudder-ai-events/) | ✅ Available | Onboard an existing app to RudderStack AI events with [`@rudderstack/ai`](https://www.npmjs.com/package/@rudderstack/ai) (Node.js), [`rudderstack-ai`](https://pypi.org/project/rudderstack-ai/) (Python) and `ai-sdk-go` (Go): discover, plan, instrument, verify |
 
 Most users drive RudderStack with more than one tool. Install `rudder-core` plus whichever tool plugins you use; the domain knowledge lives in `rudder-core` so it never duplicates across tool-specific plugins.
 
@@ -116,6 +117,14 @@ npx skills add rudderlabs/rudder-agent-skills -a cursor
 | `rudder-profiles-update` | Updating a Profiles project with features, inputs, propensity, or incremental changes |
 | `rudder-profiles-debug` | Diagnosing compile failures, run failures, and output-quality issues |
 
+### `rudder-ai-events`
+
+| Skill | When to use |
+|---|---|
+| `rudder-ai-events-setup` | Onboarding an app to AI events: discovering chat, background-agent, browser and MCP server surfaces and planning `ai-events.yaml` |
+| `rudder-ai-events-instrument` | Adding the AI events code from an approved `ai-events.yaml`, including MCP server wrappers |
+| `rudder-ai-events-verify` | Validating captured AI events against the spec before real traffic |
+
 ## How skills work together
 
 ```mermaid
@@ -146,7 +155,7 @@ rudder-agent-skills/
 │   └── installation.md        # full install guide
 ├── examples/                  # end-to-end worked examples
 └── plugins/
-    └── <plugin>/              # rudder-core, rudder-cli, rudder-mcp, rudder-terraform, rudder-profiles
+    └── <plugin>/              # rudder-core, rudder-cli, rudder-mcp, rudder-terraform, rudder-profiles, rudder-ai-events
         ├── .claude-plugin/plugin.json
         └── skills/
             └── <skill>/
@@ -165,6 +174,7 @@ Each plugin includes a setup skill that guides you through installing and config
 | `rudder-mcp` | `/rudder-mcp-setup` | Configures Claude Code to connect to RudderStack's MCP server at `mcp.rudderstack.com` |
 | `rudder-terraform` | `/rudder-terraform-setup` | Installs Terraform, configures the RudderStack provider |
 | `rudder-profiles` | `/rudder-profiles-setup` | Installs `pb`, configures `profiles-mcp`, and wires editor MCP settings |
+| `rudder-ai-events` | `/rudder-ai-events-setup` | Plans AI events for your app in `ai-events.yaml`; `/rudder-ai-events-instrument` then adds the pinned SDK |
 
 After installing a plugin, run its setup skill to get started. Use `/rudder-environment-check` to verify your full setup.
 
