@@ -57,6 +57,7 @@ Measured, not guessed. Plan around them.
 - **connection-mode**: A JavaScript source is source type `web`. Its destination's config needs `connection_mode: {web: cloud}` (or device or hybrid where the type supports it). Without it validate fails with `event-stream/connection/semantic-valid`. _Source: rudder-iac destination definitions README, verified with validate._
 - **destination-disabled**: A destination's `enabled` defaults to false. Without `enabled: true` validate only warns, and nothing is delivered. _Source: rudder-iac providers/destination/model.go, verified with validate._
 - **webhook-public-url**: A webhook `webhook_url` must be a public http(s) domain. `localhost` and `*.ngrok.io` are rejected. _Source: rudder-iac definitions/webhook/definition.go._
+- **unfilled-secret**: In `rudder/secrets.vars.yaml`, a line `NAME:` with no value makes validate and apply fail with `key "NAME" has a null or empty value`, which tells the user what is left to fill. `NAME: ""` validates clean and sends an empty secret. Never write it, even though that error message suggests empty quotes. _Source: rudder-iac varsubst/resolver/file_resolver.go and project/importer/varfile.go at d8abd910, run 21 Oct 2026._
 - **write-key-delay**: A new source's write key is refused with HTTP 401 `invalid write key` for about two minutes after apply. It is propagation, not a wrong key. Sending immediately fails. _Source: live run, 1 Oct 2026._
 - **metrics-no-timestamps**: MCP metrics tools return counts without last-seen times, so a count only means "somewhere in the window". Pass `start_time` set to the time you recorded before sending. _Source: rudder-mcp-server sdk/webapp/model.go (timestamps are json:"-")._
 - **metrics-minute-buckets**: Delivery metrics are counted in one-minute buckets, and a query keeps only buckets that start at or after `start_time`. A start time inside a minute therefore drops that whole minute, so events sent right after recording it never show. Round the start time down to the minute. _Source: rudder-mini reporting, 16 Oct 2026 (start 05:24:07Z returned nothing; 05:24:00Z returned every event)._
@@ -201,10 +202,10 @@ Visible choices, a free-text fallback, and no secrets typed into chat.
 2. For a webhook, ask for the URL. It must be a public http(s) domain (fact webhook-public-url). If the user has none, a tunnel to a local listener or a request bin both work; say which you are choosing and that a request bin is a third party.
 3. Ask whether the endpoint needs an auth header. Only if it does, add the header with its value as `'{{ .WEBHOOK_AUTH }}'`.
 4. Write `rudder/destinations/<id>.yaml` from the destination reference: `definition_version: 1`, `enabled: true`, and `connection_mode: {web: cloud}` for a JavaScript source.
-5. For every secret the destination needs, reference it as `'{{ .NAME }}'` and add `NAME: ""` to `rudder/secrets.vars.yaml`.
+5. For every secret the destination needs (the destination reference lists them per type), reference it as `'{{ .NAME }}'` and add the line `NAME:`, with no value, to `rudder/secrets.vars.yaml` (fact unfilled-secret).
 6. If you created a var file, ask the user to fill it in their editor and say continue. Do not read the values back.
 
-Facts that apply here: **webhook-public-url**, **connection-mode**, **destination-disabled**.
+Facts that apply here: **webhook-public-url**, **connection-mode**, **destination-disabled**, **unfilled-secret**.
 
 Done when:
 
@@ -228,7 +229,7 @@ Needs: `source_id`, `destination_id`.
 
 **Gate.** Show the dry-run plan and ask "Apply these changes to <workspace_name>?" Do not continue without an explicit yes.
 
-Facts that apply here: **silent-decline**, **apply-scope**.
+Facts that apply here: **silent-decline**, **apply-scope**, **unfilled-secret**.
 
 Done when:
 
@@ -241,6 +242,7 @@ If it fails:
 
 - Dry run lists `Removed resources:`: stop (rule), show the list, and go back to step 2's branch.
 - Apply fails with 401 or 403: the token is read-only or for another workspace. Ask for a read-write token.
+- Validate fails with `key "NAME" has a null or empty value`: that secret is not filled yet. Ask the user to fill it in their editor; never write `NAME: ""` (fact unfilled-secret).
 
 ## 6. Instrument
 
