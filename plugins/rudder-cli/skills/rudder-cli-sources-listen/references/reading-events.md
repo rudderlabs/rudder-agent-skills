@@ -4,7 +4,7 @@ Agent shells cut output near 30,000 characters. Read only what the check needs: 
 
 ## The Lines on stdout
 
-Each line is one accepted event, exactly as the SDK sent it, with the whitespace removed. Nothing is added: no `seq`, no receive time, no status, no `messageId` that the SDK did not send, no `type` for a `/v1/track` body sent without one. A batch of five events gives five lines. A refused request gives no line; its `refused:` line is on stderr.
+Each line is one accepted event, exactly as the SDK sent it, with the whitespace removed. Nothing is added: no `seq`, no receive time, no status, no `messageId` that the SDK did not send, no `type` for a `/v1/track` body sent without one. A batch of five events gives five lines. A refused request gives no line. A refused ingestion request has its `refused:` line on stderr.
 
 ```bash
 wc -l < "$d/events"                                                    # how many events

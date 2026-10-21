@@ -1,6 +1,6 @@
 # Running `sources listen` in the Background
 
-`rudder-cli sources listen` is a foreground server, like `python -m http.server` or `nc -l`. After it binds its port, it prints one JSON ready line on stderr. Then it prints each accepted event on stdout and each refused request on stderr, until SIGINT or SIGTERM.
+`rudder-cli sources listen` is a foreground server, like `python -m http.server` or `nc -l`. After it binds its port, it prints one JSON ready line on stderr. Then it prints each accepted event on stdout and each refused ingestion request on stderr, until SIGINT or SIGTERM.
 
 An agent shell call waits for the command to exit. A foreground `sources listen` never exits on its own, so the call hangs until the shell timeout. Three rules prevent this in every agent:
 

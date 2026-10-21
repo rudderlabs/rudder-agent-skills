@@ -79,7 +79,7 @@ Give each service its own write key (`web`, `api`, `worker`) in its SDK config. 
 
 ## Proof Order When the App Looks Correct but Nothing Arrives
 
-1. `grep '^refused:' "$d/log"` is empty: nothing was refused.
+1. `grep '^refused:' "$d/log"` is empty: no ingestion request was refused. A request to a wrong path prints nothing here.
 2. The curl test (item 10) prints `ok`: the server works.
-3. With `--store`, `curl -fsS "$url/_dev/v1/requests?kind=control"` shows `/sourceConfig`: the SDK loaded with the correct URL.
+3. With `--store`, `curl -fsS "$url/_dev/v1/requests?kind=control"` shows `/sourceConfig`: the SDK loaded with the correct URL. A 404 record with the reason `unknown path` there means that the SDK sends to a wrong path.
 4. The host list (item 12) shows where the app really sends.

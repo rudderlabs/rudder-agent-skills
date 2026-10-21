@@ -282,7 +282,7 @@ When the YAML validates but the app sends a wrong or missing event, reproduce it
 
 1. Start `rudder-cli sources listen` in the background, with stdout and stderr in files, and point the app at its `url`.
 2. Run the code path. Each stdout line is one event exactly as the app sent it. Compare its `properties` with the YAML.
-3. Nothing arrived: read the `refused:` lines on stderr. None means the app does not send to `url`; check its data plane URL and config URL.
+3. Nothing arrived: read the `refused:` lines on stderr. None means no request reached an event route of `url`. Check the app's data plane URL (the base URL, with no path) and its config URL.
 4. Fix, repeat, then run `rudder-cli validate` and the dry-run.
 
 ## RudderTyper & Live Event Debugging

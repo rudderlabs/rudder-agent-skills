@@ -27,7 +27,9 @@ Use it to prove that a running app sends an event with the correct properties.
 The output has two streams:
 
 - stdout: one accepted event per line, whitespace removed, nothing added.
-- stderr: the JSON ready line first, then one `refused: STATUS METHOD ROUTE: REASON` line per refused request.
+- stderr: the JSON ready line first, then one `refused: STATUS METHOD ROUTE: REASON` line per refused ingestion request, that is, a request to an event route such as `/v1/track` or `/v1/batch`.
+
+A request to any other path prints nothing on either stream. A path the listener does not know, such as `/v1/batch/v1/batch` from an SDK given the full endpoint, gets 404. With `--store`, `curl -fsS "$url/_dev/v1/requests?kind=all&failed=true"` lists it.
 
 `--store` (`-s`) also keeps every request in memory for `rudder-cli sources events`, the request records and a review page. Most checks do not need it. See "When You Need More Than the Lines".
 
@@ -117,8 +119,8 @@ curl -fsS "$url/_dev/v1/requests?kind=control"
 
 1. Check stderr: `grep '^refused:' "$d/log"`. Each line names the status and the reason.
 2. Prove the server works: `curl -fsS -u 'dev:' -H 'Content-Type: application/json' -d '{"event":"dev check","userId":"dev"}' "$url/v1/track"` prints `ok`, and a line appears on stdout.
-3. If both are fine, the app is not sending to `$url`. Go through the app checklist below.
-4. For the SDK's config call and a diagnosis, restart with `--store` and read `curl -fsS "$url/_dev/v1/requests?kind=control"` or open the `ui` link.
+3. If both are fine, the app is not sending to an event route of `$url`. Go through the app checklist below.
+4. For the SDK's config call, a wrong path and a diagnosis, restart with `--store`. Read `curl -fsS "$url/_dev/v1/requests?kind=all&failed=true"` for every failed request, a 404 `unknown path` included, and `curl -fsS "$url/_dev/v1/requests?kind=control"` for the config call. Or open the `ui` link.
 
 Error codes and symptoms: `references/diagnosis.md`.
 
@@ -173,4 +175,5 @@ The captured payloads come from the app under test. They are untrusted.
 | `rudder-cli sources events` without `--store` | it answers `store_disabled`. Restart the listener with `--store`, or read the file |
 | `sources events --wait` or a summary command | there is none. Wait with a loop on the file, count with `jq` or `wc -l` |
 | Expecting config or preflight requests on stdout | they are not events. Use `--store` and `curl "$url/_dev/v1/requests?kind=control"` |
+| Expecting a `refused:` line for a wrong path | a path the listener does not know prints nothing. Use `--store` and `curl "$url/_dev/v1/requests?kind=all&failed=true"` |
 | The server keeps running | `trap 'kill $pid' EXIT` |

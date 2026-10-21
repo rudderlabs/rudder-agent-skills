@@ -42,7 +42,7 @@ Rules:
 - Never write a check as `! grep ...`. `set -e` ignores a command that starts with `!`. Use `if grep ...; then exit 1; fi`.
 - The wait loop on the file replaces a server-side wait. 150 rounds of 0.2 s is 30 s.
 - Use `jq -e -s` on the file. `length > 0` stops an empty file from passing, because `all()` over nothing is true.
-- A refused request never reaches stdout. The `refused:` check catches a bad body or a rejected key that would otherwise look like a missing event.
+- A refused request never reaches stdout. The `refused:` check catches a bad body or a rejected key that would otherwise look like a missing event. A request to a wrong path prints no `refused:` line. The count check catches it as a missing event.
 - Take the expected names and values from the tracking plan YAML or the test, never from the capture.
 - Several services in one job: run one listener per service with `--port 0` and its own files. stdout has no write key. To check keys on one listener, use `--store` and the request records.
 - On a public repository, use synthetic data and the key `dev`. Do not print properties into the log unless the job fails.

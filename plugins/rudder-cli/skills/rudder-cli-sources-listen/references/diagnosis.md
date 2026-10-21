@@ -11,7 +11,7 @@ A 200 `ok` and a new line on stdout prove that the server works. The problem is 
 
 ## Refused Requests
 
-Each refused request prints one line on stderr: `refused: STATUS METHOD ROUTE: REASON`. Its events never reach stdout.
+Each refused ingestion request prints one line on stderr: `refused: STATUS METHOD ROUTE: REASON`. Its events never reach stdout. Ingestion routes are the event routes: `/v1/track`, `/v1/page`, `/v1/screen`, `/v1/identify`, `/v1/group`, `/v1/alias`, `/v1/batch`, `/v1/import`, `/v1/merge`, `/v1/audiencelist`, `/beacon/v1/batch`, `/pixel/v1/track` and `/pixel/v1/page`. A request to any other path is a control request and prints no `refused:` line.
 
 | Line | Likely cause | Fix |
 |---|---|---|
@@ -19,19 +19,26 @@ Each refused request prints one line on stderr: `refused: STATUS METHOD ROUTE: R
 | `refused: 400 ...: invalid json` and other 400s | bad JSON, a `batch` that is not an array, no `userId` and no `anonymousId`, bad gzip | read the raw body with `--store` (below) |
 | `refused: 413 ...` | a body over 2,048,000 bytes, or more than 10,000 events in one batch | send smaller batches |
 | `refused: 503 ...` | more than 8 requests in flight at once | slow the sender down, or retry |
-| `refused: 404 ...` | an ingestion route the listener does not know | check the data plane URL path. Java takes the base URL only |
+| `refused: 405 ...` | the wrong HTTP method on an event route, such as a GET on `/v1/track` | send events with POST. Only the `/pixel/` routes take GET |
 
 A pixel request answers 200 even when its event is dropped. It still prints a `refused:` line.
 
-## Nothing on stdout, Nothing on stderr
-
-The listener saw no event request. Go through the checklist in `app-bootstrap.md`: data plane URL, config URL, build-time values, analytics gates, flush. To see the SDK's own requests, restart with `--store`:
+A request to a path the listener does not know prints nothing, on stderr or stdout. It is a control request and gets 404 `unknown path`. A common cause is an SDK given the full endpoint instead of the base URL, so it sends to `/v1/batch/v1/batch`. Java takes the base URL only. With `--store`, list every failed request, control requests included:
 
 ```bash
-curl -fsS "$url/_dev/v1/requests?kind=control"   # /sourceConfig and preflights
+curl -fsS "$url/_dev/v1/requests?kind=all&failed=true&view=compact"
+```
+
+## Nothing on stdout, Nothing on stderr
+
+The listener saw no ingestion request. Go through the checklist in `app-bootstrap.md`: data plane URL, config URL, build-time values, analytics gates, flush. To see the SDK's own requests, restart with `--store`:
+
+```bash
+curl -fsS "$url/_dev/v1/requests?kind=control"   # /sourceConfig, preflights and unknown paths
 ```
 
 - No control request at all: the app does not reach `$url`. Check the URL and restart the app after an env change.
+- A 404 record with the reason `unknown path`: the app reaches `$url` on a wrong path. Give the SDK the base URL only.
 - Only CORS preflights: the browser blocked the real request. Read `response.headers` of the preflight records.
 - `/sourceConfig` with 200 and no events: the SDK loaded but sent nothing. The default browser entry waits for plugins from the CDN; import `/bundled`. Or the action did not run.
 - `/sourceConfig` with 401 or 400: no write key in Basic auth, or a key outside the allowlist.
@@ -56,12 +63,13 @@ The review page at the ready line's `ui` shows a diagnosis when events are missi
 
 ## Error Codes
 
-`sources listen` prints a startup error as one JSON object, the last line of stderr. Under `--json`, `sources events` prints a failure as one object on stderr and nothing on stdout: `{"error":{"status","code","message","param","details","next"}}`. Run `next`. On a terminal, the same error prints as `Error: <message>` and `Next: <command>`. Every command exits 1 on an error.
+`sources listen` prints a startup error as one JSON object, the last line of stderr. Under `--json`, `sources events` prints a failure as one object on stderr and nothing on stdout: `{"error":{"status","code","message","param","details","next"}}`. Run `next`, or the fix in the table below. On a terminal, the same error prints as `Error: <message>` and `Next: <command>`. Every command exits 1 on an error.
 
-| Code | Meaning | Next |
+| Code | Meaning | Fix |
 |---|---|---|
 | `experimental_disabled` | the gate is off | `export RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_SOURCES_LISTEN=true` |
 | `port_in_use` | from `sources listen --port` | `rudder-cli sources listen --port 0` |
+| `listen_failed` | `sources listen` could not bind the address, or stopped serving | the message names the cause. `rudder-cli sources listen --help` |
 | `store_disabled` | `sources events` or `/_dev/` on a listener started without `--store` (404) | restart with `--store`, or read the stdout file |
 | `invalid_parameter`, `unknown_parameter`, `usage` | a bad flag or value: `--limit` out of range, `--fields` with `--view`, a comma in `--fields`, a missing URL | the `--help` of the command |
 | `server_unreachable` | no listener at the URL, or something else answered there | start one: `rudder-cli sources listen --port 0 --store` |
