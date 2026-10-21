@@ -13,20 +13,29 @@ without it an old count looks like a new delivery.
 ## 2. Wait for the write key
 
 A new write key is refused for about two minutes after apply. Probe it without sending an event: an empty
-batch is authenticated first and then rejected for being empty, so nothing is ingested.
+batch is authenticated first and then rejected for being empty, so nothing is ingested. This call reads the key
+and the URL from `.env.local`, the `VITE_RUDDERSTACK_` names in a Vite app or the `RUDDERSTACK_` names on the curl
+path, so neither appears on the command line or in the output. It probes every 20 seconds for up to 5 minutes;
+give the call a timeout of 6 minutes.
 
 ```bash
-curl -s -o /dev/null -w '%{http_code}' \
-  -H "Authorization: Basic $(printf '%s:' "$WRITE_KEY" | base64)" \
-  -H 'Content-Type: application/json' -d '{"batch":[]}' "$DATA_PLANE_URL/v1/batch"
+set -a; . ./.env.local; set +a
+key=${RUDDERSTACK_WRITE_KEY:-$VITE_RUDDERSTACK_WRITE_KEY}; dp=${RUDDERSTACK_DATA_PLANE_URL:-$VITE_RUDDERSTACK_DATA_PLANE_URL}
+: "${key:?no write key in .env.local}" "${dp:?no data plane URL in .env.local}"
+for i in $(seq 15); do
+  code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Basic $(printf '%s:' "$key" | base64)" \
+    -H 'Content-Type: application/json' -d '{"batch":[]}' "$dp/v1/batch")
+  [ "$code" != 401 ] && break
+  sleep 20
+done
+echo "write key probe: $code"
 ```
 
-- `401`: not active yet. Try again in 20 seconds. Give up after 5 minutes and report the last status.
+- `401`: still not active after 5 minutes. Report it and stop.
 - Any other status (typically `400`): the key is accepted.
 
-Keep the write key in a shell variable read from `.env.local`; do not print it. `WRITE_KEY` and `DATA_PLANE_URL`
-above are the values of the `VITE_RUDDERSTACK_` names in a Vite app, and of `RUDDERSTACK_WRITE_KEY` and
-`RUDDERSTACK_DATA_PLANE_URL` on the curl path.
+In a framework with other names for the two values, such as `NEXT_PUBLIC_` in Next.js, put those names in the
+second line.
 
 ## 3. Send real events
 
@@ -35,17 +44,21 @@ Start the app against `.env.local` (no overrides) and ask the user to go through
 ### No app here: send the first planned event with curl
 
 When `sender` is `curl`, send the first event in `rudder/plan.events.json` yourself, once the probe above stops
-answering `401` (it then answers `400`). Give each property a sample value of its agreed type: a string, a number with a fraction such as `42.5`, a
-whole number for `integer`, `true` for `boolean`. The property names and JSON types must match the plan exactly.
-The key and the URL come from `.env.local`, so neither appears on the command line:
+answering `401`. Run this command as written. It builds the body from the plan, so the event name and property
+names match it exactly, and gives each property a sample value of its agreed type: `"sample"` for `string`,
+`42.5` for `number`, `42` for `integer` and `true` for `boolean`. The key and the URL come from `.env.local`, so
+neither appears on the command line:
 
 ```bash
 set -a; . ./.env.local; set +a
+: "${RUDDERSTACK_WRITE_KEY:?no write key in .env.local}" "${RUDDERSTACK_DATA_PLANE_URL:?no data plane URL in .env.local}"
+body=$(jq -c 'to_entries[0] | {type: "track", event: .key, anonymousId: "rudderstack-first-event",
+  properties: (.value | with_entries(.value |= {string: "sample", number: 42.5, integer: 42, boolean: true}[.]))}' \
+  rudder/plan.events.json) || exit 2
+echo "$body"
 curl -sS -o /dev/null -w '%{http_code}\n' \
   -H "Authorization: Basic $(printf '%s:' "$RUDDERSTACK_WRITE_KEY" | base64)" \
-  -H 'Content-Type: application/json' \
-  -d '{"type":"track","event":"Order Completed","anonymousId":"rudderstack-first-event","properties":{"order_id":"ORD-1001","total":42.5,"currency":"USD"}}' \
-  "$RUDDERSTACK_DATA_PLANE_URL/v1/track"
+  -H 'Content-Type: application/json' -d "$body" "$RUDDERSTACK_DATA_PLANE_URL/v1/track"
 ```
 
 `200` means RudderStack accepted the event. `401` means the key is not active yet: probe again as in section 2.
@@ -74,5 +87,5 @@ first; it arrives within seconds.
 ## 5. Check the payload
 
 MCP hashes property values, so it cannot show `total: 128.5`. The destination's own copy can. For a webhook
-the user can read (a local listener behind a tunnel, or a request bin), check the event names, the values and
-their JSON types there.
+the user can read (a request bin, or an endpoint the user runs), check the event names, the values and their
+JSON types there.

@@ -8,7 +8,7 @@ allowed-tools: Bash(rudder-cli *), Bash(git *), Bash(npm *), Bash(npx *), Bash(c
 
 # Set up RudderStack in this project
 
-Done means one real event reached the destination the user chose, sent by this app or, when there is no app here, by curl, proven by the destination's delivery count and by the destination's own copy of the payload. The pipeline exists as specs in `rudder/` and every change is committed, so `git revert` followed by `rudder-cli apply` undoes it. The user makes three decisions: the plan (what to learn and which events), where events go, and whether to apply the specs.
+Done means one real event reached the destination the user chose. The app sends it, or curl does when there is no app here. The destination's delivery count proves it, and so does the payload at the destination when the user can read it there. The pipeline exists as specs in `rudder/` and every change is committed, so `git revert` followed by `rudder-cli apply` undoes it. The user makes three decisions: the plan (what to learn and which events), where events go, and whether to apply the specs.
 
 ## When to use
 
@@ -311,7 +311,7 @@ Visible choices, a free-text fallback, and no secrets typed into chat.
      - Amplitude
      - Mixpanel
      - Something else. Type its name.
-2. For a webhook, ask for the URL. It must be a public http(s) domain (fact webhook-public-url). If the user has none, a tunnel to a local listener or a request bin both work; say which you are choosing and that a request bin is a third party.
+2. For a webhook, ask for the URL. It must be a public http(s) domain (fact webhook-public-url). If the user has none, ask whether to use a request bin, such as webhook.site, which shows each request it receives. Say that it is a third party that sees every payload, and use one only on a yes.
 3. Ask whether the endpoint needs an auth header. Only if it does, add the header with its value as `'{{ .WEBHOOK_AUTH }}'`.
 4. Write `rudder/destinations/<id>.yaml` from the destination reference: `definition_version: 1`, `enabled: true`, and the `connection_mode` entry for `source_type`, `{web: cloud}` for a `javascript` source (fact connection-mode).
 5. For every secret the destination needs (the destination reference lists them per type), reference it as `'{{ .NAME }}'` and add the line `NAME:`, with no value, to `rudder/secrets.vars.yaml` (fact unfilled-secret).
@@ -423,7 +423,7 @@ Local is clean. Now the real pipeline, measured from a known start time.
 Needs: `write_key`, `data_plane_url`, `remote_destination_id`, `events`, `sender`.
 
 1. Record `started_at` as the current UTC time rounded down to the minute: `date -u +%Y-%m-%dT%H:%M:00Z` (fact metrics-minute-buckets).
-2. Probe whether the write key is accepted yet, as the live verification reference shows, without sending an event.
+2. Probe whether the write key is accepted yet with the live verification reference's probe, one call that retries for up to 5 minutes, without sending an event.
 3. Start the app against the real data plane (`.env.local`) and ask the user to go through the flow once, then say done.
 4. Call MCP `get_destination_event_metrics` with the destination id and `start_time: started_at`. Delivered means each event the user sent from `rudder/plan.events.json` shows `deliveredCount` of at least 1 and `failedCount` 0.
 5. If anything failed, call `get_destinations_errors` for the destination and report the error.
@@ -431,9 +431,9 @@ Needs: `write_key`, `data_plane_url`, `remote_destination_id`, `events`, `sender
 
 If `sender` is `curl`:
 
-- Instead of item 3, once the write-key probe stops answering 401, send the first event in `rudder/plan.events.json` with curl and sample values of its agreed types, as the live verification reference shows (fact http-api-any-source). Expect HTTP 200. Items 4 to 6 then check that one event.
+- Instead of item 3, once the write-key probe stops answering 401, send the first event in `rudder/plan.events.json` with the live verification reference's send command, which builds the body from the plan with sample values of the agreed types (fact http-api-any-source). Send it once and expect HTTP 200. Items 4 to 6 then check that one event.
 
-**Loop.** Probe the write key every 20 seconds, then poll delivery metrics every 30 seconds until the write key is accepted, and each agreed event shows as delivered since started_at or has arrived at a destination the user can read, give up after 5 minutes for the write key, then 10 minutes for delivery. When the bound is hit: Report the last probe status and the last metrics seen, and suggest get_destinations_errors and the live events page.
+**Loop.** Probe the write key every 20 seconds until it is accepted, then poll delivery metrics every 30 seconds until each agreed event shows as delivered since started_at or has arrived at a destination the user can read, give up after 5 minutes for the write key and 10 minutes for delivery. When the bound is hit: Report the last probe status and the last metrics seen, and suggest get_destinations_errors and the live events page.
 
 Facts that apply here: **write-key-delay**, **metrics-no-timestamps**, **metrics-minute-buckets**, **metrics-lag**, **mcp-hashes-values**, **http-api-any-source**.
 
