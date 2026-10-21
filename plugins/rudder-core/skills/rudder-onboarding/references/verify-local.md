@@ -15,8 +15,8 @@ skill" in SKILL.md).
   and the app, the user acts, then check.
 - **One call** where the agent stops background processes when a call returns (Codex): start, wait while the
   user acts, check and stop, all in one call.
-- Not sure, as in Cursor: start with two calls. If the mark command says the listener is not running, the agent
-  stopped it; switch to one call.
+- When you are not sure, as in Cursor, start with two calls. If the mark command says the listener is not
+  running, the agent stopped it; switch to one call.
 
 Each shell call is a new shell, so a variable set in one call is gone in the next. Each command prints the
 values the next one needs. Write them into the next command where it shows `<D>`, `<PID>`, `<URL>`, `<APP>`,
@@ -73,7 +73,7 @@ echo "APP=$!"
 
 Variables set in the process environment win over `.env.local`, so nothing in the app changes. Read the local
 address from `<D>/app.log` and give it to the user. If the log shows an error and no address, the app did not
-start: fix that before the mark. Serve the app from `http://localhost`: Chrome blocks a public
+start. Fix that before the mark. Serve the app from `http://localhost`: Chrome blocks a public
 HTTPS page from sending to a loopback address. Mobile SDKs take the URL as `controlPlaneUrl` too, and server SDKs
 must flush before the process exits.
 
@@ -165,7 +165,7 @@ exit 1
 ```
 
 The exit codes are the same as in the two-call recipe. The listener and the app stop when the call ends, also
-when the agent interrupts it. If the agent kills the call outright, they keep running: stop them with
+when the agent interrupts it. If the agent kills the call outright, they keep running. Stop them with
 `kill <PID> <APP>`, from the numbers the call printed first. For another pass, fix the code and run the whole
 call again.
 
