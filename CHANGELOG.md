@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`rudder-core` / `rudder-code-first-instrumentation`,
+  `rudder-design-first-instrumentation`, `rudder-instrumentation-debugging`**.
+  Added a "verify locally with `rudder-cli sources listen`" step before the
+  dev workspace step, a runtime debugging section, and checklist items.
+  `rudder-core` 0.0.6 to 0.0.7.
+- **`rudder-cli` / `rudder-typer-workflow`**. After the build, fire the event
+  and confirm the payload locally.
+- **`rudder-mcp` / `rudder-mcp-workflow`**. Optional step 0 in the
+  instrumentation verification workflow, to capture locally before applying the
+  tracking plan. `rudder-mcp` 0.0.2 to 0.0.3.
+
 - **Breaking (repo layout):** renamed the top-level `skills/` directory back to
   `plugins/` (reverting the earlier `plugins/` → `skills/` rename). Each plugin
   lives at `plugins/<plugin>/skills/<skill>/SKILL.md`; marketplace `source` fields
@@ -27,6 +38,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`rudder-cli` / `rudder-cli-sources-listen`** (new, experimental). Runs
+  `rudder-cli sources listen`, a local server that accepts events the way
+  RudderStack ingestion does and prints each accepted event on stdout as one
+  JSON line. The skill covers the background loop, pointing web, server and
+  mobile SDKs at the listener, checks with `grep` and `jq`, CI recipes,
+  `--store` for request records, and diagnosis. Requires a Rudder CLI version
+  that includes the `sources` commands. `rudder-cli` 0.0.3 to 0.0.4.
 - **`rudder-ai-events`** — new plugin that onboards an existing app to RudderStack AI events
   (spec v0.3) with the `@rudderstack/ai` (Node.js), `rudderstack-ai` (Python) and `ai-sdk-go` (Go)
   SDKs, pinned to the release that ships spec v0.3.

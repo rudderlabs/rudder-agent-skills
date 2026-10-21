@@ -1,6 +1,6 @@
 ---
 name: rudder-instrumentation-debugging
-description: Diagnoses and fixes validation errors, schema issues, and instrumentation problems. Use when debugging validation errors, schema issues, or instrumentation problems
+description: Diagnoses and fixes validation errors, schema issues, and instrumentation problems, including tracking calls that send wrong or missing events. Use when debugging validation errors, schema issues, or events that do not match the tracking plan
 allowed-tools: "Bash(rudder-cli *), Read, Write, Edit"
 ---
 
@@ -16,7 +16,7 @@ This skill teaches how to diagnose and fix common **validation errors**, **schem
 └────────┬────────┘
          ▼
 ┌─────────────────┐
-│ Identify Type   │ ← Validation? Schema? Runtime?
+│ Identify Type   │ ← Validation? Schema? Runtime (capture it locally)?
 └────────┬────────┘
          ▼
 ┌─────────────────┐
@@ -276,6 +276,15 @@ Shows:
 grep -r "urn:rudder:property/product_id" data-catalog/
 ```
 
+## Runtime Debugging: Capture Locally First
+
+When the YAML validates but the app sends a wrong or missing event, reproduce it locally before you check a workspace. The `rudder-cli-sources-listen` skill has the recipe.
+
+1. Start `rudder-cli sources listen` in the background, with stdout and stderr in files, and point the app at its `url`.
+2. Run the code path. Each stdout line is one event exactly as the app sent it. Compare its `properties` with the YAML.
+3. Nothing arrived: read the `refused:` lines on stderr. None means no request reached an event route of `url`. Check the app's data plane URL (the base URL, with no path) and its config URL.
+4. Fix, repeat, then run `rudder-cli validate` and the dry-run.
+
 ## RudderTyper & Live Event Debugging
 
 See `references/error-reference.md` for:
@@ -303,6 +312,9 @@ rudder-cli auth login
 
 # Show detailed validation
 rudder-cli validate -l ./ --verbose
+
+# Print the events a local app sends (experimental)
+rudder-cli sources listen --port 4321
 ```
 
 ## Quick Reference: Error → Fix
@@ -316,6 +328,8 @@ rudder-cli validate -l ./ --verbose
 | `syntax error` | Bad YAML | Check indentation, use YAML linter |
 | `unexpected deletion` | Missing file | Restore from git or re-import |
 | `no changes` | Files not saved | Save files, check directory |
+| event not arriving | App wiring or SDK config | `refused:` lines from `sources listen`, then its app checklist |
+| wrong property in capture | Code and YAML disagree | Compare captured `properties` with the YAML |
 
 ## Prevention Tips
 

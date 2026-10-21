@@ -26,7 +26,7 @@
     {
       "name": "rudder-cli",
       "source": "plugins/rudder-cli",
-      "description": "Workflows for driving the rudder-cli and rudder-typer CLIs: validate, dry-run, apply, import, transformations.",
+      "description": "Workflows for driving the rudder-cli and rudder-typer CLIs: validate, dry-run, apply, import, transformations, local event capture.",
       "author": {
         "name": "RudderStack"
       },
