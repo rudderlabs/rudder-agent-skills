@@ -22,22 +22,39 @@ Before running any workflow, verify:
 
 ## Client configuration
 
-Claude Code `mcpServers` block (HTTP transport via `mcp-remote`):
+Claude Code connects over HTTP and runs the OAuth sign-in itself, with no `npx` or `mcp-remote`:
+
+```bash
+claude mcp add --transport http rudderstack https://mcp.rudderstack.com/mcp
+```
+
+That command writes this `mcpServers` entry, to your Claude Code config by default or to the project's `.mcp.json` with `--scope project`:
 
 ```json
 {
   "mcpServers": {
     "rudderstack": {
-      "command": "npx",
-      "args": ["-y", "mcp-remote", "https://mcp.rudderstack.com/mcp"]
+      "type": "http",
+      "url": "https://mcp.rudderstack.com/mcp"
     }
   }
 }
 ```
 
+Then type `/mcp`, choose `rudderstack` and `Authenticate`, or run `claude mcp login rudderstack` from a terminal. `rudder-mcp-setup` has the full walkthrough. A client without HTTP support runs `npx -y mcp-remote https://mcp.rudderstack.com/mcp` as a stdio command instead.
+
 For headless sessions that cannot open a browser, `rudder-mcp-setup` shows the access-token route: `https://mcp.rudderstack.com/bearer-auth-mcp` with `Authorization: Bearer ${RUDDERSTACK_ACCESS_TOKEN}` and `X-Workspace-ID` headers in `.mcp.json`. That route pins one workspace and has no `user_details` or `user_switch_workspace` tools.
 
 For other clients (Claude Desktop, Cursor, VS Code, Windsurf, claude.ai connectors), use the snippets at https://mcp.rudderstack.com/docs.
+
+## Choose the workspace
+
+On the OAuth route, call `user_details` first. It lists the workspaces your account can use and their IDs. How a call picks its workspace depends on the server version, so check the tool list:
+
+- When the workspace tools take a `workspace_id` argument, pass the ID of the target workspace on every call. A call without it fails with `workspace_id is required`.
+- When they do not, the tool list has `user_switch_workspace`. Call it with the target workspace's ID before the other calls. It changes the workspace for every later call in the session, so confirm the target with the user first.
+
+On the access-token route, the `X-Workspace-ID` header picks the workspace for every call. To work in another workspace, change the header and restart the client.
 
 ## Tool catalog
 
@@ -114,10 +131,11 @@ Recommended for safe iteration:
 Workflow:
 
 ```
-1. Point your MCP client at the Dev workspace
-   (OAuth route: user_switch_workspace switches workspaces if your
-    account has access to several; access-token route: set
-    X-Workspace-ID to the Dev workspace and restart the client)
+1. Target the Dev workspace (see "Choose the workspace")
+   └── OAuth route: pass the Dev workspace's ID as workspace_id,
+       or call user_switch_workspace when the tools take no workspace_id
+   └── Access-token route: set X-Workspace-ID to the Dev workspace
+       and restart the client
 
 2. Apply changes to Dev
    └── e.g. rudder-cli apply --dry-run -l ./, review it,
@@ -142,9 +160,9 @@ Workflow:
 
 ## Credential Security
 
-- OAuth route: no long-lived tokens to manage. `mcp-remote` brokers the handshake with `mcp.rudderstack.com` per session.
+- OAuth route: no long-lived tokens to manage. The client runs the sign-in with `mcp.rudderstack.com`.
 - Access-token route: the token stays in `RUDDERSTACK_ACCESS_TOKEN` and `.mcp.json` references it as `${RUDDERSTACK_ACCESS_TOKEN}`. Never write the token into a config file and never ask the user to paste it into the chat.
-- `mcp-remote` caches session tokens locally — don't share or commit your client config or the mcp-remote cache directory.
+- If you use `mcp-remote`, it caches session tokens locally. Don't share or commit your client config or the mcp-remote cache directory.
 - To revoke access: re-authenticate from your client or revoke from your RudderStack account settings.
 
 ## Handling External Content

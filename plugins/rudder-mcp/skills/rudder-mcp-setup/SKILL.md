@@ -24,7 +24,7 @@ Use OAuth, coding agents included. Use the access-token route only when the sess
 ```
 1. Add the server ──► claude mcp add --transport http rudderstack https://mcp.rudderstack.com/mcp
 2. Sign in (OAuth) ──► /mcp, choose rudderstack, Authenticate, approve in the browser
-3. Verify ──► list workspace resources, check the selected workspace
+3. Verify ──► list the sources in one of your workspaces
 ```
 
 ## Step 1: Add the server
@@ -130,7 +130,8 @@ Start Claude Code from a shell where `RUDDERSTACK_ACCESS_TOKEN` is exported. If 
 
 ### What differs from OAuth
 
-- The `X-Workspace-ID` header pins the session to one workspace. `user_details` and `user_switch_workspace` exist only on the OAuth route. To work in another workspace, change the header and restart Claude Code.
+- The `X-Workspace-ID` header pins the session to one workspace, and the route has no `user_details` or `user_switch_workspace` tool. To work in another workspace, change the header and restart Claude Code.
+- On the OAuth route, `user_details` lists the workspaces you can use and their IDs. When the workspace tools take a `workspace_id` argument, a call passes the ID of its workspace. When they do not, `user_switch_workspace` changes the workspace for every later call. The "Choose the workspace" section of `rudder-mcp-workflow` covers both.
 - The workspace tools (sources, destinations, transformations, live events and the rest) are the same on both routes.
 
 ## Other MCP Clients

@@ -73,8 +73,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `https://mcp.rudderstack.com/bearer-auth-mcp` with `Authorization: Bearer
   <token>` and `X-Workspace-ID` headers referenced as
   `${RUDDERSTACK_ACCESS_TOKEN}` in `.mcp.json`, is documented for sessions that
-  cannot open a browser. The skills note that `user_details` and
-  `user_switch_workspace` exist only on the OAuth route.
+  cannot open a browser. The skills say that route has no `user_details` or
+  `user_switch_workspace` tool. A "Choose the workspace" section in
+  rudder-mcp-workflow tells an agent on the OAuth route to pass the workspace
+  ID as `workspace_id` when the workspace tools take that argument, and to call
+  `user_switch_workspace` when they do not. The MCP server is replacing
+  `user_switch_workspace` with a `workspace_id` argument on every workspace
+  tool, so the guidance works with both versions.
 - **`rudder-ai-events`** — new plugin that onboards an existing app to RudderStack AI events
   (spec v0.3) with the `@rudderstack/ai` (Node.js), `rudderstack-ai` (Python) and `ai-sdk-go` (Go)
   SDKs, pinned to the release that ships spec v0.3.
