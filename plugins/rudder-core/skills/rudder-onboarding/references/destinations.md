@@ -87,18 +87,29 @@ NAME:
   single quotes of the slot. So in the value the CLI reads, every `'` must be doubled. Write a plain value as it
   is, with each `'` in it written twice (`it''s`).
 - Write a JSON value, such as a service account key, on one line in single quotes, `NAME: '{"type": ...}'`, and
-  keep its `\n` escapes as they are. `jq -c . key.json` prints a key file on one line. Inside those quotes, each
-  `'` of the value is written four times.
+  keep its `\n` escapes as they are. Inside those quotes, each `'` of the value is written four times.
+- For a key file, ask the user for its path and run this command with that path and the variable's name in
+  place of `key.json` and `NAME`, instead of asking the user to paste the key. It replaces the line `NAME:` with
+  the key written as above and prints nothing. Never print a key file or the var file.
+
+  ```sh
+  t=$(mktemp) && jq -e . key.json >/dev/null && { grep -v '^NAME:' rudder/secrets.vars.yaml; printf "NAME: '%s'\n" "$(jq -c . key.json | sed "s/'/''''/g")"; } > "$t" && mv "$t" rudder/secrets.vars.yaml
+  ```
+
+- A value that spans lines, such as a PEM private key, cannot go through the var file yet. The CLI pastes it
+  into the spec's text, where YAML turns each line break into a space, and validate still passes. When a secret
+  key's pattern accepts line breaks (its `regex` starts with `(?s)`), offer the type's other way to sign in, such
+  as a password, or say this workflow cannot connect that destination yet.
 
 ## Errors you will meet
 
 | Rule id | Cause | Fix |
 |---|---|---|
-| `destination/secret-reference` (warning) | a secret key holds a value, a default, or anything but one variable reference | write the key's `slot` from the docs output; the value goes in the var file |
-| `destination/secret-reference-unique` (warning) | one variable fills two secret keys | give each key the `slot` the docs output prints for its own destination id |
+| `destination/secret-reference` (warning, exit 0) | a secret key holds a value, a default, or anything but one variable reference | write the key's `slot` from the docs output; the value goes in the var file |
+| `destination/secret-reference-unique` (warning, exit 0) | one variable fills two secret keys | give each key the `slot` the docs output prints for its own destination id |
 | `destination/spec-syntax-valid` | a missing, unknown or invalid config key | read the key's entry in the docs output's `fields` |
 | `event-stream/connection/semantic-valid` | the destination has no `connection_mode` entry for the source's token | add the entry the message names, with a mode from `connectionModes` |
 | `event-stream/connection/enabled-endpoints-valid` (warning) | destination or source not enabled | set `enabled: true` |
 | `project/var-substitution` | a `{{ .NAME }}` with no value, or a `'` not doubled | add it to the var file or `RUDDER_<NAME>`, or double the `'` |
 | none: `key "NAME" has a null or empty value` | the user has not filled `NAME` in the var file | ask the user to fill it; never write `NAME: ""` |
-| `project/spec-syntax-parse-valid` | a non-spec YAML file under the location | keep specs in `rudder/`, pass `-l rudder` |
+| `project/spec-syntax-parse-valid` | a YAML syntax error in a spec, or a non-spec YAML file under the location | fix the line it names; keep specs in `rudder/`, pass `-l rudder` |
