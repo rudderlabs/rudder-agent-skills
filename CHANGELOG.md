@@ -26,7 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   checks them against that file with a jq program shipped beside the references, in two shell
   calls, or in one for agents that stop background processes when a call returns. The destination
   reference leaves unfilled secrets as `NAME:` with no value, names every secret key of Amplitude
-  and Mixpanel, and lists the 24 verified destination types.
+  and Mixpanel, and lists the 24 verified destination types. Step 4 asks whether a webhook needs
+  an authentication header and, on yes, for its name, `Authorization` by default; the user fills
+  its value, such as `Bearer <token>`, in the var file.
   Step 1 runs its read-only checks before it changes the folder, and commits the `.gitignore` lines
   for the var file and `.env.local` on their own, so the undo (revert the instrumentation and specs
   commits, then apply) never un-ignores a secret. Step 5 shows validate's errors without the source

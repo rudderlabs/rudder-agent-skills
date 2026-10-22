@@ -392,11 +392,14 @@ Visible choices, a free-text fallback, and no secrets typed into chat.
      - Amplitude
      - Mixpanel
      - Something else. Type its name.
-2. For a webhook, ask for the URL. It must be a public http(s) domain (fact webhook-public-url). If the user has none, ask whether to use a request bin, such as webhook.site, which shows each request it receives. Say that it is a third party that sees every payload, and use one only on a yes.
-3. Ask whether the endpoint needs an auth header. Only if it does, add the header with its value as `'{{ .WEBHOOK_AUTH }}'`.
-4. Write `rudder/destinations/<id>.yaml` from the destination reference: `definition_version: 1`, `enabled: true`, and the `connection_mode` entry for `source_type`, `{web: cloud}` for a `javascript` source (fact connection-mode).
-5. For every secret the destination needs (the destination reference lists them per type), reference it as `'{{ .NAME }}'` and add the line `NAME:`, with no value, to `rudder/secrets.vars.yaml` (fact unfilled-secret).
-6. If you created a var file, ask the user to fill every line in it in their editor and say continue. Do not read the values back.
+2. For a webhook, ask for the URL. It must be a public http(s) domain (fact webhook-public-url). If the user has none, ask whether to use a request bin, such as webhook.site, which shows each request it receives. Say that it is a third party that sees every payload, and use one only on a yes. Items 3 and 4 are for a webhook only.
+3. Ask the user: "Does the endpoint need an authentication header?"
+     - No
+     - Yes, a header, such as `Authorization: Bearer <token>`
+4. On yes, ask for the header's name, `Authorization` unless the user names another. Add the header as the destination reference shows, with its value, a secret, as `'{{ .WEBHOOK_AUTH }}'`. In the var file, `WEBHOOK_AUTH` holds the whole value, such as `Bearer <token>`; say so when you ask the user to fill it.
+5. Write `rudder/destinations/<id>.yaml` from the destination reference: `definition_version: 1`, `enabled: true`, and the `connection_mode` entry for `source_type`, `{web: cloud}` for a `javascript` source (fact connection-mode).
+6. For every secret the destination needs (the destination reference lists them per type), reference it as `'{{ .NAME }}'` and add the line `NAME:`, with no value, to `rudder/secrets.vars.yaml` (fact unfilled-secret).
+7. If you created a var file, ask the user to fill every line in it in their editor and say continue. Do not read the values back.
 
 Facts that apply here: **webhook-public-url**, **connection-mode**, **destination-disabled**, **unfilled-secret**.
 
