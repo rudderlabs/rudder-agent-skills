@@ -75,8 +75,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Validate exits 0 with either warning, so step 5 does not go on to the dry run, or commit, while
   one shows. Step 4 turns away a destination that needs the dashboard's OAuth sign-in (a required
   `rudder_account_id`) and one that takes only device mode, which step 8 cannot confirm.
-  When the output lists secret keys that nothing requires, such as a webhook's header value, step 4
-  asks one question that names them, with No first, and adds only the ones the user picks.
+  When the output lists secret keys that nothing requires, no custom validator checks and the
+  template does not hold, such as a webhook's header value, step 4 asks one question that names
+  them, with No first, and adds the ones the user picks.
   Step 1 probes for both features, not for a version, and stops with upgrade instructions when
   either is missing; after an install it checks that the new rudder-cli is the one on PATH. The
   skill never falls back to written-down keys. When no platform is detected, the "What will send
