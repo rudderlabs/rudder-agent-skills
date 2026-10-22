@@ -97,6 +97,21 @@ spec:
 
 `measurement_id` starts with `G-`. `web` also supports `device` and `hybrid`.
 
+That is a web data stream. A mobile app's events belong in an app data stream, which is Firebase. For an
+`android_kotlin`, `ios_swift`, `flutter`, `react_native`, `unity`, `android` or `ios` source, use
+`client_type: firebase` with the stream's Firebase App ID in place of `measurement_id`, and the source type's
+`connection_mode` key. The App ID is not a secret; write it as a literal. Validate also accepts `gtag` on an app
+source, so it cannot catch this.
+
+```yaml
+  config:
+    api_secret: '{{ .GA4_API_SECRET }}'
+    client_type: firebase
+    firebase_app_id: 1:123456789012:android:0123456789abcdef
+    connection_mode:
+      android_kotlin: cloud
+```
+
 ## Amplitude
 
 ```yaml

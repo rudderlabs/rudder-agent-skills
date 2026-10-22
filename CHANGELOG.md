@@ -36,17 +36,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   release's binary.
   Step 2 runs a probe that names the app's source type: Flutter and React Native first, because
   their apps also hold `android/` and `ios/` folders, then Android (`android_kotlin`), iOS
-  (`ios_swift`, from an Xcode project, a Podfile or an iOS `Package.swift`), web, and only then
-  server languages. When it finds several apps it lists them and asks which one sends events; when
-  it finds none it asks "What will send events to RudderStack?", the question step 1 asks outside
-  an app, now defined once. It also lists the RudderStack and Segment SDKs the dependencies name,
-  the legacy Android (Java) and iOS (Objective-C) SDKs included. New Android (Kotlin SDK) and iOS
-  (Swift SDK) references add the dependency, keep the write key out of git, load the SDK once and
-  give each agreed event a typed function, in Kotlin or Java and in Swift or Objective-C. Step 7
-  checks a mobile app on an Android emulator (`10.0.2.2`) or the iOS Simulator, or is skipped without
-  one, and step 8 runs the app against the real data plane. A Capacitor or Cordova app gets the
-  JavaScript SDK, and a Unity game the Unity SDK. An app that already uses a RudderStack SDK keeps
-  its current source unless the user agrees to move it, and a legacy SDK is replaced only on a yes.
+  (`ios_swift`, from an Xcode project or a Podfile), web, and only then server languages; a
+  `Package.swift` or a `package.json` alone makes it ask. When it finds several apps it lists them
+  and asks which one sends events; when it finds none it asks "What will send events to
+  RudderStack?", the question step 1 asks outside an app, now defined once. It also lists the
+  RudderStack and Segment SDKs the dependencies name, the legacy Android (Java) and iOS
+  (Objective-C) SDKs included. New Android (Kotlin SDK) and iOS (Swift SDK) references add the
+  dependency, keep the write key out of git, load the SDK once and give each agreed event a typed
+  function, in Kotlin or Java and in Swift or Objective-C. Step 7 checks a mobile app on an Android
+  emulator (`10.0.2.2`) or the iOS Simulator, or is skipped without one, and step 8 runs the app
+  against the real data plane. A Capacitor or Cordova app gets the JavaScript SDK, and a Unity game
+  the Unity SDK. An app that already uses a RudderStack SDK keeps its current source unless the user
+  agrees to move it, and a legacy SDK is replaced only on a yes. The iOS reference never edits
+  `project.pbxproj` and gives the user its Xcode changes in one list. Neither mobile reference turns
+  off plain HTTP an app already allows: iOS gets `NSAllowsLocalNetworking` only without
+  `NSAllowsArbitraryLoads`, and Android's debug network config is skipped when
+  `usesCleartextTraffic` is on. An Expo app gets a development build instead of Expo Go, GA4 on a
+  mobile source uses its Firebase app stream, and an app the user will not upgrade, or cannot run on
+  any emulator, simulator or device, sends its first event with curl.
 
 ### Changed
 

@@ -6,17 +6,25 @@ It has an Objective-C API too, so the same SDK serves an app written in Objectiv
 `origin/main` (eb66043) on 21 Oct 2026. This skill has not built it into an app yet. Adapt the names to the app; keep
 the shape.
 
+## Who changes what
+
+You write files: the two xcconfig files, `.env.local`, the new source files, and `Info.plist` when the target has
+one. The Xcode project's own settings live in `project.pbxproj`. Never edit that file, by hand or with a script: a
+mistake there stops the project from opening. The project changes this reference needs are listed under "Xcode
+changes, for the user". Once your files are written, give the user the ones that apply in one message and wait for
+continue.
+
 ## Dependency
 
 The SDK needs iOS 15 or later. Check the app target's `IPHONEOS_DEPLOYMENT_TARGET` in `project.pbxproj` (and
 `platform :ios` in a `Podfile`). If it is lower, tell the user and ask before raising it, because the app then no
-longer installs on older iOS versions. Adding the package fails until it is raised.
+longer installs on older iOS versions. Adding the package fails until it is raised. If the user declines, add
+nothing: set `sender` to `curl`, so step 6 changes no code and step 8 sends the first planned event with curl.
 
-In an Xcode app, add the package and link `RudderStackAnalytics` to the app target: File, Add Package Dependencies,
-the URL above, Up to Next Major Version from 1.4.0. That changes `project.pbxproj` and `Package.resolved`. If you
-cannot drive Xcode, ask the user to do this one step and say continue.
+In an Xcode app, adding the package is one of the Xcode changes. It changes `project.pbxproj` and
+`Package.resolved`.
 
-In a `Package.swift`:
+When the code that sends events lives in a local Swift package, add the dependency to its `Package.swift`:
 
 ```swift
 dependencies: [
@@ -29,7 +37,8 @@ targets: [
 
 ## Keys out of git
 
-An xcconfig file holds the values, and `Info.plist` passes them to the app.
+An xcconfig file holds the values, and `Info.plist` passes them to the app. Write both xcconfig files next to the
+`.xcodeproj`, outside the app's source folder: they configure the build and are not part of the app.
 
 `RudderStack.xcconfig`, committed. Its empty values keep a fresh clone building:
 
@@ -50,17 +59,23 @@ RUDDERSTACK_DATA_PLANE_URL = https:/$()/<data plane host>
 
 Then:
 
-- Set `RudderStack.xcconfig` as the app target's configuration file for Debug and Release (the project's Info tab,
-  Configurations). If the target already has one, add `#include "RudderStack.xcconfig"` to it. When CocoaPods
-  generated that file, ask the user where their own build settings live instead.
-- Add three String keys to the target's `Info.plist`: `RudderStackWriteKey` set to `$(RUDDERSTACK_WRITE_KEY)`,
+- If the app target already has a configuration file (`baseConfigurationReference` in `project.pbxproj`), add
+  `#include "RudderStack.xcconfig"` to that file. When CocoaPods generated it, ask the user where their own build
+  settings live instead. Otherwise attaching `RudderStack.xcconfig` is an Xcode change.
+- Pass three String keys through `Info.plist`: `RudderStackWriteKey` set to `$(RUDDERSTACK_WRITE_KEY)`,
   `RudderStackDataPlaneURL` set to `$(RUDDERSTACK_DATA_PLANE_URL)` and `RudderStackControlPlaneURL` set to
-  `$(RUDDERSTACK_CONTROL_PLANE_URL)`. A target without an `Info.plist` file takes them in its Info tab, Custom iOS
-  Target Properties.
-- Add `NSAppTransportSecurity` with `NSAllowsLocalNetworking` set to YES, so a debug build can send plain HTTP to
-  step 7's listener on the Mac's loopback. It does not allow plain HTTP to public hosts.
-- Write the write key and data plane URL to `.env.local` too, as `RUDDERSTACK_WRITE_KEY` and
-  `RUDDERSTACK_DATA_PLANE_URL`, with plain URLs. Step 8's probe reads them there.
+  `$(RUDDERSTACK_CONTROL_PLANE_URL)`. When the target has an `Info.plist` file (`INFOPLIST_FILE` in
+  `project.pbxproj` names it), add them to that file. When it has none, as in Xcode's current templates
+  (`GENERATE_INFOPLIST_FILE = YES` and no `INFOPLIST_FILE`), they are an Xcode change.
+- Allow plain HTTP to step 7's listener on the Mac's loopback. If the app's `NSAppTransportSecurity` sets
+  `NSAllowsArbitraryLoads` to YES, add nothing: plain HTTP is already allowed, and iOS 10 and later ignore
+  `NSAllowsArbitraryLoads` once `NSAllowsLocalNetworking` is present, which would block the app's plain HTTP to
+  every other host in every build. Otherwise add `NSAllowsLocalNetworking` set to YES to `NSAppTransportSecurity`,
+  creating the dictionary if needed and keeping its other keys. It allows plain HTTP to local addresses only, and
+  changes nothing for public hosts. Like the keys above, it goes in the `Info.plist` file, or is an Xcode change
+  when there is none.
+- Add the write key and data plane URL to `.env.local` too, as `RUDDERSTACK_WRITE_KEY` and
+  `RUDDERSTACK_DATA_PLANE_URL`, with plain URLs, and keep the file's other lines. Step 8's probe reads them there.
 
 A CI or archive build has no `RudderStack.local.xcconfig`, so its values are empty and the SDK stays off. Tell the
 user to create that file in the build from their secret store.
@@ -253,6 +268,24 @@ The `Rudder` pod and the `rudder-sdk-ios` package are the legacy iOS (Objective-
   Before removing the legacy SDK, ask the user: "Remove the legacy SDK and move its other calls to the Swift SDK now,
   or keep it beside the Swift SDK for now?" Kept, it still sends the app's other events to the source it uses today.
   Never leave both SDKs sending the same event to the new source.
+
+## Xcode changes, for the user
+
+Give the user only the changes that apply, as one numbered list in one message, and wait for continue:
+
+1. Raise the app target's minimum deployment to iOS 15: the target's General tab, Minimum Deployments. Only if the
+   user agreed.
+2. Add the package: File, Add Package Dependencies, `https://github.com/rudderlabs/rudder-sdk-swift`, Up to Next
+   Major Version from 1.4.0, with `RudderStackAnalytics` added to the app target.
+3. Attach `RudderStack.xcconfig`: File, Add Files to "<app>", with no target ticked, then the project's Info tab,
+   Configurations, `RudderStack.xcconfig` for the app target in Debug and Release.
+4. Add the three `Info.plist` keys, and `NSAppTransportSecurity` with `NSAllowsLocalNetworking` set to YES when it
+   applies: the target's Info tab, Custom iOS Target Properties.
+5. Add the new source files to the app target: File, Add Files to "<app>", with the app target ticked.
+
+A project made with Xcode 16 or later usually keeps the app's source folder in sync with the target: `project.pbxproj`
+lists it as a `PBXFileSystemSynchronizedRootGroup`. Write the new source files inside that folder; they then build
+with no Xcode change, and item 5 drops out.
 
 ## Check
 

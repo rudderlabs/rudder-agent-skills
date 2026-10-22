@@ -16,7 +16,9 @@ Check these in the Gradle files and the version catalog before adding the SDK:
   1.9 and earlier cannot read its classes. An app written in Java needs no Kotlin plugin.
 
 If any is lower, tell the user which one and ask before upgrading it. Raising the Android Gradle plugin or Kotlin can
-change the whole build, so the user may prefer to do it on their own first.
+change the whole build, so the user may prefer to do it on their own first; then wait for continue and check again.
+If the user declines, add nothing: set `sender` to `curl`, so step 6 changes no code and step 8 sends the first
+planned event with curl.
 
 ## Dependency
 
@@ -37,7 +39,8 @@ declares no permissions, so the app's main manifest needs
 
 The values live in `.env.local` at the Gradle root, the folder that holds `settings.gradle.kts`. It is the file and
 the names every other path of this skill uses, so step 8's probe reads it unchanged, and step 1 git-ignored it.
-Check with `git check-ignore -q .env.local` before writing it.
+Check with `git check-ignore -q .env.local` before writing it. Add these lines, or update them, and keep the file's
+other lines.
 
 ```text
 RUDDERSTACK_WRITE_KEY=<write key from MCP list_sources>
@@ -268,6 +271,10 @@ security config allows the host. Allow that one host in the debug build, with tw
     <application android:networkSecurityConfig="@xml/network_security_config" />
 </manifest>
 ```
+
+If a manifest the debug build uses already sets `android:usesCleartextTraffic="true"`, add neither file. Plain HTTP
+to `10.0.2.2` is allowed already, and Android 7.0 and later ignore that attribute once a network security config is
+present, so the config would block plain HTTP to every other host in the debug build.
 
 If `app/src/debug/AndroidManifest.xml` already exists, add the attribute to its `<application>` instead of
 replacing the file. If the main manifest already sets `android:networkSecurityConfig`, copy that file's rules into

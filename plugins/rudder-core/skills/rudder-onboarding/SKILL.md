@@ -36,7 +36,7 @@ Done means one real event reached the destination the user chose. The app sends 
 - Commit by explicit paths (`git add rudder`, then the files you changed), never `git add -A`, `git add .` or `git commit -a`, so none of the user's own work is swept in. The one exception is step 1's baseline commit of an app that was not in git.
 - Commit after the apply and after the instrumentation, so either can be undone with `git revert`.
 - Ask one question at a time. Offer choices, and accept a free-text answer.
-- `allowed-tools` pre-approves single commands such as `rudder-cli`, `git`, `grep`, `jq` and `curl`. The step 1 and step 2 probes, the step 7 recipes and step 8's probe and send are multi-line shell scripts it does not cover, so the user is asked to approve each one. Tell the user before the first.
+- `allowed-tools` pre-approves single commands such as `rudder-cli`, `git`, `grep`, `jq` and `curl`. It does not cover the step 1 and step 2 probes, the step 7 recipes and step 8's probe and send, which are multi-line shell scripts, or a mobile app's build tools (`./gradlew`, `adb`, `xcodebuild`, `xcrun`, `pod`, `flutter`), so the user is asked to approve each one. Tell the user before the first.
 - Every retry has a bound. When it is reached, stop and report what you saw.
 
 Stop and wait for an explicit yes at these gates: step 3 (Goal and plan), step 5 (Plan and apply).
@@ -257,7 +257,7 @@ Needs: `dir_kind`, `sender`.
 
 Run these first, as written. Each prints one word; keep it as the value it names.
 
-`found_types`: the source types the code here points to (fact source-type). It looks four levels down, skips dependency and build folders, and checks in this order: `flutter` (a `pubspec.yaml` with the Flutter SDK), `react_native` (a `package.json` whose `dependencies` name react-native), `javascript` for a Capacitor or Cordova app, `unity`, `android_kotlin` (a Gradle file that applies the Android application plugin or holds an `android` block), `ios_swift` (an Xcode project or workspace, a `Podfile`, or a `Package.swift` with an iOS platform) and `javascript` (a `package.json` with a browser framework, or an `index.html` at the top, in `public/` or in `src/`). Frameworks come first and claim the `android/` and `ios/` folders under them, because their apps hold both. Only when it finds none of these does it look for a server: `node` (express, fastify, koa, nest, hapi, hono or restify), `python`, `go`, `java`, `dotnet`, `php`, `ruby`, `rust`, then `node` for any other `package.json`. Several types are joined with `+`; nothing it knows prints `none`.
+`found_types`: the source types the code here points to (fact source-type). It looks four levels down, skips dependency and build folders, and checks in this order: `flutter` (a `pubspec.yaml` with the Flutter SDK), `react_native` (a `package.json` whose `dependencies` name react-native), `javascript` for a Capacitor or Cordova app, `unity`, `android_kotlin` (a Gradle file that applies the Android application plugin, puts the Android Gradle plugin on its classpath, or holds an `android` block), `ios_swift` (an Xcode project or workspace, or a `Podfile`; a `Package.swift` alone is a library) and `javascript` (a `package.json` with a browser framework, or an `index.html` at the top, in `public/` or in `src/`). Frameworks come first and claim the `android/` and `ios/` folders under them, because their apps hold both. Only when it finds none of these does it look for a server: `node` (express, fastify, koa, nest, hapi, hono or restify), `python`, `go`, `java`, `dotnet`, `php`, `ruby` or `rust`. Several types are joined with `+`; nothing it knows, such as a `package.json` with none of these frameworks, prints `none`.
 
 ```sh
 m() { find . -maxdepth 4 \( -name node_modules -o -name '.?*' -o -name build -o -name dist -o -name Pods -o -name vendor -o -name target -o -name rudder \) -prune -o "$@" 2>/dev/null; }
@@ -271,8 +271,8 @@ t=; add() { case "+$t+" in *"+$1+"*) ;; *) t=${t:+$t+}$1 ;; esac; }
 [ -n "$rn" ] && add react_native
 [ -n "$hybrid" ] && add javascript
 [ -f ProjectSettings/ProjectVersion.txt ] && add unity
-[ -n "$(m \( -name build.gradle -o -name build.gradle.kts \) -exec grep -lE 'android\.?[Aa]pplication|^[[:space:]]*android[[:space:]]*\{' {} + | own)" ] && add android_kotlin
-[ -n "$(m \( -name '*.xcodeproj' -o -name '*.xcworkspace' -o -name Podfile \) -print | own)$(m -name Package.swift -exec grep -l '\.iOS(' {} + | own)" ] && add ios_swift
+[ -n "$(m \( -name build.gradle -o -name build.gradle.kts \) -exec grep -lE 'android\.?[Aa]pplication|com\.android\.tools\.build|^[[:space:]]*android[[:space:]]*\{' {} + | own)" ] && add android_kotlin
+[ -n "$(m \( -name '*.xcodeproj' -o -name '*.xcworkspace' -o -name Podfile \) -print | own)" ] && add ios_swift
 [ -n "$(m -name package.json -exec grep -lE '"(react-dom|vue|svelte|@sveltejs/kit|@angular/core|next|nuxt|vite|preact|solid-js|astro|gatsby|@remix-run/react)"[[:space:]]*:' {} + | own)$(find . -maxdepth 2 \( -path ./index.html -o -path ./public/index.html -o -path ./src/index.html \) -print | own)" ] && add javascript
 if [ -z "$t" ]; then
   [ -n "$(m -name package.json -exec grep -lE '"(express|fastify|koa|@nestjs/core|@hapi/hapi|hono|restify)"[[:space:]]*:' {} +)" ] && add node
@@ -283,13 +283,12 @@ if [ -z "$t" ]; then
   [ -n "$(m -name composer.json -print)" ] && add php
   [ -n "$(m -name Gemfile -print)" ] && add ruby
   [ -n "$(m -name Cargo.toml -print)" ] && add rust
-  [ -z "$t" ] && [ -n "$(m -name package.json -print)" ] && add node
 fi
 echo "${t:-none}"
 ```
 
 1. Act on `found_types` with the branches below. `source_type` is the type it names, unless a branch changes it (fact source-type). Then read the manifest and entry points of that app: `package.json`, the vite or next config and `src/` for a browser app; the app module's `build.gradle.kts` and its `Application` class for Android; the Xcode project and the `@main` App or `AppDelegate` for iOS; `pubspec.yaml` and `lib/main.dart` for Flutter; `package.json` and `App.tsx` for React Native. Decide where the code runs, and the language of a native app: Kotlin or Java (the app module applies no Kotlin plugin), Swift or Objective-C.
-2. List the analytics SDKs the dependencies already name with this one command, which prints each file and the SDK it found: `grep -rIoE --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=Pods --exclude-dir=build --include=package.json --include='*.gradle' --include='*.gradle.kts' --include='*.versions.toml' --include=Podfile --include=Package.swift --include=Package.resolved --include=project.pbxproj --include=pubspec.yaml '@rudderstack/[a-z-]+|rudder-sdk-[a-z-]+|com\.rudderstack\.[a-z.]+|rudder_sdk_flutter|pod .Rudder.|@segment/[a-z-]+|com\.segment\.analytics[a-z.]*|analytics-swift|segment_analytics|pod .Analytics[^A-Za-z]' .` Then search the code for other analytics: `gtag(`, `mixpanel`, `amplitude`, `posthog`.
+2. List the analytics SDKs the dependencies already name with this one command, which prints each file and the SDK it found: `grep -rIoE --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=Pods --exclude-dir=build --include=package.json --include='*.gradle' --include='*.gradle.kts' --include='*.versions.toml' --include=Podfile --include=Package.swift --include=Package.resolved --include=project.pbxproj --include=pubspec.yaml '@rudderstack/[a-z-]+|rudder-sdk-[a-z-]+|com\.rudderstack\.[a-z.]+|rudder_sdk_flutter|pod .Rudder.|@segment/[a-z-]+|com\.segment\.analytics[a-z.]*|analytics-swift|segment_analytics|pod .Analytics[^A-Za-z]' .` When the user picked one of several apps, run it in that app's folder in place of `.`, or, for an app at the top, add `--exclude-dir=<folder>` for each other app's folder, so the branches below concern only the chosen app. Then search its code for other analytics: `gtag(`, `mixpanel`, `amplitude`, `posthog`.
 3. Call MCP `list_sources` (retl_type none), `list_destinations` and `list_connections` to see what the workspace holds.
 4. Find resources other projects manage: run `rudder-cli apply -l rudder --dry-run`, adding `--var-file rudder/secrets.vars.yaml` when the file exists, with `rudder/` still empty unless `dir_kind` is `resume`. Every line under `Removed resources:` is a CLI-managed resource that an apply from this project would delete, of any type (sources, destinations, tracking plans, transformations). `No changes to apply` means there are none.
 5. Report in four short lines: what the app is, analytics found in the code, what the workspace holds, the source you propose.
@@ -311,7 +310,7 @@ If `found_types` names several types, such as `android_kotlin+javascript`:
 - `source_type` is the type of the app the user picks. On something else, ask the shared question `what-sends` (under Shared questions) and follow its notes.
 - When the chosen app is in a subfolder, its `.env.local` and its install, build and start commands go there. Run everything else from `work_dir`, where `rudder/` is, including step 7's check and step 8's probe, and write `<subfolder>/.env.local` wherever a command reads or checks `.env.local`.
 
-If `found_types` is `none`, so there is code here but no manifest the probe knows:
+If `found_types` is `none`, so there is code here but no app the probe knows:
 
 - Say in one line what you see, for example a `mix.exs`.
 - Ask the shared question `what-sends`, "What will send events to RudderStack?", as written under Shared questions, and follow its notes.
@@ -321,7 +320,7 @@ If the SDK list names a RudderStack SDK:
 - Ask the user: "This app already sends events to a RudderStack source with <SDK>, set up in <file>. Should it send to the new source instead? Builds with this change then stop sending to the source it uses now and to that source's destinations."
     - Send to the new source
     - Leave the app as it is, and send the first event with curl
-- On leave, set `sender` to `curl`: step 6 changes no code, step 8 sends the first planned event with curl, and step 9 skips its advice to copy `rudder/` into the app, which is already here.
+- On leave, set `sender` to `curl`: step 6 changes no code, and step 8 sends the first planned event with curl.
 - On send, step 6 points the app's SDK at the new source. `com.rudderstack.android.sdk` (Android, Java) and the `Rudder` pod or `rudder-sdk-ios` package (iOS, Objective-C) are the legacy SDKs, whose types are `android` and `ios` (fact source-type). For those, also ask whether to keep the legacy SDK with that type, or to move to the Kotlin or Swift SDK with `android_kotlin` or `ios_swift`.
 
 If the SDK list names a Segment SDK:
@@ -334,7 +333,7 @@ If that dry run lists anything under `Removed resources:` other than the old sou
 
 If `source_type` is not `javascript`:
 
-- Say which path steps 6 to 8 take. For `android_kotlin` and `ios_swift`, step 6 follows the Android or iOS instrumentation reference, in the app's language, and step 7 the local verification reference's part for mobile apps. For `flutter`, `react_native`, `unity` and the legacy `android` and `ios`, step 6 follows the SDK's own documentation in the same shape; step 7 is skipped for `unity`. For a server app, step 6 adapts the SDK's documentation and step 7 starts the app with its own command. Ask before continuing.
+- Say which path steps 6 to 8 take. For `android_kotlin` and `ios_swift`, and the legacy `android` and `ios`, step 6 follows the Android or iOS instrumentation reference, in the app's language, and step 7 the local verification reference's part for mobile apps. For `flutter`, `react_native` and `unity`, step 6 follows the SDK's own documentation in the same shape; step 7 is skipped for `unity`. For a server app, step 6 adapts the SDK's documentation and step 7 starts the app with its own command. Ask before continuing.
 
 If the app has no package manager, as with a static site of HTML files:
 
@@ -450,25 +449,25 @@ Needs: `events`, `data_plane_url`, `sender`.
 2. Install the SDK with the app's package manager, for example `npm install @rudderstack/analytics-js` for a browser app.
 3. Create one module that loads the SDK once and exports one typed function per event in `rudder/plan.events.json`, with exactly its names, properties and types. Follow the browser instrumentation reference, including the development-time error when the write key is missing, so events are never dropped silently.
 4. Call those functions at the places `rudder/plan.md` lists. Change nothing else.
-5. Write the write key and data plane URL to `.env.local`, which step 1 git-ignored. Check with `git check-ignore -q .env.local` before writing, and stop if it is not ignored.
+5. Add the write key and data plane URL to `.env.local`, which step 1 git-ignored, or update them there, and keep its other lines. Check with `git check-ignore -q .env.local` before writing, and stop if it is not ignored.
 6. Run the type check or build (`npx tsc --noEmit` where there is a `tsconfig.json`, or `npm run build`) and fix what it reports.
 7. Commit by explicit paths, the files you changed or created plus the package manifest and lockfile, without `.env.local`, as "Instrument <app> with <n> events".
 
 If `sender` is `curl`:
 
-- Install no SDK and change no code. Do item 1 only, then write the write key and data plane URL to `.env.local` as `RUDDERSTACK_WRITE_KEY` and `RUDDERSTACK_DATA_PLANE_URL`, after the same `git check-ignore` check. There is nothing to commit, so there is no `code_commit`.
+- Install no SDK and change no code. Do item 1 only, then add the write key and data plane URL to `.env.local` as `RUDDERSTACK_WRITE_KEY` and `RUDDERSTACK_DATA_PLANE_URL`, as item 5 says. There is nothing to commit, so there is no `code_commit`.
 
 If `source_type` is `android_kotlin`:
 
-- Follow the Android instrumentation reference instead of the browser one, in Kotlin or in Java as the app is written. Check the build against the requirements it lists first, and ask before upgrading anything. It adds `com.rudderstack.sdk.kotlin:android` to the app module, has Gradle read the write key and URLs from `.env.local` at the Gradle root into `BuildConfig`, loads the SDK once from the `Application` class, and allows plain HTTP to `10.0.2.2` in the debug build only. Write `.env.local` there, as `RUDDERSTACK_WRITE_KEY` and `RUDDERSTACK_DATA_PLANE_URL`. Build with `./gradlew :<app module>:assembleDebug` instead of the type check; the module is `:app` in most apps and `:composeApp` in a Kotlin Multiplatform app.
+- Follow the Android instrumentation reference instead of the browser one, in Kotlin or in Java as the app is written. Check the build against the requirements it lists first, and ask before upgrading anything; on a no, `sender` becomes `curl`, as the reference says. It adds `com.rudderstack.sdk.kotlin:android` to the app module, has Gradle read the write key and URLs from `.env.local` at the Gradle root into `BuildConfig`, loads the SDK once from the `Application` class, and allows plain HTTP to `10.0.2.2` in the debug build only. Add `RUDDERSTACK_WRITE_KEY` and `RUDDERSTACK_DATA_PLANE_URL` to the `.env.local` there. Build with `./gradlew :<app module>:assembleDebug` instead of the type check; the module is `:app` in most apps and `:composeApp` in a Kotlin Multiplatform app. If Gradle cannot build here, for want of a JDK or the Android SDK, ask the user to build in Android Studio and say continue.
 
 If `source_type` is `ios_swift`:
 
-- Follow the iOS instrumentation reference instead of the browser one, in Swift or in Objective-C as the app is written. The SDK needs iOS 15; if the app targets an older version, ask before raising it. The reference adds the `rudder-sdk-swift` package, keeps the values in `RudderStack.local.xcconfig`, passes them to the app through `Info.plist`, and loads the SDK once at launch. That file is not `.env.local`, so check it first with `git check-ignore -q RudderStack.local.xcconfig`. If git does not ignore it, add it to `.gitignore` and commit that line alone, as step 1 does. Write the write key and data plane URL to `.env.local` as well, as `RUDDERSTACK_WRITE_KEY` and `RUDDERSTACK_DATA_PLANE_URL`, because step 8's probe reads them there. Build with `xcodebuild` where Xcode is installed; otherwise ask the user to build in Xcode and say continue.
+- Follow the iOS instrumentation reference instead of the browser one, in Swift or in Objective-C as the app is written. The SDK needs iOS 15; if the app targets an older version, ask before raising it, and on a no `sender` becomes `curl`, as the reference says. The reference adds the `rudder-sdk-swift` package, keeps the values in `RudderStack.local.xcconfig`, passes them to the app through `Info.plist`, and loads the SDK once at launch. That file is not `.env.local`, so check it first with `git check-ignore -q RudderStack.local.xcconfig`. If git does not ignore it, add it to `.gitignore` and commit that line alone, as step 1 does. Add the write key and data plane URL to `.env.local` as well, as `RUDDERSTACK_WRITE_KEY` and `RUDDERSTACK_DATA_PLANE_URL`, because step 8's probe reads them there. The reference never edits `project.pbxproj`; ask the user for the Xcode changes it lists, in one message. Build with `xcodebuild` where Xcode is installed; otherwise ask the user to build in Xcode and say continue.
 
 If `source_type` is `flutter`, `react_native` or `unity`:
 
-- This skill has no reference for them yet. Follow the SDK's README and keep the shape of the Android and iOS references: one module that loads the SDK once, one typed function per agreed event, the write key in a git-ignored file the build reads, and a development-time error when it is missing. Flutter: `rudder_sdk_flutter` 3.4.0, then `RudderController.instance.initialize(writeKey, config: builder.build())` with a `RudderConfigBuilder` that sets `withDataPlaneUrl`, and `withControlPlaneUrl` for step 7. React Native: `@rudderstack/rudder-sdk-react-native` 3.2.1, then `await rudderClient.setup(writeKey, { dataPlaneUrl, controlPlaneUrl })`, and `pod install` in `ios/`. Unity: RudderStack's Unity SDK documentation. Write the write key and data plane URL to `.env.local` too, as `RUDDERSTACK_WRITE_KEY` and `RUDDERSTACK_DATA_PLANE_URL`, for step 8's probe.
+- This skill has no reference for them yet. Follow the SDK's README and keep the shape of the Android and iOS references: one module that loads the SDK once, one typed function per agreed event, the write key in a git-ignored file the build reads, and a development-time error when it is missing. Flutter: `rudder_sdk_flutter` 3.4.0, then `RudderController.instance.initialize(writeKey, config: builder.build())` with a `RudderConfigBuilder` that sets `withDataPlaneUrl`, and `withControlPlaneUrl` for step 7. React Native: `@rudderstack/rudder-sdk-react-native` 3.2.1, then `await rudderClient.setup(writeKey, { dataPlaneUrl, controlPlaneUrl })`, and `pod install` in `ios/`. In an Expo app (`expo` in `dependencies`), install it with `npx expo install @rudderstack/rudder-sdk-react-native` instead. Its native module is missing from Expo Go, where the SDK throws when it loads, so run a development build, `npx expo run:android` or `npx expo run:ios`, which also runs `pod install`. That command generates `android/` or `ios/` when the app has none; ask before running it. Unity: RudderStack's Unity SDK documentation. Add the write key and data plane URL to `.env.local` too, as `RUDDERSTACK_WRITE_KEY` and `RUDDERSTACK_DATA_PLANE_URL`, for step 8's probe.
 
 If step 2 found a RudderStack SDK in the app, and the user chose to send to the new source:
 
@@ -477,7 +476,7 @@ If step 2 found a RudderStack SDK in the app, and the user chose to send to the 
 Done when:
 
 - the write key is in `.env.local`, which git ignores (check: `test -s .env.local && git check-ignore -q .env.local`)
-- a RudderStack SDK is a dependency of the app (package.json, Gradle, Package.swift or Package.resolved, the Xcode project, Podfile or pubspec.yaml), where there is an app (check: `[ -z "$(find . -maxdepth 3 -name node_modules -prune -o \( -name package.json -o -name 'build.gradle*' -o -name Podfile -o -name Package.swift -o -name '*.xcodeproj' -o -name pubspec.yaml \) -print)" ] || grep -rqE --exclude-dir=node_modules --exclude-dir=Pods --exclude-dir=build --include=package.json --include='*.gradle' --include='*.gradle.kts' --include='*.versions.toml' --include=Podfile --include=Package.swift --include=Package.resolved --include=project.pbxproj --include=pubspec.yaml '"@rudderstack/|com\.rudderstack\.|rudder-sdk-(swift|ios)|pod .Rudder.|rudder_sdk_flutter' .`)
+- when `sender` is `app`, a RudderStack SDK is a dependency of the app (package.json, Gradle, Package.swift or Package.resolved, the Xcode project, Podfile or pubspec.yaml) (check: `[ -z "$(find . -maxdepth 3 -name node_modules -prune -o \( -name package.json -o -name 'build.gradle*' -o -name Podfile -o -name Package.swift -o -name '*.xcodeproj' -o -name pubspec.yaml \) -print)" ] || grep -rqE --exclude-dir=node_modules --exclude-dir=Pods --exclude-dir=build --include=package.json --include='*.gradle' --include='*.gradle.kts' --include='*.versions.toml' --include=Podfile --include=Package.swift --include=Package.resolved --include=project.pbxproj --include=pubspec.yaml '"@rudderstack/|com\.rudderstack\.|rudder-sdk-(swift|ios)|pod .Rudder.|rudder_sdk_flutter' .`)
 - the app type-checks, where it has a tsconfig.json (check: `[ ! -f tsconfig.json ] || npx --no-install tsc --noEmit`)
 - `.env.local` is not tracked (check: `! git ls-files --error-unmatch .env.local 2>/dev/null`)
 
@@ -541,7 +540,7 @@ If `sender` is `curl`:
 
 If `source_type` is a mobile type or `unity`:
 
-- In item 3, run the app with its real values, not the listener's from step 7, as the live verification reference shows: for Android `./gradlew :<app module>:installDebug` with no `-P` values, for iOS Run in Xcode or `xcrun simctl launch` with no `SIMCTL_CHILD_` values, and for Flutter and React Native a debug build without the listener's URLs. Run a Unity game as usual. A physical device works too, because the data plane is public. Ask the user to wait 15 seconds after the last action before saying done (fact mobile-batches).
+- In item 3, run the app with its real values, not the listener's from step 7, as the live verification reference shows: for Android `./gradlew :<app module>:installDebug` with no `-P` values, for iOS Run in Xcode or `xcrun simctl launch` with no `SIMCTL_CHILD_` values, and for Flutter and React Native a debug build without the listener's URLs. Run a Unity game as usual. A physical device works too, because the data plane is public. Ask the user to wait 15 seconds after the last action before saying done (fact mobile-batches). If the app cannot run on an emulator, a simulator or a device, send the first planned event with curl as the `curl` branch does; `.env.local` already holds the write key and data plane URL.
 
 **Loop.** Probe the write key every 20 seconds until it is accepted, then poll delivery metrics every 30 seconds until each agreed event shows as delivered since started_at or has arrived at a destination the user can read, give up after 5 minutes for the write key and 10 minutes for delivery. When the bound is hit, report the last probe status and the last metrics seen, and suggest get_destinations_errors and the live events page.
 
@@ -562,8 +561,8 @@ Needs: `sender`.
 If `sender` is `curl`:
 
 - Say that the pipeline is real and the event came from curl, not from an app.
-- To send events from the app later: copy `rudder/` into the app's repository, for example `cp -R rudder <path to the app>/`, and make no commit there yourself. The app may not ignore `rudder/secrets.vars.yaml` yet; step 1 there git-ignores it before its first commit. If `rudder/` travels through git instead, the var file stays behind, because git ignores it.
-- Then start the agent in the app and run the same command. Step 1 finds the specs (`resume`), works out the app's source type and offers to change the source if it differs. Starting there with an empty `rudder/` would stop at step 2, because these resources are CLI-managed now (fact apply-scope).
+- If `work_dir` is not the app, as when step 1 continued in an empty folder or in `./rudderstack-first-event`, the app can send events later once `rudder/` is in its repository. Copy it there, for example with `cp -R rudder <path to the app>/`, and make no commit there yourself. The app may not ignore `rudder/secrets.vars.yaml` yet; step 1 there git-ignores it before its first commit. If `rudder/` travels through git instead, the var file stays behind, because git ignores it.
+- Then the user starts the agent in the app and runs the same command. Step 1 finds the specs (`resume`), works out the app's source type and offers to change the source if it differs. Starting there with an empty `rudder/` would stop at step 2, because these resources are CLI-managed now (fact apply-scope).
 
 Facts that apply here: **apply-scope**.
 

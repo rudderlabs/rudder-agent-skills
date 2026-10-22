@@ -198,7 +198,10 @@ machine's loopback, so step 7 is skipped for it.
      install booted '<D>/xcode/Build/Products/Debug-iphonesimulator/<app>.app'`. Run in Xcode installs it too, but
      launches it with the real values first, so those first events go to the live data plane. Then launch it with
      the listener's values in its environment, which a debug build reads first (iOS instrumentation reference), and
-     ask the user to use it without pressing Run again. `<bundle id>` is the target's `PRODUCT_BUNDLE_IDENTIFIER`:
+     ask the user to use it without pressing Run again. `<bundle id>` is the target's `PRODUCT_BUNDLE_IDENTIFIER`.
+     Read it with `xcodebuild -scheme '<scheme>' -showBuildSettings | grep -m1 ' PRODUCT_BUNDLE_IDENTIFIER ='`, and
+     never show `-showBuildSettings` output unfiltered, because it prints the write key from
+     `RudderStack.local.xcconfig`. The launch command:
 
      ```sh
      SIMCTL_CHILD_RUDDERSTACK_WRITE_KEY=dev SIMCTL_CHILD_RUDDERSTACK_DATA_PLANE_URL=http://127.0.0.1:4321 SIMCTL_CHILD_RUDDERSTACK_CONTROL_PLANE_URL=http://127.0.0.1:4321 xcrun simctl launch --terminate-running-process booted '<bundle id>'
@@ -206,10 +209,11 @@ machine's loopback, so step 7 is skipped for it.
 
    - **Flutter and React Native.** Set the SDK's data plane and control plane URLs to the same addresses in a debug
      build, as the SDK's documentation shows, and start the app on the emulator or simulator. Both platforms refuse
-     plain HTTP unless the app allows it. A Flutter app needs the two debug files from the Android instrumentation
-     reference under `android/app/src/debug/`, and `NSAllowsLocalNetworking` in `ios/Runner/Info.plist`, or the
-     check sees `nothing_received`. React Native's templates already allow both in debug builds, for Metro; check
-     that the app still does.
+     plain HTTP unless the app allows it. A Flutter app needs the debug network config from the Android
+     instrumentation reference under `android/app/src/debug/`, and the plain HTTP setting from the iOS
+     instrumentation reference in `ios/Runner/Info.plist`, each with that reference's check of what the app already
+     allows, or the check sees `nothing_received`. React Native's templates already allow both in debug builds,
+     for Metro; check that the app still does.
 3. The mobile SDKs send in batches, every 10 seconds or every 30 events. Ask the user to wait 15 seconds after the
    last action before saying done. The check waits up to 10 seconds more.
 
