@@ -1,8 +1,10 @@
-# Destination and connection specs
+# Source, connection and destination specs
 
-Every file below validates with `rudder-cli validate -l rudder --var-file rudder/secrets.vars.yaml` on
-rudder-cli built from rudder-iac main (d8abd910, 21 Oct 2026). Full per-type documentation, including every
-optional key, is in rudder-iac under `cli/internal/providers/destination/definitions/<type>/README.md`.
+Step 4 writes the destination spec from `rudder-cli docs destination <type> --source <source type> --id <id>
+--json`, which prints the type's keys, allowed values, defaults, patterns, connection modes and secret keys from
+the definitions compiled into the installed rudder-cli, plus a spec to start from. This file holds only what that
+output cannot say: where the files go, the source and connection specs, how to get a webhook endpoint, and how to
+write values in the var file. It names no destination keys. Read them from the docs output.
 
 Layout:
 
@@ -14,9 +16,11 @@ rudder/
   secrets.vars.yaml      # git-ignored; never committed
 ```
 
-Ids are kebab-case and unique per kind. `display_name` matches `^[\w .-]{2,100}$`.
+Ids are lowercase kebab-case, start with a letter and are unique per kind. A destination's secret variable names
+are built from its id, so `docs destination` rejects an id that would give an invalid name and suggests one that
+works. `display_name` matches `^[\w .-]{2,100}$`; the docs template sets it to the id.
 
-## Source: JavaScript (browser)
+## Source
 
 ```yaml
 version: rudder/v1
@@ -30,8 +34,9 @@ spec:
   enabled: true
 ```
 
-A `javascript` source is source type `web`, so every destination it connects to needs a `web` entry in
-`connection_mode`.
+`type` is one of the types `rudder-cli docs source` lists. Each connects to a destination as the token listed
+beside it, `javascript` as `web` and every backend language as `cloud`. A destination's `connection_mode` needs an
+entry for that token; `docs destination --source <type>` shows only that token under `connectionModes`.
 
 ## Connection
 
@@ -50,138 +55,50 @@ spec:
       enabled: true
 ```
 
-## Webhook
+## A webhook endpoint
+
+A webhook's URL must match the pattern the docs output gives it: a public http(s) domain, so a `localhost` URL
+fails validate. When the user has no public endpoint, offer one of these:
+
+- A quick tunnel to a server on this machine. Start a server that accepts POST requests and prints each body,
+  for example `node -e "require('http').createServer((q,s)=>{let b='';q.on('data',c=>b+=c).on('end',()=>{console.log(b);s.end('ok')})}).listen(8787)"`,
+  then `cloudflared tunnel --url http://localhost:8787`, which prints an `https://<name>.trycloudflare.com` URL
+  that passes. Only this machine sees the payloads. `cloudflared` must be installed, and installing it is the
+  user's call. A quick tunnel stops with its process and can stop answering after a few days while the process
+  stays up, so start a new one for each run. The URL changes each time, and the destination spec must follow.
+- A request bin, such as webhook.site, which shows each request it receives. It is a third party that sees every
+  payload, so use one only when the user says yes to that.
+
+## Secrets in the var file
+
+`rudder/secrets.vars.yaml` is flat YAML, one `NAME: value` line per variable, and its file name must end in
+`.vars.yaml`. Step 4 writes one line per variable the docs output names, with no value, for the user to fill in:
 
 ```yaml
-version: rudder/v1
-kind: destination
-metadata:
-  name: storefront-webhook
-spec:
-  id: storefront-webhook
-  display_name: Storefront Webhook
-  type: webhook
-  definition_version: 1
-  enabled: true
-  config:
-    webhook_url: https://sink.example.com/hook
-    webhook_method: POST
-    connection_mode:
-      web: cloud
+NAME:
 ```
 
-- `webhook_url` must be a public http(s) domain. `localhost` and `*.ngrok.io` fail with
-  `'webhook_url' is not valid: must be a public http(s) domain URL and must not use localhost or ngrok`.
-- Only when the endpoint needs auth, add headers. `from` is the header name and `to` is its value, the
-  reverse of the `http` type. Header values are secrets:
-
-  ```yaml
-      headers:
-        - from: Authorization
-          to: '{{ .WEBHOOK_AUTH }}'
-  ```
-
-## Google Analytics 4
-
-```yaml
-  type: ga4
-  definition_version: 1
-  enabled: true
-  config:
-    api_secret: '{{ .GA4_API_SECRET }}'
-    client_type: gtag
-    measurement_id: '{{ .GA4_MEASUREMENT_ID }}'
-    connection_mode:
-      web: cloud
-```
-
-`measurement_id` starts with `G-`. `web` also supports `device` and `hybrid`.
-
-That is a web data stream. A mobile app's events belong in an app data stream, which is Firebase. For an
-`android_kotlin`, `ios_swift`, `flutter`, `react_native`, `unity`, `android` or `ios` source, use
-`client_type: firebase` with the stream's Firebase App ID in place of `measurement_id`, and the source type's
-`connection_mode` key. The App ID is not a secret; write it as a literal. Validate also accepts `gtag` on an app
-source, so it cannot catch this.
-
-```yaml
-  config:
-    api_secret: '{{ .GA4_API_SECRET }}'
-    client_type: firebase
-    firebase_app_id: 1:123456789012:android:0123456789abcdef
-    connection_mode:
-      android_kotlin: cloud
-```
-
-## Amplitude
-
-```yaml
-  type: am
-  definition_version: 1
-  enabled: true
-  config:
-    api_key: '{{ .AMPLITUDE_API_KEY }}'
-    residency_server: standard   # or EU
-    connection_mode:
-      web: cloud
-```
-
-Amplitude has two secret keys, `api_key` and `api_secret`. Only `api_key` is required. If the user adds
-`api_secret`, reference it the same way, as `'{{ .AMPLITUDE_API_SECRET }}'`.
-
-## Mixpanel
-
-```yaml
-  type: mp
-  definition_version: 1
-  enabled: true
-  config:
-    token: '{{ .MIXPANEL_TOKEN }}'
-    data_residency: us           # us, eu or in
-    identity_merge_api: simplified
-    connection_mode:
-      web: cloud
-```
-
-Mixpanel has four secret keys: `token`, `gdpr_api_token`, `service_account_secret` and
-`service_account_user_name`. Only `token` is required, unless `user_deletion_api` is `task`, which also requires
-`gdpr_api_token`. Reference any of the others the user adds the same way, never as a literal.
-
-Other types: `rudder-cli` always registers these 24: active_campaign, am, attentive_tag, bq, bqstream, braze,
-customerio, facebook_conversions, facebook_pixel, ga4, gcs, googleads, hs, http, iterable, mp, postgres, posthog,
-rs, s3, s3_datalake, snowflake, tiktok_ads and webhook. A type that is not registered fails validate, which lists
-the registered ones. Any other type needs both `RUDDERSTACK_CLI_EXPERIMENTAL=true` and
-`RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true` in the environment of every `validate` and `apply`. Ask the user
-before setting them.
-
-## Secrets
-
-`rudder/secrets.vars.yaml` is flat `KEY: value` YAML, and the name must end in `.vars.yaml`. Write each variable
-with no value, for the user to fill in:
-
-```yaml
-WEBHOOK_AUTH:
-```
-
-- Until the user fills it, validate and apply fail with `key "WEBHOOK_AUTH" has a null or empty value`. The
-  error names only the first empty key, so ask the user to fill every line at once. Never write
-  `WEBHOOK_AUTH: ""`: it validates clean and sends an empty secret, even though that error message suggests empty
-  quotes.
-- Pass it with `--var-file rudder/secrets.vars.yaml` on `validate` and `apply`. An environment variable
-  `RUDDER_<KEY>` overrides the file.
-- Substitution pastes the value into the raw text before YAML is parsed, so write every reference in
-  single quotes, `'{{ .VAR }}'`, as these samples do. In a double-quoted slot a value containing `"` or `\`
-  breaks the YAML or silently changes the secret. A `'` inside the value must be doubled (`''`); the CLI
-  reports an unescaped one as an error.
-- Every referenced variable must be defined, even for `validate`. A missing one fails with
-  `error[project/var-substitution]` and the file, line and column.
+- Until the user fills a line, validate and apply fail with `key "NAME" has a null or empty value`. The error
+  names only the first empty line, so ask the user to fill every line at once. Never write `NAME: ""`: it
+  validates clean and sends an empty secret, even though that error message suggests empty quotes.
+- Pass the file with `--var-file rudder/secrets.vars.yaml` on `validate` and `apply`; nothing else reads it. An
+  environment variable `RUDDER_<NAME>` overrides the line `NAME`.
+- The CLI reads the value from the var file, then pastes it into the spec's text before parsing it, inside the
+  single quotes of the slot. So in the value the CLI reads, every `'` must be doubled. Write a plain value as it
+  is, with each `'` in it written twice (`it''s`).
+- Write a JSON value, such as a service account key, on one line in single quotes, `NAME: '{"type": ...}'`, and
+  keep its `\n` escapes as they are. `jq -c . key.json` prints a key file on one line. Inside those quotes, each
+  `'` of the value is written four times.
 
 ## Errors you will meet
 
 | Rule id | Cause | Fix |
 |---|---|---|
-| `event-stream/connection/semantic-valid` | destination has no `connection_mode` entry for the source type | add the entry the message names, `{web: cloud}` for a `javascript` source |
+| `destination/secret-reference` (warning) | a secret key holds a value, a default, or anything but one variable reference | write the key's `slot` from the docs output; the value goes in the var file |
+| `destination/secret-reference-unique` (warning) | one variable fills two secret keys | give each key the `slot` the docs output prints for its own destination id |
+| `destination/spec-syntax-valid` | a missing, unknown or invalid config key | read the key's entry in the docs output's `fields` |
+| `event-stream/connection/semantic-valid` | the destination has no `connection_mode` entry for the source's token | add the entry the message names, with a mode from `connectionModes` |
 | `event-stream/connection/enabled-endpoints-valid` (warning) | destination or source not enabled | set `enabled: true` |
-| `destination/spec-syntax-valid` | bad config value, for example a localhost webhook URL | follow the message |
-| `project/var-substitution` | a `{{ .VAR }}` with no value | add it to the var file or `RUDDER_<VAR>` |
-| none: `key "VAR" has a null or empty value` | the user has not filled `VAR` in the var file | ask the user to fill it; never write `VAR: ""` |
+| `project/var-substitution` | a `{{ .NAME }}` with no value, or a `'` not doubled | add it to the var file or `RUDDER_<NAME>`, or double the `'` |
+| none: `key "NAME" has a null or empty value` | the user has not filled `NAME` in the var file | ask the user to fill it; never write `NAME: ""` |
 | `project/spec-syntax-parse-valid` | a non-spec YAML file under the location | keep specs in `rudder/`, pass `-l rudder` |

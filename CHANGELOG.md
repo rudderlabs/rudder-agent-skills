@@ -62,6 +62,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`rudder-core` / `rudder-onboarding` reads every destination spec from rudder-cli.** It needs
+  the first rudder-cli release that contains rudderlabs/rudder-iac#989 and #990. Step 4 writes the
+  spec from `rudder-cli docs destination <type> --source <source type> --id <id> --json`
+  (rudder-iac#989): its `specTemplate`, then the keys, allowed values, defaults, patterns,
+  connection modes and conditional rules that output lists, with each secret key holding the slot
+  it prints and each variable written to the var file as `NAME:`. Its done check is validate's
+  `destination/secret-reference` and `destination/secret-reference-unique` warnings
+  (rudder-iac#990), which name a secret key that holds a value and a variable that fills two keys.
+  Step 1 probes for both features, not for a version, and stops with upgrade instructions when
+  either is missing; the skill never falls back to written-down keys. When no platform is
+  detected, the "What will send events" options come from `rudder-cli docs source --json`.
+  `references/destinations.md` keeps only the layout, the source and connection specs, how to get
+  a webhook endpoint, and how to write values in the var file, JSON keys and `'` included. It names
+  no destination keys, samples or secret names. `rudder-core` 0.0.9.
 - **Breaking (repo layout):** renamed the top-level `skills/` directory back to
   `plugins/` (reverting the earlier `plugins/` → `skills/` rename). Each plugin
   lives at `plugins/<plugin>/skills/<skill>/SKILL.md`; marketplace `source` fields
