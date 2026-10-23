@@ -17,7 +17,8 @@ skill" in SKILL.md).
   user acts, check and stop, all in one call.
 - When you are not sure, as in Cursor, start with two calls. If the mark command says the listener is not
   running, the agent stopped it; switch to one call.
-- A mobile app on an emulator or simulator uses two calls with the changes under "Mobile apps".
+- A mobile app on an emulator or simulator uses two calls with the changes under "Mobile apps". It has no
+  one-call form, so in an agent that stops background processes, step 7 is skipped for a mobile app.
 
 Each shell call is a new shell, so a variable set in one call is gone in the next. Each command prints the
 values the next one needs. Write them into the next command where it shows `<D>`, `<PID>`, `<URL>`, `<APP>`,
@@ -30,7 +31,7 @@ values the next one needs. Write them into the next command where it shows `<D>`
 | 0 | Pass: every planned event arrived with the agreed property types | Stop the listener and the app, go to step 8 |
 | 1 | The check failed: a planned event is missing, or a property has another type | Read the table and the diagnosis under it, fix the code, run another pass |
 | 2 | The checker could not run: `rudder/plan.events.json` is missing or malformed, or `<CHECK>` is wrong | Fix that and check again. It is not a failed check |
-| 3 | The listener is not running | Read the lines printed from its log and start again. If it was running at the end of the start call and gone by the next one, this agent stops background processes: use one call |
+| 3 | The listener is not running | Read the lines printed from its log and start again. If it was running at the end of the start call and gone by the next one, this agent stops background processes: use one call, or skip step 7 for a mobile app |
 | 4 | This rudder-cli has no `sources listen` | Tell the user, as below |
 | 5 | The app did not start, or the one-call recipe's port is taken | Read the lines printed from `<D>/app.log`, stop what holds the port or fix the start command, and run again. It is not a failed check |
 
