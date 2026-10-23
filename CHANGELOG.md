@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking (repo layout):** renamed the top-level `skills/` directory back to
+  `plugins/` (reverting the earlier `plugins/` → `skills/` rename). Each plugin
+  lives at `plugins/<plugin>/skills/<skill>/SKILL.md`; marketplace `source` fields
+  were updated to match. The rename to `skills/` was unnecessary — skills.sh
+  discovery is manifest-driven and name-agnostic — and it broke cursor.directory,
+  whose parser derives a skill's name from the first `skills/` path segment and so
+  collapsed every plugin's skills into a single mis-named entry. `npx skills add`
+  and Claude Code install UX are unchanged.
+
+### Fixed
+
+- **`rudder-profiles` / `rudder-profiles-setup`, `rudder-profiles-update`** —
+  quoted the `description` frontmatter. An unquoted `: ` (colon-space) made the
+  skills.sh CLI's YAML parser read it as a nested mapping and reject the
+  frontmatter, silently dropping both skills from skills.sh (21/23 → 23/23 now).
+
 ### Added
 
 - **`rudder-core` carries the RudderStack MCP server** — `plugins/rudder-core/.mcp.json`
@@ -87,26 +105,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the rudder-core plugin's server, step 1 has the user authenticate it instead of adding a second
   one. The facts, step 2's probe and the Flutter, React Native and Unity notes moved to references,
   so SKILL.md is 556 lines, not 593.
-
-### Changed
-
-- **Breaking (repo layout):** renamed the top-level `skills/` directory back to
-  `plugins/` (reverting the earlier `plugins/` → `skills/` rename). Each plugin
-  lives at `plugins/<plugin>/skills/<skill>/SKILL.md`; marketplace `source` fields
-  were updated to match. The rename to `skills/` was unnecessary — skills.sh
-  discovery is manifest-driven and name-agnostic — and it broke cursor.directory,
-  whose parser derives a skill's name from the first `skills/` path segment and so
-  collapsed every plugin's skills into a single mis-named entry. `npx skills add`
-  and Claude Code install UX are unchanged.
-
-### Fixed
-
-- **`rudder-profiles` / `rudder-profiles-setup`, `rudder-profiles-update`** —
-  quoted the `description` frontmatter. An unquoted `: ` (colon-space) made the
-  skills.sh CLI's YAML parser read it as a nested mapping and reject the
-  frontmatter, silently dropping both skills from skills.sh (21/23 → 23/23 now).
-
-### Added
 
 - **`rudder-ai-events`** — new plugin that onboards an existing app to RudderStack AI events
   (spec v0.3) with the `@rudderstack/ai` (Node.js), `rudderstack-ai` (Python) and `ai-sdk-go` (Go)
