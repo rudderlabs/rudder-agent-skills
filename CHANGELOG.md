@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`rudder-core` / `rudder-onboarding` reads every destination spec from rudder-cli.** It needs
+  the first rudder-cli release that contains rudderlabs/rudder-iac#989 and #990. Step 4 writes the
+  spec from `rudder-cli docs destination <type> --source <source type> --id <id> --json`
+  (rudder-iac#989): its `specTemplate`, then the keys, allowed values, defaults, patterns,
+  connection modes and conditional rules that output lists, with each secret key holding the slot
+  it prints and each variable written to the var file as `NAME:`. Its done check is validate's
+  `destination/secret-reference` and `destination/secret-reference-unique` warnings
+  (rudder-iac#990), which name a secret key that holds a value and a variable that fills two keys.
+  Validate exits 0 with either warning, so step 5 does not go on to the dry run, or commit, while
+  one shows. Step 4 turns away a destination that needs the dashboard's OAuth sign-in (a required
+  `rudder_account_id`) and one that takes only device mode, which step 8 cannot confirm.
+  When the output lists secret keys that nothing requires, no custom validator checks and the
+  template does not hold, such as a webhook's header value, step 4 asks one question that names
+  them, with No first, and adds the ones the user picks.
+  Step 1 probes for both features, not for a version, and stops with upgrade instructions when
+  either is missing; after an install it checks that the new rudder-cli is the one on PATH. The
+  skill never falls back to written-down keys. When no platform is detected, the "What will send
+  events" options come from `rudder-cli docs source --json`. `references/destinations.md` keeps
+  only the layout, the source and connection specs, how to get a webhook endpoint, and how to
+  write values in the var file, JSON keys and `'` included. It gives a command that writes a key
+  file into the var file without printing it, and says that a multi-line secret, such as a PEM
+  private key, cannot go through the var file yet. It names no destination keys, samples or secret
+  names. `rudder-core` 0.0.9.
 - **Breaking (repo layout):** renamed the top-level `skills/` directory back to
   `plugins/` (reverting the earlier `plugins/` → `skills/` rename). Each plugin
   lives at `plugins/<plugin>/skills/<skill>/SKILL.md`; marketplace `source` fields
