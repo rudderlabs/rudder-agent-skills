@@ -168,11 +168,15 @@ Put the values in a var file and pass it to `validate` and to both `apply` runs:
 
 ```yaml
 # secrets.vars.yaml (git-ignored)
-WEBHOOK_SIGNING_KEY: "value-goes-here"
+WEBHOOK_SIGNING_KEY: 'value-goes-here'
 ```
 
+The var file is YAML too, so single-quote its values as well. Inside double quotes YAML reads `\` as an escape: `ab\tc` arrives with a real tab, and `a\d` fails to parse. A value that contains `'` is the exception above, written unquoted with each `'` doubled.
+
+`validate` prints the source line of each error and warning after substitution, so a diagnostic on a secret's line shows the secret. Print only the error lines and the exit status:
+
 ```bash
-rudder-cli validate -l ./ --var-file secrets.vars.yaml
+{ rudder-cli validate -l ./ --var-file secrets.vars.yaml 2>&1; echo "exit $?"; } | grep -E '^(error|warning)\[|^ *-->|^(Found|Error:|exit) '
 rudder-cli apply --dry-run -l ./ --var-file secrets.vars.yaml
 rudder-cli apply --confirm=false -l ./ --var-file secrets.vars.yaml
 ```
