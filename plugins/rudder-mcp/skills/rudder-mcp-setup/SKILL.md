@@ -123,6 +123,8 @@ claude mcp add --scope project --transport http rudderstack https://mcp.rudderst
 
 Keep the single quotes around the `Authorization` header. With double quotes the shell substitutes the token before `claude` runs, and the token is written into `.mcp.json`.
 
+If `/mcp` also lists `plugin:rudder-core:rudderstack`, the rudder-core plugin's OAuth entry, disable that entry for this folder in `/mcp`. It points at a different URL, so Claude Code keeps both entries and the agent sees every RudderStack tool twice.
+
 ### 3. Start Claude Code with the variable set
 
 Start Claude Code from a shell where `RUDDERSTACK_ACCESS_TOKEN` is exported. If it is unset, `claude mcp list` warns `Missing environment variables: RUDDERSTACK_ACCESS_TOKEN`, and the server answers `401` because the request carries no valid token. In an interactive session Claude Code asks for approval the first time it loads a server from `.mcp.json`.

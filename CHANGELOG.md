@@ -103,7 +103,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tool, so the guidance works with both versions. When `/mcp` already lists
   `plugin:rudder-core:rudderstack`, both skills authenticate that entry
   instead of adding a second server, and they give that name for
-  `claude mcp login` and `claude mcp logout`. rudder-mcp-setup's
+  `claude mcp login` and `claude mcp logout`. With the access-token route,
+  rudder-mcp-setup says to disable that entry for the folder in `/mcp`, since
+  its different URL would leave both servers listed. rudder-mcp-setup's
   `allowed-tools` names only the two `claude mcp add` commands its steps run,
   and its troubleshooting table maps `403` `insufficient_scope` to a wrong
   `X-Workspace-ID` and `401` `bearer token authorization failed` to a refused
