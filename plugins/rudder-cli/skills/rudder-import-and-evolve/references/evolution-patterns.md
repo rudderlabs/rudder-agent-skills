@@ -222,7 +222,8 @@ workspaces/
 
 ```bash
 # Login to different workspace (a person at a terminal; an agent
-# needs the user to export a different RUDDERSTACK_ACCESS_TOKEN)
+# needs the user to export that workspace's RUDDERSTACK_ACCESS_TOKEN
+# and restart the agent from that shell)
 rudder-cli auth login
 
 # Verify current workspace
@@ -231,18 +232,23 @@ rudder-cli workspace info --json
 
 ### Promote Changes
 
+`apply` writes to the workspace of the CLI's token, whichever directory you run it in. Switch workspaces (above) before each step, and check that `workspaceID` is the directory's workspace before you apply.
+
 ```bash
 # 1. Develop and test in dev workspace
 cd workspaces/development
+rudder-cli workspace info --json   # workspaceID must be the dev workspace
 rudder-cli apply -l ./
 
-# 2. Copy to staging, apply
+# 2. Switch to the staging workspace, copy to staging, apply
 cp -r data-catalog ../staging/
 cd ../staging
+rudder-cli workspace info --json   # workspaceID must be the staging workspace
 rudder-cli apply -l ./
 
-# 3. After testing, copy to production
+# 3. After testing, switch to the production workspace, copy, apply
 cp -r data-catalog ../production/
 cd ../production
+rudder-cli workspace info --json   # workspaceID must be the production workspace
 rudder-cli apply -l ./
 ```

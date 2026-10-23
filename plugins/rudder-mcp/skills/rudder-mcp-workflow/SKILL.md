@@ -131,21 +131,26 @@ Recommended for safe iteration:
 Workflow:
 
 ```
-1. Target the Dev workspace (see "Choose the workspace")
+1. Target the Dev workspace in MCP (see "Choose the workspace")
    └── OAuth route: pass the Dev workspace's ID as workspace_id,
        or call user_switch_workspace when the tools take no workspace_id
    └── Access-token route: set X-Workspace-ID to the Dev workspace
        and restart the client
 
 2. Apply changes to Dev
+   └── rudder-cli workspace info --json must show the Dev workspaceID
    └── e.g. rudder-cli apply --dry-run -l ./, review it,
        then rudder-cli apply --confirm=false -l ./
 
 3. Verify events end-to-end in Dev
    └── Live events + warehouse check via MCP
 
-4. Switch to the Prod workspace and apply
+4. Target the Prod workspace in MCP and in the CLI, then apply
+   └── rudder-cli workspace info --json must show the Prod workspaceID
+       before the dry run
 ```
+
+The MCP target and the CLI target are separate. `rudder-cli apply` writes to the workspace of the CLI's token, whatever workspace the MCP calls use. Its dry run names that workspace only from rudder-cli 0.28.0, on a first line `Workspace: <name> (<id>)`. Before each dry run, compare the `workspaceID` from `rudder-cli workspace info --json` with the target workspace's ID, and stop if they differ. Changing the CLI's workspace means restarting the agent: the user exports that workspace's token as `RUDDERSTACK_ACCESS_TOKEN` and starts the agent again from that shell.
 
 **Why two workspaces:**
 - **Safe iteration** — test tracking-plan changes without affecting production

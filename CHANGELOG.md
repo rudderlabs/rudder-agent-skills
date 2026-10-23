@@ -22,7 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   commands an agent runs after a reviewed dry-run now carry `--confirm=false`.
   The interactive iteration loop in rudder-cli-workflow is labelled as being for
   a person at a terminal. rudder-import-and-evolve says its reference examples
-  need the same flag when an agent runs them.
+  need the same flag when an agent runs them. In the multi-workspace flows,
+  rudder-mcp-workflow's Dev and Prod pattern and the Promote Changes example in
+  rudder-import-and-evolve, an agent checks that
+  `rudder-cli workspace info --json` shows the target workspace ID before each
+  dry run, because `apply` writes to the workspace of the CLI's token.
+  Changing that workspace means the user restarts the agent with that
+  workspace's token. The Promote Changes example now switches workspaces
+  between steps.
 - **Versions.** `rudder-cli` 0.0.3 to 0.0.4, `rudder-mcp` 0.0.2 to 0.0.3.
 
 - **Breaking (repo layout):** renamed the top-level `skills/` directory back to

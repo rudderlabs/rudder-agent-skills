@@ -107,6 +107,8 @@ See `references/evolution-patterns.md` for detailed patterns including:
 
 The examples there end with `rudder-cli apply -l ./`, which waits on a confirmation prompt. An agent shows the user the `rudder-cli apply --dry-run -l ./` output first, then runs `rudder-cli apply --confirm=false -l ./`. Without `--confirm=false`, a non-interactive run auto-declines the prompt and applies nothing.
 
+The CLI applies to the workspace of its token, not to the workspace a directory was imported from. The dry run names that workspace only from rudder-cli 0.28.0, on a first line `Workspace: <name> (<id>)`. In the multi-workspace examples, run `rudder-cli workspace info --json` before each dry run and check that `workspaceID` is that directory's workspace. If it is not, stop. Changing the CLI's workspace means restarting the agent: the user exports that workspace's token as `RUDDERSTACK_ACCESS_TOKEN` and starts the agent again from that shell.
+
 ## Handling Import Drift
 
 **Problem:** Someone made changes in the UI after import.
