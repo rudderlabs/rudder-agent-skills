@@ -16,10 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `plugin:rudder-core:rudderstack`, and cursor.directory picks up the same file.
   `rudder-destination-debugging` and `rudder-environment-check` now have the user authenticate
   that entry in `/mcp` and send them to `rudder-mcp-setup` only when `/mcp` lists no RudderStack
-  server. Claude Code skips the plugin's entry when a hand-added HTTP server has the same URL, but
-  keeps both beside a hand-added `npx -y mcp-remote` entry, so remove that one with
-  `claude mcp remove rudderstack`. The README says the server comes with plugin installs only, and
-  how to add it after `npx skills add`.
+  server, and the environment check now also looks for the MCP tools. Claude Code skips the
+  plugin's entry when a hand-added HTTP server has the same URL, but keeps both beside a hand-added
+  `npx -y mcp-remote` entry, so remove that one with `claude mcp remove rudderstack`. It also
+  keeps both beside an access-token entry at `https://mcp.rudderstack.com/bearer-auth-mcp`, a
+  different URL, so in that folder disable the plugin's entry in `/mcp`. The README says the
+  server comes with plugin installs only, and how to add it after `npx skills add`.
 - **`rudder-core` / `rudder-onboarding`** — nine steps from an app with no analytics to one real
   event delivered to a destination the user picks: start, explore, goal, destination and secrets,
   plan and apply, instrument, verify locally, verify live, wrap up. Specs live in `rudder/`; the
