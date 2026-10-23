@@ -22,7 +22,9 @@ Before running any workflow, verify:
 
 ## Client configuration
 
-Claude Code connects over HTTP and runs the OAuth sign-in itself, with no `npx` or `mcp-remote`:
+If `/mcp` already lists `plugin:rudder-core:rudderstack`, the rudder-core plugin added this server. Choose it and `Authenticate` instead of adding another.
+
+Otherwise, Claude Code connects over HTTP and runs the OAuth sign-in itself, with no `npx` or `mcp-remote`:
 
 ```bash
 claude mcp add --transport http rudderstack https://mcp.rudderstack.com/mcp

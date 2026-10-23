@@ -89,7 +89,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ID as `workspace_id` when the workspace tools take that argument, and to call
   `user_switch_workspace` when they do not. The MCP server is replacing
   `user_switch_workspace` with a `workspace_id` argument on every workspace
-  tool, so the guidance works with both versions.
+  tool, so the guidance works with both versions. When `/mcp` already lists
+  `plugin:rudder-core:rudderstack`, both skills authenticate that entry
+  instead of adding a second server. rudder-mcp-setup's `allowed-tools` allows
+  only the two `claude mcp add` commands its steps run, and its troubleshooting
+  table maps `403` `insufficient_scope` to a wrong `X-Workspace-ID` and `401`
+  `bearer token authorization failed` to a refused token.
 - **`rudder-ai-events`** — new plugin that onboards an existing app to RudderStack AI events
   (spec v0.3) with the `@rudderstack/ai` (Node.js), `rudderstack-ai` (Python) and `ai-sdk-go` (Go)
   SDKs, pinned to the release that ships spec v0.3.
