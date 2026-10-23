@@ -48,6 +48,10 @@ terraform providers
 curl -s -o /dev/null -w "%{http_code}" https://mcp.rudderstack.com/health
 ```
 
+### 4. Check the MCP tools
+
+Check that the rudderstack MCP server's tools, such as `list_sources` and `user_details`, are available to you. Don't call them. They are missing when no RudderStack server is added, when it is disabled, or when the user has not signed in to it.
+
 ## Output Format
 
 Present results as a status table:
@@ -62,6 +66,7 @@ rudder-cli              ✓ Ready
 terraform               ✗ Missing   Run: /rudder-terraform-setup
   └─ provider           ─ Skipped   (terraform required first)
 mcp.rudderstack.com     ✓ Reachable
+  └─ MCP tools          ✓ Ready
 ─────────────────────────────────────────────────────
 ```
 
@@ -80,7 +85,8 @@ mcp.rudderstack.com     ✓ Reachable
 |--------------|--------|
 | rudder-cli | Run `/rudder-cli-setup` or ask "help me install rudder-cli" |
 | terraform | Run `/rudder-terraform-setup` or ask "help me setup terraform for rudderstack" |
-| MCP unreachable | Run `/rudder-mcp-setup` or check network connectivity |
+| MCP unreachable | Check network connectivity to `mcp.rudderstack.com` |
+| MCP tools missing | In Claude Code, type `/mcp`. If it lists `plugin:rudder-core:rudderstack` (the server the rudder-core plugin adds) or `rudderstack`, choose it, enable it if it is disabled, and choose `Authenticate`. Run `/rudder-mcp-setup` only if `/mcp` lists neither |
 
 ## Credential Security
 
