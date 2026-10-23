@@ -80,8 +80,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `error[project/var-substitution]` failure, git-ignoring the var file, and that
   substitution is on by default only from rudder-cli 0.25.0. The var file's
   values are single-quoted too, since YAML reads `\` as an escape inside double
-  quotes. The recipe prints only `validate`'s error lines, since validate shows
-  each diagnostic's source line after substitution, secrets included.
+  quotes, and a `'` in a value is written as four inside those quotes. The
+  recipe filters the output of `validate`, the dry run and apply, since each
+  shows a diagnostic's source line after substitution, secrets included,
+  whether the value comes from a var file or a `RUDDER_<NAME>` variable.
   rudder-transformations says `transformations test` needs the same
   `--var-file` flags.
 - **`rudder-mcp` / `rudder-mcp-setup`, `rudder-mcp-workflow`.** OAuth setup
