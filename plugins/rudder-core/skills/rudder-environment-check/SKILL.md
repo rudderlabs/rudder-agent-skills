@@ -80,7 +80,8 @@ mcp.rudderstack.com     ✓ Reachable
 |--------------|--------|
 | rudder-cli | Run `/rudder-cli-setup` or ask "help me install rudder-cli" |
 | terraform | Run `/rudder-terraform-setup` or ask "help me setup terraform for rudderstack" |
-| MCP unreachable | Run `/rudder-mcp-setup` or check network connectivity |
+| MCP unreachable | Check network connectivity to `mcp.rudderstack.com` |
+| MCP tools missing | In Claude Code, type `/mcp`. If it lists `plugin:rudder-core:rudderstack` (the server the rudder-core plugin adds) or `rudderstack`, choose it and `Authenticate`. Run `/rudder-mcp-setup` only if `/mcp` lists neither |
 
 ## Credential Security
 

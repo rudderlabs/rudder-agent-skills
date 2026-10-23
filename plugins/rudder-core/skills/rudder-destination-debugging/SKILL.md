@@ -8,7 +8,7 @@ allowed-tools: "Read, Write, Edit"
 
 This skill teaches how to diagnose and fix **event delivery failures** between RudderStack and a destination — covering dropped events, auth errors, rate limiting, transformation filters, and warehouse sync failures.
 
-Requires RudderStack MCP connected. See `rudder-mcp-setup` if not yet configured.
+Requires the RudderStack MCP server, connected and signed in. In Claude Code, type `/mcp`. If it lists `plugin:rudder-core:rudderstack` (the server the rudder-core plugin adds) or `rudderstack`, choose it and `Authenticate`. Use `rudder-mcp-setup` only when `/mcp` lists neither, so the server is not added twice.
 
 ## Event Delivery Pipeline
 

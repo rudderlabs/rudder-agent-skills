@@ -73,8 +73,11 @@ npx skills add rudderlabs/rudder-agent-skills -a cursor
 
 ### `rudder-core`
 
-`rudder-core` also connects the RudderStack MCP server (`https://mcp.rudderstack.com/mcp`). The first time an MCP
-tool runs, your agent asks you to sign in to RudderStack in the browser. No token goes in a config file.
+Installed as a Claude Code or Cursor plugin, `rudder-core` also connects the RudderStack MCP server
+(`https://mcp.rudderstack.com/mcp`). The first time an MCP tool runs, your agent asks you to sign in to RudderStack in
+the browser. No token goes in a config file. The Skills CLI copies skill folders only, so after `npx skills add`, add
+the server yourself: in Claude Code, `claude mcp add --scope user --transport http rudderstack https://mcp.rudderstack.com/mcp`;
+in other agents, an HTTP MCP server with that URL.
 
 | Skill | When to use |
 |---|---|

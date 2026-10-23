@@ -32,9 +32,10 @@ Done means one real event reached the destination the user chose. The app sends 
 - Specs live in `rudder/`. Pass `-l rudder` to every `validate` and `apply`. Never pass `-l .` in an app repository. The CLI parses every YAML file under the location, so a CI workflow file fails validation.
 - Show the dry run and get a yes before every apply. Apply as `rudder-cli apply -l rudder --confirm=false`, because without a terminal the default asks, declines on its own, and still exits 0.
 - Stop if a dry run lists `Removed resources:`. Apply deletes every CLI-managed resource in the workspace that is missing from `rudder/`, including resources another project created. The one exception is a source the user agreed to replace in step 1.
+- Run every `validate`, `apply` and `apply --dry-run` as `{ <command> 2>&1; echo "exit $?"; } | grep -vE '^ *[0-9]* \|'`. Each prints its warnings and errors with the line of the spec they are about, after secrets are filled in. The filter drops those lines and keeps the plan, the messages and the exit status. Step 5 narrows validate's output further, to its error lines.
 - Secrets go in `rudder/secrets.vars.yaml` (git-ignored) and are referenced in single quotes, `'{{ .NAME }}'`, because the value is pasted in before the YAML is parsed. Never put a secret in a spec, a commit, a command line or the chat.
 - Commit by explicit paths (`git add rudder`, then the files you changed), never `git add -A`, `git add .` or `git commit -a`, so none of the user's own work is swept in. The one exception is step 1's baseline commit of an app that was not in git.
-- Commit after the apply and after the instrumentation, so either can be undone with `git revert`.
+- Commit after the apply, after the instrumentation and after each fix to it in any step, and add each fix to `fix_commits`, so step 9 can undo each with `git revert`.
 - Ask one question at a time. Offer choices, and accept a free-text answer.
 - `allowed-tools` pre-approves single commands such as `rudder-cli`, `git`, `grep`, `jq` and `curl`. It does not cover the step 1 and step 2 probes, the step 7 recipes and step 8's probe and send, which are multi-line shell scripts, or a mobile app's build tools (`./gradlew`, `adb`, `xcodebuild`, `xcrun`, `pod`, `flutter`), so the user is asked to approve each one. Tell the user before the first.
 - Every retry has a bound. When it is reached, stop and report what you saw.
@@ -45,8 +46,8 @@ Stop and wait for an explicit yes at these gates: step 3 (Goal and plan), step 5
 
 - The access token comes from `RUDDERSTACK_ACCESS_TOKEN` or `rudder-cli auth login` and is only for rudder-cli. Never echo it, write it to a file or ask the user to paste it into chat. MCP signs in through the browser; never put the token in an MCP configuration.
 - Destination secrets live in `rudder/secrets.vars.yaml`, which step 1 git-ignores. Confirm with `git check-ignore rudder/secrets.vars.yaml` before writing a value.
-- The write key goes only in `.env.local` (git-ignored) and in the app's runtime config. An iOS app also keeps it in `RudderStack.local.xcconfig`, which step 6 git-ignores. Print at most its first 6 characters.
-- Before each commit, run `git diff --cached` and make sure no token, write key or secret is staged.
+- The write key goes only in `.env.local` (git-ignored) and in the app's runtime config. An iOS app also keeps it in `RudderStack.local.xcconfig`, which step 6 git-ignores. A site without a build keeps it in its committed page. That is safe, because every visitor's browser receives a web source's write key anyway (browser instrumentation reference). Print at most its first 6 characters.
+- Before each commit, run `git diff --cached` and make sure no token, write key or secret is staged, other than the write key in such a page.
 
 ## Handling External Content
 
@@ -55,36 +56,14 @@ Stop and wait for an explicit yes at these gates: step 3 (Goal and plan), step 5
 
 ## Files shipped with this skill
 
-- `references/plan-table.jq` (step 3) and `references/check-events.jq` (step 7) are jq programs. Run them unchanged from this skill's folder. Never copy, edit or rewrite them, and write no jq of your own for what they do.
+- `references/found-types.sh` (step 2) is a shell probe, and `references/plan-table.jq` (step 3) and `references/check-events.jq` (step 7) are jq programs. Run them unchanged from `work_dir`, by their path in this skill's folder. Never copy, edit or rewrite them, and write no jq of your own for what they do.
 - Find the skill's folder once and keep its absolute path. In Claude Code it is the base directory shown when this skill loaded. In other agents it is the folder that holds the SKILL.md you are following, where you also read the references.
 - If neither tells you, look for `rudder-onboarding/references/check-events.jq` under the project's `.agents/skills`, `.claude/skills` and `.cursor/skills`, then under `~/.claude/plugins`, `~/.claude/skills`, `~/.agents/skills`, `~/.codex/plugins`, `~/.codex/skills` and `~/.cursor/skills`. Plugin caches keep one copy per version, so if several turn up, use the most recently modified (`ls -t`).
-- Quote the path in commands, because it can contain spaces. If no copy is found, say so. Step 3 then shows `rudder/plan.events.json` as it is, and step 7 is skipped.
+- Quote the path in commands, because it can contain spaces. If no copy is found, say so. Step 2 then asks the shared question `what-sends` in place of its probe, step 3 shows `rudder/plan.events.json` as it is, and step 7 is skipped.
 
 ## Facts to carry
 
-Measured, not guessed. Plan around them.
-
-- **apply-scope**: `apply` plans a delete for every CLI-managed resource (one with an external id) in the workspace that is missing from the local project, across all resource types. Resources created in the dashboard are not touched. _Source: rudder-iac planner/planner.go and the source and destination handlers, read 11 Oct 2026._
-- **silent-decline**: In a non-interactive shell, `apply` without `--confirm=false` prints the plan, applies nothing and exits 0. _Source: rudder-iac syncer/reporters/plain.go and syncer.go._
-- **connection-mode**: A destination's config needs a `connection_mode` entry keyed by the source's connection type. A `javascript` source connects as `web`, so `connection_mode: {web: cloud}` (or device or hybrid where the type supports it). Every other client type keeps its own name (`ios_swift`, `android_kotlin`, `flutter`, `react_native`, `unity`, `cordova`, and the legacy `android` and `ios`), and server types connect as `cloud`. Without the entry validate fails with `event-stream/connection/semantic-valid` and names the missing key. _Source: rudder-iac destination/definitions/common/source_type_mapping.go at d8abd910, verified with validate._
-- **destination-disabled**: A destination's `enabled` defaults to false. Without `enabled: true` validate only warns, and nothing is delivered. _Source: rudder-iac providers/destination/model.go, verified with validate._
-- **cli-features**: `rudder-cli docs destination` prints a destination type's keys, allowed values, defaults, patterns, connection modes and secret keys, read from the definitions compiled into the installed rudder-cli, the same ones validate and apply use. Validate's `destination/secret-reference` warning names a secret key that holds anything but one variable reference with no default, and `destination/secret-reference-unique` a variable that fills two secret keys; both read the specs before variables are filled in. Validate's text output masks the values of secret keys. This skill needs the first rudder-cli release that contains rudder-iac#989 and #990. Nothing written in this skill replaces them. _Source: rudder-iac#989 at 98fb86a1 and #990 at 28dbeb78, run 21 Oct 2026 on a build of both merged._
-- **unfilled-secret**: In `rudder/secrets.vars.yaml`, a line `NAME:` with no value makes validate and apply fail with `key "NAME" has a null or empty value`. It names only the first such key, so a run reports one per attempt. `NAME: ""` validates clean and sends an empty secret. Never write it, even though that error message suggests empty quotes. _Source: rudder-iac varsubst/resolver/file_resolver.go and project/importer/varfile.go at d8abd910, run 21 Oct 2026._
-- **source-type**: The source `type` for each kind of sender: a website or web app `javascript`; an iOS app `ios_swift`; an Android app `android_kotlin`; a Flutter app `flutter`; a React Native app `react_native`; a backend service the type of its language, `node`, `python`, `go`, `java`, `dotnet`, `php`, `ruby` or `rust`; a Unity game `unity`. `android` and `ios` are the types of the legacy Android (Java) and iOS (Objective-C) SDKs. RudderStack's source catalog marks both legacy and tells new implementations to use `android_kotlin` with the Kotlin SDK and `ios_swift` with the Swift SDK; the Kotlin SDK also has a Java API, and the Swift SDK an Objective-C one. A Capacitor app is `javascript`, the JavaScript SDK in its web code. So is a Cordova app: the Cordova SDK (`cordova`) reaches end of life on 1 December 2026, and its README sends Cordova apps to the JavaScript SDK in a Capacitor app; say so. There is no `http` or `webhook` source type. A type the CLI does not accept fails `rudder-cli validate`, which lists the valid ones. _Source: rudder-iac providers/event-stream/source/model.go at d8abd910, verified with validate; rudder-integrations-config src/configurations/sources/{android,ios}/db-config.json at 7bc73879; rudder-sdk-cordova README at e1094439._
-- **source-type-fixed**: `apply` cannot change an existing source's `type`: the update fails with `type cannot be changed`. A new type needs a source spec with a new `id`, which creates a new source with a new write key and removes the old one. _Source: rudder-iac providers/event-stream/source/handler.go (Update) at d8abd910._
-- **first-commit-adds-whole-files**: In a repository that `git init` has just created, the first commit that touches a file adds the whole file, so `git revert` of that commit deletes it. Reverting this workflow's commits in an app that was not in git deletes the app's files and its own `.gitignore`. A baseline commit of the app as it is, made first, prevents that. _Source: reproduced in scratch, 20 and 21 Oct 2026._
-- **http-api-any-source**: A POST to `<data plane>/v1/track` with the write key as the Basic auth user and a JSON body with `type`, `event`, `anonymousId` and `properties` is ingested and delivered like an SDK event. On 1 Oct 2026 a curl with a javascript source's write key reached a webhook with the payload intact. _Source: live run, 1 Oct 2026._
-- **write-key-delay**: A new source's write key is refused with HTTP 401 `invalid write key` for about two minutes after apply. It is propagation, not a wrong key. Sending immediately fails. _Source: live run, 1 Oct 2026._
-- **metrics-no-timestamps**: MCP metrics tools return counts without last-seen times, so a count only means "somewhere in the window". Pass `start_time` set to the time you recorded before sending. _Source: rudder-mcp-server sdk/webapp/model.go (timestamps are json:"-")._
-- **metrics-minute-buckets**: Delivery metrics are counted in one-minute buckets, and a query keeps only buckets that start at or after `start_time`. A start time inside a minute therefore drops that whole minute, so events sent right after recording it never show. Round the start time down to the minute. _Source: rudder-mini reporting, 16 Oct 2026 (start 05:24:07Z returned nothing; 05:24:00Z returned every event)._
-- **metrics-lag**: Delivery metrics can lag, and unevenly by event. On 15 Oct one event showed as delivered 2 minutes after RudderStack received it and another took between 4 and 8 minutes; that run's start time fell inside a minute, so part of the wait may have been the bucket effect. A payload at a destination the user can read arrives within seconds, so check there first and treat metrics as the later confirmation. _Source: one end-to-end run against a dev workspace, 15 Oct 2026._
-- **mcp-hashes-values**: `get_live_events` hashes every property value, so it can confirm event names and property keys but not values or types. The destination's own copy proves the payload. _Source: rudder-mcp-server internal/pii/pii.go._
-- **local-no-types**: `rudder-cli sources listen` checks nothing. It prints each accepted event on stdout as the SDK sent it, and with `--store` its counts view counts events by name only. The shipped `references/check-events.jq` compares names and property types with `rudder/plan.events.json`. _Source: rudder-iac devlisten/stream.go and devlisten/api/summary.go at d8abd910 (#981 removed the summary command)._
-- **sources-listen-gate**: `rudder-cli sources` is experimental and hidden. The call that starts the listener needs `RUDDERSTACK_CLI_EXPERIMENTAL=true` and `RUDDERSTACK_X_SOURCES_LISTEN=true`, or it exits 1 with `experimental_disabled`. rudder-cli 0.28.0 and earlier have no `sources` command at all; 0.29.0 is the first release with it. _Source: rudder-iac cmd/sources/sources.go and config/experimental.go at d8abd910, release PR rudder-iac#954; 0.24.0 and 0.28.0 run 21 Oct 2026._
-- **mobile-config-url**: Mobile SDKs fetch their source config from `controlPlaneUrl`, which defaults to RudderStack cloud. Pointed at the local listener, both `dataPlaneUrl` and `controlPlaneUrl` must be its URL, as `configUrl` must be for the browser SDK. _Source: rudder-iac devlisten/guide.md at d8abd910; rudder-sdk-kotlin core Configuration.kt at 671ff81; rudder-sdk-swift Configuration.swift at eb66043._
-- **emulator-loopback**: An Android emulator reaches the machine it runs on at `10.0.2.2`; `127.0.0.1` inside it is the emulator itself. Android refuses plain HTTP unless the app's network security config allows the host. The iOS Simulator shares the Mac's loopback, so `127.0.0.1` works there, with `NSAllowsLocalNetworking` in the app's ATS settings. A physical device reaches neither. _Source: rudder-agent-skills#34 references/app-bootstrap.md; Android emulator networking and network security configuration documentation._
-- **mobile-batches**: The Kotlin and Swift SDKs send events in batches, every 10 seconds or every 30 events, whichever comes first. An event can therefore reach the listener or the data plane up to 10 seconds after the action. _Source: rudder-sdk-kotlin core policies FrequencyFlushPolicy.kt and CountFlushPolicy.kt at 671ff81; rudder-sdk-swift Constants.swift at eb66043._
-- **background-processes**: Some agents stop the background processes a shell call started when that call returns; Codex does. Claude Code keeps them: a listener started in one call answered in the next. _Source: rudder-agent-skills#34 references/running-in-background.md; Claude Code measured 20 Oct 2026._
+Measured, not guessed. Plan around them. They are in `references/facts.md`, each under its id, and a step cites one as (fact <id>). Read that file before step 1.
 
 ## Shared questions
 
@@ -146,6 +125,7 @@ Keep these values as you go, and restate them in the wrap-up:
 - `remote_destination_id`: the destination's id in RudderStack, from MCP list_destinations
 - `write_key`: the source's write key. Show only its first 6 characters.
 - `code_commit`: the commit that added the instrumentation
+- `fix_commits`: the commits that fixed the instrumentation after `code_commit`, in any step, if any
 - `started_at`: RFC 3339 UTC time, rounded down to the minute, recorded just before the first live send
 
 ## 1. Start
@@ -224,7 +204,7 @@ If `dir_kind` is `resume`:
 - `rudder/` already holds specs, from an earlier run here or copied from the folder where a first event was sent. Keep them. Never start again with an empty `rudder/`: its resources are CLI-managed now, and step 2's dry run would list them for removal (fact apply-scope).
 - If this folder has no app (no manifest, as in the folder a first event came from), set `sender` to `curl`.
 - Otherwise work out the app's `source_type` as step 2 does, starting with its probe, and compare it with `type:` in `rudder/sources/*.yaml`. If they differ, say so and ask whether to change it. The CLI cannot change a source's type in place (fact source-type-fixed). On yes, give the source spec a new `id` and `name` with the new `type`, point `rudder/connections.yaml` at the new id, and add the new type's `connection_mode` entry to the destination (fact connection-mode). Step 5's dry run then lists the old source under `Removed resources:`; that is the one removal the user agreed to.
-- If a spec references a secret as `'{{ .NAME }}'` and `rudder/secrets.vars.yaml` is missing, as it is when `rudder/` came through git, write the file with one `NAME:` line per secret and no value (fact unfilled-secret). Ask the user to fill every line in their editor and say continue, because step 2's dry run needs the values. Do not read them back.
+- If a spec references a secret as `'{{ .NAME }}'` and `rudder/secrets.vars.yaml` is missing, as it is when `rudder/` came through git or was copied without it, write the file with one `NAME:` line per secret and no value (fact unfilled-secret). Ask the user to fill every line in their editor and say continue, because step 2's dry run needs the values. Do not read them back.
 - In steps 2 to 5, reuse what exists: show the plan from `rudder/plan.events.json` and ask whether to keep or change it, keep the destination unless the user wants another, and apply only what the dry run lists. Step 5 commits `rudder/` as usual.
 
 If `workspace info` says an access token is required, or answers 401:
@@ -233,13 +213,13 @@ If `workspace info` says an access token is required, or answers 401:
 
 If the rudderstack MCP tools are missing, or a call says the server needs authentication:
 
-- Ask the user to connect the RudderStack MCP server and stop. In Claude Code, if `/mcp` does not list rudderstack, run `claude mcp add --scope user --transport http rudderstack https://mcp.rudderstack.com/mcp` in a terminal. User scope makes it load in every folder, including the app the user may restart in. Then start Claude Code again, type `/mcp`, choose rudderstack, choose Authenticate and approve in the browser. In other agents, add an HTTP MCP server with that URL in the agent's MCP settings and sign in. It uses the user's RudderStack login, not the access token. On restart, begin again at this step; it is idempotent. If `dir_kind` is not `app` or `resume`, give the advice to start again in the app in the same message.
+- Ask the user to connect the RudderStack MCP server and stop. In Claude Code, the user types `/mcp`. If it lists `plugin:rudder-core:rudderstack`, the server the rudder-core plugin adds, or `rudderstack`, they choose it, enable it if it is disabled, choose Authenticate, approve in the browser and say continue. Nothing else is added. Only if it lists neither, they run `claude mcp add --scope user --transport http rudderstack https://mcp.rudderstack.com/mcp` in a terminal, start Claude Code again and authenticate it the same way. User scope makes it load in every folder, including the app the user may restart in. In other agents, add an HTTP MCP server with that URL in the agent's MCP settings and sign in. It uses the user's RudderStack login, not the access token. Then begin again at this step; it is idempotent. If `dir_kind` is not `app` or `resume`, give the advice to start again in the app in the same message.
 
 If the CLI's workspace is not among the workspaces `user_details` lists, or `user_switch_workspace` says it is not found:
 
 - The RudderStack login MCP signed in with cannot see the token's workspace. Ask the user to sign in to MCP with a login that belongs to that workspace, or to create the token in the workspace they mean. Stop.
 
-Facts that apply here: **cli-features**, **first-commit-adds-whole-files**, **source-type**, **source-type-fixed**, **http-api-any-source**.
+Facts that apply here (`references/facts.md`): **cli-features**, **first-commit-adds-whole-files**, **source-type**, **source-type-fixed**, **http-api-any-source**.
 
 Done when:
 
@@ -261,40 +241,16 @@ Needs: `dir_kind`, `sender`.
 
 Run these first, as written. Each prints one word; keep it as the value it names.
 
-`found_types`: the source types the code here points to (fact source-type). It looks four levels down, skips dependency and build folders, and checks in this order: `flutter` (a `pubspec.yaml` with the Flutter SDK), `react_native` (a `package.json` whose `dependencies` name react-native), `javascript` for a Capacitor or Cordova app, `unity`, `android_kotlin` (a Gradle file that applies the Android application plugin, puts the Android Gradle plugin on its classpath, or holds an `android` block), `ios_swift` (an Xcode project or workspace, or a `Podfile`; a `Package.swift` alone is a library) and `javascript` (a `package.json` with a browser framework, or an `index.html` at the top, in `public/` or in `src/`). Frameworks come first and claim the `android/` and `ios/` folders under them, because their apps hold both. Only when it finds none of these does it look for a server: `node` (express, fastify, koa, nest, hapi, hono or restify), `python`, `go`, `java`, `dotnet`, `php`, `ruby` or `rust`. Several types are joined with `+`; nothing it knows, such as a `package.json` with none of these frameworks, prints `none`.
+`found_types`: the source types the code here points to (fact source-type), joined with `+` when there are several, or `none` when it finds no app it knows. It looks four levels down, and its comments say what it checks, in order. Frameworks come first and claim the `android/` and `ios/` folders under them, and a server language counts only when it finds no client app.
 
 ```sh
-m() { find . -maxdepth 4 \( -name node_modules -o -name '.?*' -o -name build -o -name dist -o -name Pods -o -name vendor -o -name target -o -name rudder \) -prune -o "$@" 2>/dev/null; }
-flutter=$(m -name pubspec.yaml -exec grep -lE '^[[:space:]]*sdk:[[:space:]]*flutter' {} +)
-rn=$(m -name package.json -exec jq -r 'select(.dependencies["react-native"]) | input_filename' {} \;)
-hybrid=$(m -name package.json -exec grep -l '"@capacitor/core"[[:space:]]*:' {} +; m -name config.xml -exec grep -l 'w3\.org/ns/widgets' {} +)
-roots=$(printf '%s\n' "$flutter" "$rn" "$hybrid" | sed -n 's#/[^/]*$#/#p')
-own() { if [ -n "$roots" ]; then grep -vF -e "$roots"; else cat; fi; }
-t=; add() { case "+$t+" in *"+$1+"*) ;; *) t=${t:+$t+}$1 ;; esac; }
-[ -n "$flutter" ] && add flutter
-[ -n "$rn" ] && add react_native
-[ -n "$hybrid" ] && add javascript
-[ -f ProjectSettings/ProjectVersion.txt ] && add unity
-[ -n "$(m \( -name build.gradle -o -name build.gradle.kts \) -exec grep -lE 'android\.?[Aa]pplication|com\.android\.tools\.build|^[[:space:]]*android[[:space:]]*\{' {} + | own)" ] && add android_kotlin
-[ -n "$(m \( -name '*.xcodeproj' -o -name '*.xcworkspace' -o -name Podfile \) -print | own)" ] && add ios_swift
-[ -n "$(m -name package.json -exec grep -lE '"(react-dom|vue|svelte|@sveltejs/kit|@angular/core|next|nuxt|vite|preact|solid-js|astro|gatsby|@remix-run/react)"[[:space:]]*:' {} + | own)$(find . -maxdepth 2 \( -path ./index.html -o -path ./public/index.html -o -path ./src/index.html \) -print | own)" ] && add javascript
-if [ -z "$t" ]; then
-  [ -n "$(m -name package.json -exec grep -lE '"(express|fastify|koa|@nestjs/core|@hapi/hapi|hono|restify)"[[:space:]]*:' {} +)" ] && add node
-  [ -n "$(m \( -name pyproject.toml -o -name 'requirements*.txt' -o -name Pipfile -o -name setup.py \) -print)" ] && add python
-  [ -n "$(m -name go.mod -print)" ] && add go
-  [ -n "$(m \( -name pom.xml -o -name build.gradle -o -name build.gradle.kts \) -print)" ] && add java
-  [ -n "$(m \( -name '*.csproj' -o -name '*.fsproj' -o -name '*.sln' \) -print)" ] && add dotnet
-  [ -n "$(m -name composer.json -print)" ] && add php
-  [ -n "$(m -name Gemfile -print)" ] && add ruby
-  [ -n "$(m -name Cargo.toml -print)" ] && add rust
-fi
-echo "${t:-none}"
+sh '<skill folder>/references/found-types.sh'
 ```
 
 1. Act on `found_types` with the branches below. `source_type` is the type it names, unless a branch changes it (fact source-type). Then read the manifest and entry points of that app: `package.json`, the vite or next config and `src/` for a browser app; the app module's `build.gradle.kts` and its `Application` class for Android; the Xcode project and the `@main` App or `AppDelegate` for iOS; `pubspec.yaml` and `lib/main.dart` for Flutter; `package.json` and `App.tsx` for React Native. Decide where the code runs, and the language of a native app: Kotlin or Java (the app module applies no Kotlin plugin), Swift or Objective-C.
 2. List the analytics SDKs the dependencies already name with this one command, which prints each file and the SDK it found: `grep -rIoE --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=Pods --exclude-dir=build --include=package.json --include='*.gradle' --include='*.gradle.kts' --include='*.versions.toml' --include=Podfile --include=Package.swift --include=Package.resolved --include=project.pbxproj --include=pubspec.yaml '@rudderstack/[a-z-]+|rudder-sdk-[a-z-]+|com\.rudderstack\.[a-z.]+|rudder_sdk_flutter|pod .Rudder.|@segment/[a-z-]+|com\.segment\.analytics[a-z.]*|analytics-swift|segment_analytics|pod .Analytics[^A-Za-z]' .` When the user picked one of several apps, run it in that app's folder in place of `.`, or, for an app at the top, add `--exclude-dir=<folder>` for each other app's folder, so the branches below concern only the chosen app. Then search its code for other analytics: `gtag(`, `mixpanel`, `amplitude`, `posthog`.
 3. Call MCP `list_sources` (retl_type none), `list_destinations` and `list_connections` to see what the workspace holds.
-4. Find resources other projects manage: run `rudder-cli apply -l rudder --dry-run`, adding `--var-file rudder/secrets.vars.yaml` when the file exists, with `rudder/` still empty unless `dir_kind` is `resume`. Every line under `Removed resources:` is a CLI-managed resource that an apply from this project would delete, of any type (sources, destinations, tracking plans, transformations). `No changes to apply` means there are none.
+4. Find resources other projects manage: run `rudder-cli apply -l rudder --dry-run`, adding `--var-file rudder/secrets.vars.yaml` when the file exists, with its output filtered (rule) and `rudder/` still empty unless `dir_kind` is `resume`. Every line under `Removed resources:` is a CLI-managed resource that an apply from this project would delete, of any type (sources, destinations, tracking plans, transformations). `No changes to apply` means there are none.
 5. Report in four short lines: what the app is, analytics found in the code, what the workspace holds, the source you propose.
 6. Ask the user: "I will create a new <source_type> source called <name>. OK?"
      - Yes
@@ -333,7 +289,7 @@ If the SDK list names a Segment SDK:
 
 If that dry run lists anything under `Removed resources:` other than the old source the user agreed to replace in step 1:
 
-- Stop. Explain that apply would delete them (fact apply-scope). Offer to continue in an empty workspace, or to bring them into this project first with `rudder-cli import workspace`.
+- Stop. Explain that apply would delete them (fact apply-scope). Offer to continue in an empty workspace, or, when the user owns the project that manages them, to copy its spec files into `rudder/` first, so this project holds every CLI-managed resource. For each secret those specs reference as `'{{ .NAME }}'`, add a `NAME:` line with no value to `rudder/secrets.vars.yaml` and ask the user to fill it, as step 1 does for specs that came without their var file. Say that from then on only this project may apply, because an apply from the other one would delete what this one adds. `rudder-cli import workspace` cannot help: it imports only resources no project manages, and refuses while a dry run lists removals.
 
 If `source_type` is not `javascript`:
 
@@ -341,9 +297,9 @@ If `source_type` is not `javascript`:
 
 If the app has no package manager, as with a static site of HTML files:
 
-- Say that steps 6 and 7 are written for apps built with npm. Step 6 then adds the SDK with the script snippet from RudderStack's JavaScript SDK documentation instead of a package, and step 7 is skipped, because its recipes start the app with `npm run dev`. Ask before continuing.
+- Say that steps 6 and 7 are written for apps built with npm. Step 6 then adds the SDK with the script snippet from RudderStack's JavaScript SDK documentation instead of a package, with the write key in the page, as the browser instrumentation reference shows for a site without a build. Step 7 is skipped, because its recipes start the app with `npm run dev`. Ask before continuing.
 
-Facts that apply here: **apply-scope**, **source-type**.
+Facts that apply here (`references/facts.md`): **apply-scope**, **source-type**.
 
 Record: `app_kind`, `source_type`, `source_id`, `sender`.
 
@@ -405,7 +361,7 @@ Visible choices, a spec built from what the installed rudder-cli accepts, and no
 8. A key is a secret only when its entry in `fields` says `secret: true`. Its value is the field's `slot`, unchanged; under a list, `<N>` in `slot` and `var` is the item's zero-based index. Never write a value, a default (`{{ .NAME | value }}`) or a variable name of your own. Add an optional secret the user wants the same way. Add each `var` the spec references to `rudder/secrets.vars.yaml` as `NAME:` with no value (fact unfilled-secret), and keep the lines already there.
 9. Check the slots: `rudder-cli validate -l rudder 2>&1 | grep -E '^warning\[destination/secret-reference(-unique)?\]|^Found |configuration is valid'`, with the variables under `enable` set when `verified` is false. It needs no `--var-file`, and its lines name keys and variables, never values. Without the var file, the `Found` line also counts each variable as undefined, which is expected here. If it prints neither a `Found` line nor `Project configuration is valid`, validate did not run; fix that first. For each warning, write that key's `slot` from the docs output, with its own `var` in the var file. Then ask the user to fill every line of the var file in their editor and say continue; the destination reference says how to write a JSON value, a `'` or a key file, and which values cannot go in the file. Do not read the file back.
 
-Facts that apply here: **cli-features**, **connection-mode**, **destination-disabled**, **unfilled-secret**.
+Facts that apply here (`references/facts.md`): **cli-features**, **connection-mode**, **destination-disabled**, **unfilled-secret**.
 
 Done when:
 
@@ -422,15 +378,15 @@ Needs: `source_type`, `source_id`, `destination_id`.
 
 1. Write `rudder/sources/<source_id>.yaml` with `type` set to `source_type`, and `rudder/connections.yaml`, from the destination reference.
 2. Validate, printing only the error lines and the exit status: `{ rudder-cli validate -l rudder --var-file rudder/secrets.vars.yaml 2>&1; echo "exit $?"; } | grep -E '^(error|warning)\[|^ *-->|^(Found|Error:|exit) '`, without `--var-file` when the file does not exist. Validate masks the values of secret keys in the source lines it prints under each error (fact cli-features); show only these lines anyway, because the fix needs nothing else. For an error on a destination key, read the key's field in step 4's docs output, running the command again if you no longer have it; a custom validator named in its `checkedBy` says what it needs only in the error. When a secret key is missing, or validate warns `destination/secret-reference` or `destination/secret-reference-unique`, write the key's `slot`, add its `var` to the var file as `NAME:` and ask the user to fill it; never ask for the value in chat. Validate exits 0 with either warning, so read its lines, not only its exit status.
-3. Dry run: `rudder-cli apply -l rudder --dry-run` with the same `--var-file`. Show the plan as N to create, N to change, N to delete.
-4. Apply: `rudder-cli apply -l rudder --confirm=false` with the same `--var-file`. Expect exit 0 and the created resources listed.
+3. Dry run: `rudder-cli apply -l rudder --dry-run` with the same `--var-file`, its output filtered (rule). Show the plan as N to create, N to change, N to delete.
+4. Apply: `rudder-cli apply -l rudder --confirm=false` with the same `--var-file`, its output filtered. Expect exit 0 and the created resources listed.
 5. Commit `rudder/` by its path alone, `git add rudder`, with the message "Add RudderStack event delivery as specs". Step 1 already committed `.gitignore`, and `.mcp.json` stays out. Tell the user that step 9 gives the undo.
 
 **Loop.** Fix the reported file and line, then validate again until validate exits 0 with no errors and no `destination/secret-reference` or `destination/secret-reference-unique` warning, at most 5 attempts. When the bound is hit, show the remaining errors and their files to the user and stop.
 
 **Gate.** Show the dry-run plan and ask "Apply these changes to <workspace_name>?" Do not continue without an explicit yes.
 
-Facts that apply here: **cli-features**, **silent-decline**, **apply-scope**, **unfilled-secret**.
+Facts that apply here (`references/facts.md`): **cli-features**, **silent-decline**, **apply-scope**, **unfilled-secret**.
 
 Done when:
 
@@ -467,18 +423,19 @@ If `sender` is `curl`:
 
 If `source_type` is `android_kotlin`:
 
-- Follow the Android instrumentation reference instead of the browser one, in Kotlin or in Java as the app is written. Check the build against the requirements it lists first, and ask before upgrading anything; on a no, `sender` becomes `curl`, as the reference says. It adds `com.rudderstack.sdk.kotlin:android` to the app module, has Gradle read the write key and URLs from `.env.local` at the Gradle root into `BuildConfig`, loads the SDK once from the `Application` class, and allows plain HTTP to `10.0.2.2` in the debug build only. Add `RUDDERSTACK_WRITE_KEY` and `RUDDERSTACK_DATA_PLANE_URL` to the `.env.local` there. Build with `./gradlew :<app module>:assembleDebug` instead of the type check; the module is `:app` in most apps and `:composeApp` in a Kotlin Multiplatform app. If Gradle cannot build here, for want of a JDK or the Android SDK, ask the user to build in Android Studio and say continue.
+- Follow the Android instrumentation reference instead of the browser one, in Kotlin or in Java as the app is written, from its requirements to its check, which replaces the type check. On a declined upgrade, `sender` becomes `curl`, as the reference says.
 
 If `source_type` is `ios_swift`:
 
-- Follow the iOS instrumentation reference instead of the browser one, in Swift or in Objective-C as the app is written. The SDK needs iOS 15; if the app targets an older version, ask before raising it, and on a no `sender` becomes `curl`, as the reference says. The reference adds the `rudder-sdk-swift` package, keeps the values in `RudderStack.local.xcconfig`, passes them to the app through `Info.plist`, and loads the SDK once at launch. That file is not `.env.local`, so check it first with `git check-ignore -q RudderStack.local.xcconfig`. If git does not ignore it, add it to `.gitignore` and commit that line alone, as step 1 does. Add the write key and data plane URL to `.env.local` as well, as `RUDDERSTACK_WRITE_KEY` and `RUDDERSTACK_DATA_PLANE_URL`, because step 8's probe reads them there. The reference never edits `project.pbxproj`; ask the user for the Xcode changes it lists, in one message. Build with `xcodebuild` where Xcode is installed; otherwise ask the user to build in Xcode and say continue.
+- Follow the iOS instrumentation reference instead of the browser one, in Swift or in Objective-C as the app is written, from its dependency check to its check, which replaces the type check. On a declined upgrade, `sender` becomes `curl`, as the reference says. It keeps the key in `RudderStack.local.xcconfig` as well as `.env.local`. Check that file first with `git check-ignore -q RudderStack.local.xcconfig`; if git does not ignore it, add it to `.gitignore` and commit that line alone, as step 1 does. Never edit `project.pbxproj`; ask the user for the Xcode changes the reference lists, in one message.
 
 If `source_type` is `flutter`, `react_native` or `unity`:
 
-- This skill has no reference for them yet. Follow the SDK's README and keep the shape of the Android and iOS references: one module that loads the SDK once, one typed function per agreed event, the write key in a git-ignored file the build reads, and a development-time error when it is missing. Flutter: `rudder_sdk_flutter` 3.4.0, then `RudderController.instance.initialize(writeKey, config: builder.build())` with a `RudderConfigBuilder` that sets `withDataPlaneUrl`, and `withControlPlaneUrl` for step 7. React Native: `@rudderstack/rudder-sdk-react-native` 3.2.1, then `await rudderClient.setup(writeKey, { dataPlaneUrl, controlPlaneUrl })`, and `pod install` in `ios/`. In an Expo app (`expo` in `dependencies`), install it with `npx expo install @rudderstack/rudder-sdk-react-native` instead. Its native module is missing from Expo Go, where the SDK throws when it loads, so run a development build, `npx expo run:android` or `npx expo run:ios`, which also runs `pod install`. That command generates `android/` or `ios/` when the app has none; ask before running it. Unity: RudderStack's Unity SDK documentation. Add the write key and data plane URL to `.env.local` too, as `RUDDERSTACK_WRITE_KEY` and `RUDDERSTACK_DATA_PLANE_URL`, for step 8's probe.
+- Follow the Flutter, React Native and Unity instrumentation reference instead of the browser one. It points to each SDK's own documentation, in the shape of the Android and iOS references.
 
 If step 2 found a RudderStack SDK in the app, and the user chose to send to the new source:
 
+- Before writing this source's write key or data plane URL into a git-ignored file, such as `.env.local` or `RudderStack.local.xcconfig`, save that file in the git directory, which git never commits. Run this from `work_dir`, with `<file>` the file's path from there: `B=$(git rev-parse --git-path rudderstack-backup); f='<file>'; mkdir -p "$B/files/$(dirname "$f")"; [ -e "$B/files/$f" ] || grep -qxF "$f" "$B/created" 2>/dev/null || if [ -e "$f" ]; then cp "$f" "$B/files/$f"; else echo "$f" >> "$B/created"; fi`. It copies a file that exists, and writes the path of one that does not exist yet to `created`, so the undo deletes it. It never replaces what an earlier run saved, so a run in a later session keeps the original. Step 9's undo reads this folder, so it works in a new session too.
 - If the user kept the SDK the app has, a legacy one included, install nothing. Find where the app sets it up, point it at this source's write key and data plane URL, kept the way the reference for its platform keeps them, and add the typed functions with that SDK's own track call. Build with the platform's command (Gradle or `xcodebuild` for a native app), not npm. If the user chose to move from a legacy SDK, follow the Android or iOS reference, including its part on the legacy SDK, which asks before removing it.
 
 Done when:
@@ -499,9 +456,9 @@ Needs: `events`, `sender`.
 1. Follow the local verification reference. Use its two-call recipe where background processes outlive a shell call (Claude Code), its one-call recipe where they do not (Codex), and two calls when you are not sure (fact background-processes). Run its commands as written, with the values earlier calls printed. Run `references/check-events.jq` unchanged and write no jq of your own (fact local-no-types).
 2. Start the listener with the reference's start command; it sets the two variables `rudder-cli sources` needs (fact sources-listen-gate). Exit 4 means this rudder-cli is older than 0.29.0 and has no `sources listen`. Tell the user what the reference says and skip to step 8.
 3. Start the app pointed at the listener's URL (data plane and config URL both), as the reference shows.
-4. Before each pass, run the reference's mark command and keep FROM, LOGFROM and CUR. If it says the listener is not running, this agent stops background processes. Use the one-call recipe.
+4. Before each pass, run the reference's mark command and keep FROM, LOGFROM and CUR. If it says the listener is not running, this agent stops background processes. Use the one-call recipe, or for a mobile app skip this step, as its branch says.
 5. Ask the user to open the app, go through the flows that fire every event in `rudder/plan.events.json`, and say done. With the one-call recipe, say this before the call, because the user cannot answer during it.
-6. Run the check command. Exit 0 is a pass. Exit 1 is a failed check: show the table, then the failed requests and the diagnosis printed under it. Exit 2 (the checker could not run), exit 3 (the listener stopped) and exit 5 (the app did not start) are not a failed check. Fix the cause and run the pass again without counting it as an attempt.
+6. Run the check command. Exit 0 is a pass. Exit 1 is a failed check: show the table, then the failed requests and the diagnosis printed under it. Exit 2 (the checker could not run), exit 3 (the listener stopped) and exit 5 (the app did not start) are not a failed check. Fix the cause and run the pass again. Such a rerun is not an attempt, but after 3 of them, stop and report what the last one printed.
 7. Stop the listener and the app when the check passes.
 
 If `sender` is `curl`:
@@ -514,15 +471,18 @@ If the app has no package manager (step 2's branch), or `source_type` is `unity`
 
 If `source_type` is a mobile type (`android_kotlin`, `ios_swift`, `flutter`, `react_native`, `android` or `ios`):
 
+- If this agent stops background processes (Codex, fact background-processes), skip this step and say why. The mobile recipe needs the listener to outlive a shell call, and has no one-call form.
 - Ask the user: "Can you run the app on an Android emulator or the iOS Simulator on this machine now?"
     - Yes
     - No, skip the local check
 - On no, skip this step. Tell the user that step 7 checks the events from an emulator or simulator on this machine before anything reaches RudderStack, and that step 8 still checks delivery at the destination.
 - On yes, follow the reference's section for mobile apps instead of items 2 and 3. It uses the two-call recipe with a fixed port, installs or launches the debug build with the listener's address (`10.0.2.2` from an Android emulator, `127.0.0.1` from the iOS Simulator), and asks the user to wait 15 seconds after the last action, because the SDK sends in batches (facts emulator-loopback, mobile-config-url, mobile-batches). Tell the user to open the installed app on the emulator or simulator and not to press Run in Android Studio or Xcode, which builds or launches it again with the real values, so its events go to the live data plane.
 
-**Loop.** Fix the code, ask the user to repeat the flow, and run a new pass from a new mark until the check exits 0, so every planned event arrived with the agreed property types, at most 3 attempts. When the bound is hit, show the last table of expected against received names and types, and stop.
+**Loop.** Fix the code, commit the fix by explicit paths as "Fix <app>'s RudderStack events" and add it to `fix_commits`, ask the user to repeat the flow, and run a new pass from a new mark until the check exits 0, so every planned event arrived with the agreed property types, at most 3 attempts. When the bound is hit, show the last table of expected against received names and types, and stop.
 
-Facts that apply here: **local-no-types**, **sources-listen-gate**, **background-processes**, **emulator-loopback**, **mobile-config-url**, **mobile-batches**.
+Facts that apply here (`references/facts.md`): **local-no-types**, **sources-listen-gate**, **background-processes**, **emulator-loopback**, **mobile-config-url**, **mobile-batches**.
+
+Record: `fix_commits`.
 
 Not in scope yet, mention as a next step if relevant:
 
@@ -536,15 +496,15 @@ Local is clean. Now the real pipeline, measured from a known start time.
 Needs: `write_key`, `data_plane_url`, `remote_destination_id`, `events`, `sender`.
 
 1. Record `started_at` as the current UTC time rounded down to the minute: `date -u +%Y-%m-%dT%H:%M:00Z` (fact metrics-minute-buckets).
-2. Probe whether the write key is accepted yet with the live verification reference's probe, one call that retries for up to 5 minutes, without sending an event.
+2. Probe whether the write key is accepted yet with the live verification reference's probe, one call that retries for up to 5 minutes, without sending an event. Act on its exit status as the reference says; on any exit but 0, stop before anyone sends an event.
 3. Start the app against the real data plane (`.env.local`) and ask the user to go through the flow once, then say done.
 4. Call MCP `get_destination_event_metrics` with the destination id and `start_time: started_at`. Delivered means each event the user sent from `rudder/plan.events.json` shows `deliveredCount` of at least 1 and `failedCount` 0.
 5. If anything failed, call `get_destinations_errors` for the destination and report the error.
-6. If the destination is a webhook the user can read, check the payload there, names, values and types against `rudder/plan.events.json`.
+6. If the destination is a webhook the user can read, check the payload there, names, values and types against `rudder/plan.events.json`. If the app sent a name or a type that differs, fix the code, commit the fix as step 7's loop does and add it to `fix_commits`, then repeat items 3 to 6, at most 3 times.
 
 If `sender` is `curl`:
 
-- Instead of item 3, once the write-key probe stops answering 401, send the first event in `rudder/plan.events.json` with the live verification reference's send command, which builds the body from the plan with sample values of the agreed types (fact http-api-any-source). Send it once and expect HTTP 200. Items 4 to 6 then check that one event.
+- Instead of item 3, once the write-key probe exits 0, send the first event in `rudder/plan.events.json` with the live verification reference's send command, which builds the body from the plan with sample values of the agreed types (fact http-api-any-source). Send it once and expect HTTP 200. Items 4 to 6 then check that one event.
 
 If `source_type` is a mobile type or `unity`:
 
@@ -552,9 +512,9 @@ If `source_type` is a mobile type or `unity`:
 
 **Loop.** Probe the write key every 20 seconds until it is accepted, then poll delivery metrics every 30 seconds until each agreed event shows as delivered since started_at or has arrived at a destination the user can read, give up after 5 minutes for the write key and 10 minutes for delivery. When the bound is hit, report the last probe status and the last metrics seen, and suggest get_destinations_errors and the live events page.
 
-Facts that apply here: **write-key-delay**, **metrics-no-timestamps**, **metrics-minute-buckets**, **metrics-lag**, **mcp-hashes-values**, **http-api-any-source**, **mobile-batches**.
+Facts that apply here (`references/facts.md`): **write-key-delay**, **metrics-no-timestamps**, **metrics-minute-buckets**, **metrics-lag**, **mcp-hashes-values**, **http-api-any-source**, **mobile-batches**.
 
-Record: `started_at`.
+Record: `started_at`, `fix_commits`.
 
 ## 9. Wrap up
 
@@ -563,16 +523,16 @@ What changed, how to undo it, what to try next.
 Needs: `sender`.
 
 1. Summarise in a table: workspace resources (as specs in git), code changes (files and events), evidence (delivered and failed counts since started_at), the commits, and the undo.
-2. Undo is `git revert <code_commit> <specs_commit>`, newest first, without `code_commit` where there is none. Git removes `rudder/` when no untracked file such as the var file is left in it, so run `mkdir -p rudder`. Then run `rudder-cli apply -l rudder --dry-run`, with `--var-file rudder/secrets.vars.yaml` if the file exists, show it, and on a yes apply with `--confirm=false`. Say that it removes what this project created, and that apply's scope is the whole workspace (fact apply-scope). Never revert the baseline commit or the commits that only add `.gitignore` lines (step 1, and step 6 for an iOS app).
+2. Undo is one `git revert` of this workflow's commits from step 5 on, newest first: each of `fix_commits` from the last, then `code_commit`, then `specs_commit`, leaving out the ones that do not exist. Then put back the key files step 6 saved, so the app sends to its old source again. Run this from `work_dir`; it does nothing when step 6 saved none: `B=$(git rev-parse --git-path rudderstack-backup); [ ! -d "$B/files" ] || (cd "$B/files" && find . -type f) | while IFS= read -r f; do mv "$B/files/$f" "$f"; done; [ ! -f "$B/created" ] || { while IFS= read -r f; do rm -f "$f"; done < "$B/created"; rm "$B/created"; }`. It moves each saved file back and deletes the files step 6 created. Git removes `rudder/` when no untracked file such as the var file is left in it, so run `mkdir -p rudder`. Then run `rudder-cli apply -l rudder --dry-run`, with `--var-file rudder/secrets.vars.yaml` if the file exists and its output filtered (rule), show it, and on a yes apply with `--confirm=false`, filtered the same way. Say that it removes what this project created, and that apply's scope is the whole workspace (fact apply-scope). Never revert the baseline commit or the commits that only add `.gitignore` lines (step 1, and step 6 for an iOS app).
 3. If the repository has a remote, offer to push a branch and open a pull request.
 
 If `sender` is `curl`:
 
 - Say that the pipeline is real and the event came from curl, not from an app.
-- If `work_dir` is not the app, as when step 1 continued in an empty folder or in `./rudderstack-first-event`, the app can send events later once `rudder/` is in its repository. Copy it there, for example with `cp -R rudder <path to the app>/`, and make no commit there yourself. The app may not ignore `rudder/secrets.vars.yaml` yet; step 1 there git-ignores it before its first commit. If `rudder/` travels through git instead, the var file stays behind, because git ignores it.
+- If `work_dir` is not the app, as when step 1 continued in an empty folder or in `./rudderstack-first-event`, the app can send events later once `rudder/` is in its repository. Copy it there without the filled var file, which the app's repository may not ignore yet: `tar -cf - --exclude='*.vars.yaml' rudder | tar -xf - -C '<path to the app>'`. Make no commit there yourself. Step 1 there writes the var file again, with empty lines for the user to fill.
 - Then the user starts the agent in the app and runs the same command. Step 1 finds the specs (`resume`), works out the app's source type and offers to change the source if it differs. Starting there with an empty `rudder/` would stop at step 2, because these resources are CLI-managed now (fact apply-scope).
 
-Facts that apply here: **apply-scope**.
+Facts that apply here (`references/facts.md`): **apply-scope**.
 
 Not in scope yet, mention as a next step if relevant:
 
@@ -588,11 +548,14 @@ Not in scope yet, mention as a next step if relevant:
 
 ## References
 
+- `references/facts.md`: the measured facts the steps cite
 - `references/destinations.md`: source and connection specs, webhook endpoints and the var file
 - `references/instrument-javascript.md`: browser instrumentation
 - `references/instrument-android.md`: Android instrumentation, Kotlin SDK
 - `references/instrument-ios.md`: iOS instrumentation, Swift SDK
+- `references/instrument-other-sdks.md`: Flutter, React Native and Unity instrumentation
 - `references/verify-local.md`: local verification
 - `references/verify-live.md`: live verification
 - `references/check-events.jq`: the step 7 checker, run unchanged
 - `references/plan-table.jq`: the step 3 plan table, run unchanged
+- `references/found-types.sh`: the step 2 probe, run unchanged
