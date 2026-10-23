@@ -284,6 +284,7 @@ the debug file, add `xmlns:tools="http://schemas.android.com/tools"` to the debu
 ## Check
 
 - `./gradlew :app:assembleDebug` passes, run from the Gradle root, with the application module's name in place of
-  `app`. The first run downloads Gradle and the dependencies.
+  `app`. The first run downloads Gradle and the dependencies. If Gradle cannot build here, for want of a JDK or the
+  Android SDK, ask the user to build in Android Studio and say continue.
 - `git status` shows `.env.local` untracked and ignored.
 - Commit the Gradle files, the version catalog, the manifests, `app/src/debug/` and the new sources.
