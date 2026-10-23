@@ -105,7 +105,7 @@ See `references/evolution-patterns.md` for detailed patterns including:
 - Adding custom types to existing properties
 - Multi-workspace management (dev/staging/production)
 
-The examples there end with `rudder-cli apply -l ./`, which waits on a confirmation prompt. An agent shows the user the `rudder-cli apply --dry-run -l ./` output first, then runs `rudder-cli apply --confirm=false -l ./`. Without `--confirm=false`, a non-interactive run auto-declines the prompt and applies nothing.
+The examples there end with `rudder-cli apply -l ./`, which waits on a confirmation prompt. An agent shows the user the `rudder-cli apply --dry-run -l ./` output first and waits for an explicit yes. Only then does it run `rudder-cli apply --confirm=false -l ./`, which applies with no prompt. Without `--confirm=false`, a non-interactive run auto-declines the prompt and applies nothing.
 
 The CLI applies to the workspace of its token, not to the workspace a directory was imported from. The dry run names that workspace only from rudder-cli 0.28.0, on a first line `Workspace: <name> (<id>)`. In the multi-workspace examples, run `rudder-cli workspace info --json` before each dry run and check that `workspaceID` is that directory's workspace. If it is not, stop. Changing the CLI's workspace means restarting the agent: the user exports that workspace's token as `RUDDERSTACK_ACCESS_TOKEN` and starts the agent again from that shell.
 
@@ -130,7 +130,7 @@ rudder-cli apply --dry-run -l ./
 # "Updated" means local differs from workspace
 # Decide: use local (apply) or use workspace (re-import that file)
 
-# 3. Apply your version, after the user has seen the dry run
+# 3. Apply your version, only after the user says yes to the dry run
 rudder-cli apply --confirm=false -l ./
 ```
 
@@ -173,7 +173,7 @@ If you import, delete some files, then apply:
 
 ```bash
 # The dry run lists the deleted files' resources under "Removed resources:".
-# Show it to the user first.
+# Show it to the user and wait for an explicit yes.
 rudder-cli apply --dry-run -l ./
 
 # This will DELETE those resources from the workspace!
@@ -203,7 +203,7 @@ rudder-cli validate -l ./
 # Preview changes
 rudder-cli apply --dry-run -l ./
 
-# Apply changes, after the user has seen the dry run
+# Apply changes, only after the user says yes to the dry run
 rudder-cli apply --confirm=false -l ./
 ```
 

@@ -19,10 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that the variable wins over the token saved by `auth login`.
 - **`rudder-cli` / `rudder-cli-workflow`, `rudder-transformations`,
   `rudder-import-and-evolve`; `rudder-mcp` / `rudder-mcp-workflow`.** Apply
-  commands an agent runs after a reviewed dry-run now carry `--confirm=false`.
-  The interactive iteration loop in rudder-cli-workflow is labelled as being for
-  a person at a terminal. rudder-import-and-evolve says its reference examples
-  need the same flag when an agent runs them. In the multi-workspace flows,
+  commands an agent runs now carry `--confirm=false`. That flag applies with
+  no prompt, and the rudder-cli skills' `allowed-tools` pre-approve
+  `rudder-cli`, so each of these applies says the agent first shows the user
+  the dry run and waits for an explicit yes. The interactive iteration loop in
+  rudder-cli-workflow is labelled as being for a person at a terminal.
+  rudder-import-and-evolve says its reference examples need the same flag and
+  the same yes when an agent runs them. In the multi-workspace flows,
   rudder-mcp-workflow's Dev and Prod pattern and the Promote Changes example in
   rudder-import-and-evolve, an agent checks that
   `rudder-cli workspace info --json` shows the target workspace ID before each

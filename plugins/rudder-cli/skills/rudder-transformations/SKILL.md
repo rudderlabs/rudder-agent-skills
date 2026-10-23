@@ -59,7 +59,7 @@ digraph transformations_workflow {
 2. **Validate.** `rudder-cli validate -l ./` catches YAML schema errors, missing files, camelCase `import_name` violations.
 3. **Test locally.** `rudder-cli transformations test --all -l ./` runs each transformation against its `tests/input/*.json` fixtures and diffs against `tests/output/*.json`. Use `--modified` for faster iteration or pass a specific transformation id.
 4. **Dry run.** `rudder-cli apply --dry-run -l ./` shows the diff that would be applied. Check for unexpected deletions.
-5. **Apply.** `rudder-cli apply --confirm=false -l ./` publishes libraries and transformations atomically (correct order handled by the CLI). Without `--confirm=false`, a non-interactive run (agent, CI) auto-declines the confirmation prompt and applies nothing.
+5. **Apply.** `rudder-cli apply --confirm=false -l ./` publishes libraries and transformations atomically (correct order handled by the CLI). It applies with no prompt, so an agent runs it only after showing the user the dry run and getting an explicit yes. Without `--confirm=false`, a non-interactive run (agent, CI) auto-declines the confirmation prompt and applies nothing.
 
 For the broader validate → apply cycle that applies to all CLI-managed resources, see the `rudder-cli-workflow` skill. This skill specializes it with the local-test step.
 
@@ -233,7 +233,7 @@ When specs use `{{ .NAME }}` references, pass the same `--var-file` flags to `tr
 
 4. **Dry-run:** `rudder-cli apply --dry-run -l ./`
 
-5. **Apply:** `rudder-cli apply --confirm=false -l ./`
+5. **Apply:** `rudder-cli apply --confirm=false -l ./`, only after the user says yes to the dry run
 
 **See `rudder-cli-workflow` skill for detailed iteration workflow.**
 

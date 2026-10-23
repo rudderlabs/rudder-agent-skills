@@ -91,8 +91,8 @@ After instrumenting events (via CLI, Terraform, or code), verify they reach dest
 
 ```
 1. APPLY TRACKING PLAN
-   └── e.g. rudder-cli apply --dry-run -l ./, review it,
-       then rudder-cli apply --confirm=false -l ./
+   └── e.g. rudder-cli apply --dry-run -l ./, show it to the user,
+       and on their yes rudder-cli apply --confirm=false -l ./
 
 2. TRIGGER EVENTS
    └── Run your app, trigger the instrumented events
@@ -141,8 +141,8 @@ Workflow:
 
 2. Apply changes to Dev
    └── rudder-cli workspace info --json must show the Dev workspaceID
-   └── e.g. rudder-cli apply --dry-run -l ./, review it,
-       then rudder-cli apply --confirm=false -l ./
+   └── e.g. rudder-cli apply --dry-run -l ./, show it to the user,
+       and on their yes rudder-cli apply --confirm=false -l ./
 
 3. Verify events end-to-end in Dev
    └── Live events + warehouse check via MCP

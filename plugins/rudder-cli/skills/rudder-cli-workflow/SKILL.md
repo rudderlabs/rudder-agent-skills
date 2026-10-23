@@ -297,7 +297,7 @@ rudder-cli validate -l ./
 rudder-cli apply --dry-run -l ./
 # Should show: New resources: - transformation-library:my-lib
 
-# 4. Apply (after the dry-run is reviewed)
+# 4. Apply, after the user says yes to the dry run
 rudder-cli apply --confirm=false -l ./
 ```
 
@@ -313,7 +313,7 @@ rudder-cli apply --dry-run -l ./
 # Should show: Updated resources: - transformation:my-transform
 # Check the diff is what you expect
 
-# 4. Apply (after the dry-run is reviewed)
+# 4. Apply, after the user says yes to the dry run
 rudder-cli apply --confirm=false -l ./
 ```
 
