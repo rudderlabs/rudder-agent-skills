@@ -61,6 +61,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `usesCleartextTraffic` is on. An Expo app gets a development build instead of Expo Go, GA4 on a
   mobile source uses its Firebase app stream, and an app the user will not upgrade, or cannot run on
   any emulator, simulator or device, sends its first event with curl.
+  After review, steps 7 and 8 commit each fix they make, and the undo reverts those commits too, so
+  `git revert` no longer stops on a fix it left out. When step 6 points an app's existing
+  RudderStack SDK at the new source, it first saves each git-ignored file it writes the key to,
+  under the file's own path in the git directory, keeps the first copy, and notes the files it
+  creates. The undo reads that folder, in the same session or a later one, puts the files back and
+  deletes the ones step 6 created. Every validate, dry run and apply runs through a filter that
+  drops the spec lines validate prints, which show secret values. Step 8's probe reads only its two
+  values from `.env.local`, as dotenv reads them, instead of running the file as shell, and gives
+  each request 10 seconds. It stops on any status but 400, 2xx and 401 and prints the data plane's
+  answer, so a disabled source (404), a rate limit (429) or a server error is not taken for a wrong
+  data plane URL. Step 2 no longer offers `rudder-cli import workspace` for another project's
+  resources, which it cannot import; it offers to copy that project's specs, with empty lines for
+  their secrets in the var file. Step 9 copies `rudder/` to the app without the var file. A site
+  without a build keeps its write key in the page. A mobile app skips step 7 in an agent that stops
+  background processes, and reruns after a listener or app failure are bounded. When `/mcp` lists
+  the rudder-core plugin's server, step 1 has the user authenticate it instead of adding a second
+  one. The facts, step 2's probe and the Flutter, React Native and Unity notes moved to references,
+  so SKILL.md is 556 lines, not 593.
 
 ### Changed
 

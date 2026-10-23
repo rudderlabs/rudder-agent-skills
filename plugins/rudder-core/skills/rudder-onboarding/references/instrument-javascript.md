@@ -104,6 +104,17 @@ currency's major unit, never a formatted string.
 Call the functions where the moment happens (the click handler, the route change, the success callback),
 with values the code already has. Do not add state just to track it.
 
+## A site without a build
+
+A static site, HTML files with no package manager or bundler, has nothing that reads `.env.local`. Add the script
+snippet from RudderStack's JavaScript SDK documentation to the `<head>` of each page, with the write key and the
+data plane URL in its `load` call, and put the typed functions in one script file that the pages load after it.
+
+A web source's write key is public by design: the SDK needs it in every visitor's browser, whether a bundle or the
+page delivers it. So the page is the one committed file that holds the write key; check every other staged file
+before each commit as usual. Write `.env.local` too, with `RUDDERSTACK_WRITE_KEY` and `RUDDERSTACK_DATA_PLANE_URL`,
+because step 8's probe reads them there.
+
 ## Check
 
 - `npx tsc --noEmit` (or `npm run build`) passes.
