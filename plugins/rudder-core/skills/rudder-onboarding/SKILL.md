@@ -35,7 +35,7 @@ Done means one real event reached the destination the user chose. The app sends 
 - Run every `validate`, `apply` and `apply --dry-run` as `{ <command> 2>&1; echo "exit $?"; } | grep -vE '^ *[0-9]* \|'`. Each prints its warnings and errors with the line of the spec they are about, after secrets are filled in. The filter drops those lines and keeps the plan, the messages and the exit status. Step 5 narrows validate's output further, to its error lines.
 - Secrets go in `rudder/secrets.vars.yaml` (git-ignored) and are referenced in single quotes, `'{{ .NAME }}'`, because the value is pasted in before the YAML is parsed. Never put a secret in a spec, a commit, a command line or the chat.
 - Commit by explicit paths (`git add rudder`, then the files you changed), never `git add -A`, `git add .` or `git commit -a`, so none of the user's own work is swept in. The one exception is step 1's baseline commit of an app that was not in git.
-- Commit after the apply, after the instrumentation and after each fix to it, so each can be undone with `git revert`.
+- Commit after the apply, after the instrumentation and after each fix to it in any step, and add each fix to `fix_commits`, so step 9 can undo each with `git revert`.
 - Ask one question at a time. Offer choices, and accept a free-text answer.
 - `allowed-tools` pre-approves single commands such as `rudder-cli`, `git`, `grep`, `jq` and `curl`. It does not cover the step 1 and step 2 probes, the step 7 recipes and step 8's probe and send, which are multi-line shell scripts, or a mobile app's build tools (`./gradlew`, `adb`, `xcodebuild`, `xcrun`, `pod`, `flutter`), so the user is asked to approve each one. Tell the user before the first.
 - Every retry has a bound. When it is reached, stop and report what you saw.
@@ -56,7 +56,7 @@ Stop and wait for an explicit yes at these gates: step 3 (Goal and plan), step 5
 
 ## Files shipped with this skill
 
-- `references/found-types.sh` (step 2) is a shell probe, and `references/plan-table.jq` (step 3) and `references/check-events.jq` (step 7) are jq programs. Run them unchanged from this skill's folder. Never copy, edit or rewrite them, and write no jq of your own for what they do.
+- `references/found-types.sh` (step 2) is a shell probe, and `references/plan-table.jq` (step 3) and `references/check-events.jq` (step 7) are jq programs. Run them unchanged from `work_dir`, by their path in this skill's folder. Never copy, edit or rewrite them, and write no jq of your own for what they do.
 - Find the skill's folder once and keep its absolute path. In Claude Code it is the base directory shown when this skill loaded. In other agents it is the folder that holds the SKILL.md you are following, where you also read the references.
 - If neither tells you, look for `rudder-onboarding/references/check-events.jq` under the project's `.agents/skills`, `.claude/skills` and `.cursor/skills`, then under `~/.claude/plugins`, `~/.claude/skills`, `~/.agents/skills`, `~/.codex/plugins`, `~/.codex/skills` and `~/.cursor/skills`. Plugin caches keep one copy per version, so if several turn up, use the most recently modified (`ls -t`).
 - Quote the path in commands, because it can contain spaces. If no copy is found, say so. Step 2 then asks the shared question `what-sends` in place of its probe, step 3 shows `rudder/plan.events.json` as it is, and step 7 is skipped.
@@ -127,8 +127,7 @@ Keep these values as you go, and restate them in the wrap-up:
 - `remote_destination_id`: the destination's id in RudderStack, from MCP list_destinations
 - `write_key`: the source's write key. Show only its first 6 characters.
 - `code_commit`: the commit that added the instrumentation
-- `key_backups`: the git-ignored files that held the app's old RudderStack write key, which step 6 copied into the git directory before changing them, each with the path it came from; none for an app without a RudderStack SDK
-- `fix_commits`: the commits that fixed the instrumentation during step 7, if any
+- `fix_commits`: the commits that fixed the instrumentation after `code_commit`, in any step, if any
 - `started_at`: RFC 3339 UTC time, rounded down to the minute, recorded just before the first live send
 
 ## 1. Start
@@ -286,7 +285,7 @@ If the SDK list names a Segment SDK:
 
 If that dry run lists anything under `Removed resources:` other than the old source the user agreed to replace in step 1:
 
-- Stop. Explain that apply would delete them (fact apply-scope). Offer to continue in an empty workspace, or, when the user owns the project that manages them, to copy its spec files into `rudder/` first, so this project holds every CLI-managed resource. Say that from then on only this project may apply, because an apply from the other one would delete what this one adds. `rudder-cli import workspace` cannot help: it imports only resources no project manages, and refuses while a dry run lists removals.
+- Stop. Explain that apply would delete them (fact apply-scope). Offer to continue in an empty workspace, or, when the user owns the project that manages them, to copy its spec files into `rudder/` first, so this project holds every CLI-managed resource. For each secret those specs reference as `'{{ .NAME }}'`, add a `NAME:` line with no value to `rudder/secrets.vars.yaml` and ask the user to fill it, as step 1 does for specs that came without their var file. Say that from then on only this project may apply, because an apply from the other one would delete what this one adds. `rudder-cli import workspace` cannot help: it imports only resources no project manages, and refuses while a dry run lists removals.
 
 If `source_type` is not `javascript`:
 
@@ -431,7 +430,7 @@ If `source_type` is `flutter`, `react_native` or `unity`:
 
 If step 2 found a RudderStack SDK in the app, and the user chose to send to the new source:
 
-- Before changing a git-ignored file that holds the app's current write key or data plane URL, such as `.env.local` or `RudderStack.local.xcconfig`, copy it into the git directory, which git never commits: `mkdir -p "$(git rev-parse --git-path rudderstack-backup)" && cp <file> "$(git rev-parse --git-path rudderstack-backup)/"`. Record each in `key_backups` with the path it came from; step 9's undo puts it back.
+- Before writing this source's write key or data plane URL into a git-ignored file, such as `.env.local` or `RudderStack.local.xcconfig`, save that file in the git directory, which git never commits. Run this from `work_dir`, with `<file>` the file's path from there: `B=$(git rev-parse --git-path rudderstack-backup); f='<file>'; mkdir -p "$B/files/$(dirname "$f")"; [ -e "$B/files/$f" ] || grep -qxF "$f" "$B/created" 2>/dev/null || if [ -e "$f" ]; then cp "$f" "$B/files/$f"; else echo "$f" >> "$B/created"; fi`. It copies a file that exists, and writes the path of one that does not exist yet to `created`, so the undo deletes it. It never replaces what an earlier run saved, so a run in a later session keeps the original. Step 9's undo reads this folder, so it works in a new session too.
 - If the user kept the SDK the app has, a legacy one included, install nothing. Find where the app sets it up, point it at this source's write key and data plane URL, kept the way the reference for its platform keeps them, and add the typed functions with that SDK's own track call. Build with the platform's command (Gradle or `xcodebuild` for a native app), not npm. If the user chose to move from a legacy SDK, follow the Android or iOS reference, including its part on the legacy SDK, which asks before removing it.
 
 Done when:
@@ -441,7 +440,7 @@ Done when:
 - the app type-checks, where it has a tsconfig.json (check: `[ ! -f tsconfig.json ] || npx --no-install tsc --noEmit`)
 - `.env.local` is not tracked (check: `! git ls-files --error-unmatch .env.local 2>/dev/null`)
 
-Record: `remote_source_id`, `remote_destination_id`, `write_key`, `code_commit`, `key_backups`.
+Record: `remote_source_id`, `remote_destination_id`, `write_key`, `code_commit`.
 
 ## 7. Verify locally
 
@@ -496,7 +495,7 @@ Needs: `write_key`, `data_plane_url`, `remote_destination_id`, `events`, `sender
 3. Start the app against the real data plane (`.env.local`) and ask the user to go through the flow once, then say done.
 4. Call MCP `get_destination_event_metrics` with the destination id and `start_time: started_at`. Delivered means each event the user sent from `rudder/plan.events.json` shows `deliveredCount` of at least 1 and `failedCount` 0.
 5. If anything failed, call `get_destinations_errors` for the destination and report the error.
-6. If the destination is a webhook the user can read, check the payload there, names, values and types against `rudder/plan.events.json`.
+6. If the destination is a webhook the user can read, check the payload there, names, values and types against `rudder/plan.events.json`. If the app sent a name or a type that differs, fix the code, commit the fix as step 7's loop does and add it to `fix_commits`, then repeat items 3 to 6, at most 3 times.
 
 If `sender` is `curl`:
 
@@ -510,7 +509,7 @@ If `source_type` is a mobile type or `unity`:
 
 Facts that apply here (`references/facts.md`): **write-key-delay**, **metrics-no-timestamps**, **metrics-minute-buckets**, **metrics-lag**, **mcp-hashes-values**, **http-api-any-source**, **mobile-batches**.
 
-Record: `started_at`.
+Record: `started_at`, `fix_commits`.
 
 ## 9. Wrap up
 
@@ -519,7 +518,7 @@ What changed, how to undo it, what to try next.
 Needs: `sender`.
 
 1. Summarise in a table: workspace resources (as specs in git), code changes (files and events), evidence (delivered and failed counts since started_at), the commits, and the undo.
-2. Undo is one `git revert` of this workflow's commits from step 5 on, newest first: each of `fix_commits` from the last, then `code_commit`, then `specs_commit`, leaving out the ones that do not exist. If `key_backups` lists files, copy each back from `$(git rev-parse --git-path rudderstack-backup)` to where it came from, so the app sends to its old source again. Git removes `rudder/` when no untracked file such as the var file is left in it, so run `mkdir -p rudder`. Then run `rudder-cli apply -l rudder --dry-run`, with `--var-file rudder/secrets.vars.yaml` if the file exists and its output filtered (rule), show it, and on a yes apply with `--confirm=false`, filtered the same way. Say that it removes what this project created, and that apply's scope is the whole workspace (fact apply-scope). Never revert the baseline commit or the commits that only add `.gitignore` lines (step 1, and step 6 for an iOS app).
+2. Undo is one `git revert` of this workflow's commits from step 5 on, newest first: each of `fix_commits` from the last, then `code_commit`, then `specs_commit`, leaving out the ones that do not exist. Then put back the key files step 6 saved, so the app sends to its old source again. Run this from `work_dir`; it does nothing when step 6 saved none: `B=$(git rev-parse --git-path rudderstack-backup); [ ! -d "$B/files" ] || (cd "$B/files" && find . -type f) | while IFS= read -r f; do mv "$B/files/$f" "$f"; done; [ ! -f "$B/created" ] || { while IFS= read -r f; do rm -f "$f"; done < "$B/created"; rm "$B/created"; }`. It moves each saved file back and deletes the files step 6 created. Git removes `rudder/` when no untracked file such as the var file is left in it, so run `mkdir -p rudder`. Then run `rudder-cli apply -l rudder --dry-run`, with `--var-file rudder/secrets.vars.yaml` if the file exists and its output filtered (rule), show it, and on a yes apply with `--confirm=false`, filtered the same way. Say that it removes what this project created, and that apply's scope is the whole workspace (fact apply-scope). Never revert the baseline commit or the commits that only add `.gitignore` lines (step 1, and step 6 for an iOS app).
 3. If the repository has a remote, offer to push a branch and open a pull request.
 
 If `sender` is `curl`:

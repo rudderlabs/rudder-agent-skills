@@ -16,33 +16,41 @@ A new write key is refused for about two minutes after apply. Probe it without s
 batch is authenticated first and then rejected for being empty, so nothing is ingested. This call reads the key
 and the URL from `.env.local`, the `VITE_RUDDERSTACK_` names in a Vite app or the `RUDDERSTACK_` names on the curl
 path and in a mobile app, so neither appears on the command line or in the output. It reads only those lines and
-never runs the file, which is the app's dotenv file, not a shell script. It probes every 20 seconds for up to 5
-minutes; give the call a timeout of 6 minutes.
+never runs the file, which is the app's dotenv file, not a shell script. Like dotenv, it uses the last line that sets
+a name, drops a comment after an unquoted value, and keeps a `#` inside quotes. It probes every 20 seconds for up to
+5 minutes; give the call a timeout of 6 minutes.
 
 ```bash
 f=.env.local
-val() { sed -n "s/^[[:space:]]*\(export[[:space:]]\{1,\}\)\{0,1\}$1[[:space:]]*=[[:space:]]*//p" "$f" | tail -n 1 |
-  sed -e 's/[[:space:]]*$//' -e "s/^'\(.*\)'\$/\1/" -e 's/^"\(.*\)"$/\1/'; }
+val() { sed -n "s/^[[:space:]]*\(export[[:space:]]\{1,\}\)\{0,1\}$1[[:space:]]*[=:][[:space:]]*//p" "$f" | tail -n 1 |
+  sed -e "/^[^'\"]/s/[[:space:]]*#.*//" -e 's/[[:space:]]*$//' -e "s/^'\([^']*\)'.*/\1/" -e 's/^"\([^"]*\)".*/\1/'; }
 key=$(val RUDDERSTACK_WRITE_KEY); [ -n "$key" ] || key=$(val VITE_RUDDERSTACK_WRITE_KEY)
 dp=$(val RUDDERSTACK_DATA_PLANE_URL); [ -n "$dp" ] || dp=$(val VITE_RUDDERSTACK_DATA_PLANE_URL)
 [ -n "$key" ] || { echo "no write key in $f"; exit 2; }
 [ -n "$dp" ] || { echo "no data plane URL in $f"; exit 2; }
+tmp=$(mktemp)
 for i in $(seq 15); do
-  code=$(curl -s -o /dev/null --max-time 10 -w '%{http_code}' -H "Authorization: Basic $(printf '%s:' "$key" | base64)" \
+  code=$(curl -s -o "$tmp" --max-time 10 -w '%{http_code}' -H "Authorization: Basic $(printf '%s:' "$key" | base64)" \
     -H 'Content-Type: application/json' -d '{"batch":[]}' "${dp%/}/v1/batch")
   [ "$code" = 401 ] || break
   sleep 20
 done
-echo "write key probe: $code"
-case $code in 400|2??) exit 0 ;; 401) exit 1 ;; *) echo "check the data plane URL: ${dp%/}"; exit 3 ;; esac
+echo "write key probe: $code $(head -n 1 "$tmp" | cut -c 1-200)"
+rm -f "$tmp"
+case $code in 400|2??) exit 0 ;; 401) exit 1 ;; *) echo "data plane URL: ${dp%/}"; exit 3 ;; esac
 ```
 
 - Exit 0, status `400` (or a `2xx`): the key is accepted.
 - Exit 1, status `401`: still not active after 5 minutes. Report it and stop.
-- Exit 3, any other status: the data plane URL is wrong, or the network does not reach it. `000` means no answer
-  within 10 seconds, as with a mistyped host, a proxy or no network; `404` or a `5xx` means something else
-  answered. Show the URL and the status, ask the user to compare the URL with the one in the RudderStack dashboard,
-  and stop. Do not ask the user to send events.
+- Exit 3, any other status. The probe prints the status and the first line of the answer. Do not ask the user to
+  send events.
+  - `404 source is disabled`: the URL is right and the source is turned off. Ask the user to turn it on in the
+    RudderStack dashboard, then run the probe again.
+  - `429`, or a `5xx` such as `502` or `503`: the data plane answered but did not take the request. Run the probe
+    once more after a minute. If it exits 3 again, treat it as the next case.
+  - Anything else: the data plane URL is wrong, or the network does not reach it. `000` means no answer within 10
+    seconds, as with a mistyped host, a proxy or no network; another `404` means something else answered. Show the
+    URL and the status, ask the user to compare the URL with the one in the RudderStack dashboard, and stop.
 - Exit 2: `.env.local` has no write key or no data plane URL under these names.
 
 When the app is in a subfolder, set `f` to its `.env.local`. In a framework with other names for the two values,
@@ -72,8 +80,8 @@ as in section 2, so neither appears on the command line:
 
 ```bash
 f=.env.local
-val() { sed -n "s/^[[:space:]]*\(export[[:space:]]\{1,\}\)\{0,1\}$1[[:space:]]*=[[:space:]]*//p" "$f" | tail -n 1 |
-  sed -e 's/[[:space:]]*$//' -e "s/^'\(.*\)'\$/\1/" -e 's/^"\(.*\)"$/\1/'; }
+val() { sed -n "s/^[[:space:]]*\(export[[:space:]]\{1,\}\)\{0,1\}$1[[:space:]]*[=:][[:space:]]*//p" "$f" | tail -n 1 |
+  sed -e "/^[^'\"]/s/[[:space:]]*#.*//" -e 's/[[:space:]]*$//' -e "s/^'\([^']*\)'.*/\1/" -e 's/^"\([^"]*\)".*/\1/'; }
 key=$(val RUDDERSTACK_WRITE_KEY); dp=$(val RUDDERSTACK_DATA_PLANE_URL)
 [ -n "$key" ] && [ -n "$dp" ] || { echo "no write key or data plane URL in $f"; exit 2; }
 body=$(jq -c 'to_entries[0] | {type: "track", event: .key, anonymousId: "rudderstack-first-event",
