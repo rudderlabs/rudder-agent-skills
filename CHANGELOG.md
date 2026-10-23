@@ -27,6 +27,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`rudder-core` / `rudder-onboarding`** — nine steps from an app with no analytics to one real
+  event delivered to a destination the user picks: start, explore, goal, destination and secrets,
+  plan and apply, instrument, verify locally, verify live, wrap up. Specs live in `rudder/`; the
+  skill carries the measured traps (silent decline without `--confirm=false`, workspace-wide
+  deletes, the write key's two-minute 401 window, MCP metrics without timestamps, hashed live
+  event values). References cover destination specs with secrets as variables, browser
+  instrumentation, and local and live verification.
+  Step 1 looks at the folder before changing anything. Outside an app (an empty folder, the home
+  folder, a folder of several repositories) it recommends starting again in the app, and can
+  instead continue without one, in a new subfolder unless the folder is empty, and send the first
+  planned event with curl. It stops on uncommitted changes, and commits an app that was not in git
+  as it is before changing it, so a `git revert` never deletes the app's files. Every commit names
+  its paths. Step 3 writes the event names and property types to `rudder/plan.events.json`, and
+  steps 6 to 8 read them from there. Step 7 captures events with `rudder-cli sources listen` and
+  checks them against that file with a jq program shipped beside the references, in two shell
+  calls, or in one for agents that stop background processes when a call returns. The destination
+  reference leaves unfilled secrets as `NAME:` with no value, names every secret key of Amplitude
+  and Mixpanel, and lists the 24 verified destination types. Step 4 asks whether a webhook needs
+  an authentication header and, on yes, for its name, `Authorization` by default; the user fills
+  its value, such as `Bearer <token>`, in the var file.
+  Step 1 runs its read-only checks before it changes the folder, and commits the `.gitignore` lines
+  for the var file and `.env.local` on their own, so the undo (revert the instrumentation and specs
+  commits, then apply) never un-ignores a secret. Step 5 shows validate's errors without the source
+  lines, which print secret values. Step 7 needs rudder-cli 0.29.0 or later and is skipped on an
+  older one; its one-call recipe exits 5 when the app cannot start. Step 8 builds the curl event
+  from the plan. While the installer script is unpublished, step 1 falls back to the latest
+  release's binary.
+  Step 2 runs a probe that names the app's source type: Flutter and React Native first, because
+  their apps also hold `android/` and `ios/` folders, then Android (`android_kotlin`), iOS
+  (`ios_swift`, from an Xcode project or a Podfile), web, and only then server languages; a
+  `Package.swift` or a `package.json` alone makes it ask. When it finds several apps it lists them
+  and asks which one sends events; when it finds none it asks "What will send events to
+  RudderStack?", the question step 1 asks outside an app, now defined once. It also lists the
+  RudderStack and Segment SDKs the dependencies name, the legacy Android (Java) and iOS
+  (Objective-C) SDKs included. New Android (Kotlin SDK) and iOS (Swift SDK) references add the
+  dependency, keep the write key out of git, load the SDK once and give each agreed event a typed
+  function, in Kotlin or Java and in Swift or Objective-C. Step 7 checks a mobile app on an Android
+  emulator (`10.0.2.2`) or the iOS Simulator, or is skipped without one, and step 8 runs the app
+  against the real data plane. A Capacitor or Cordova app gets the JavaScript SDK, and a Unity game
+  the Unity SDK. An app that already uses a RudderStack SDK keeps its current source unless the user
+  agrees to move it, and a legacy SDK is replaced only on a yes. The iOS reference never edits
+  `project.pbxproj` and gives the user its Xcode changes in one list. Neither mobile reference turns
+  off plain HTTP an app already allows: iOS gets `NSAllowsLocalNetworking` only without
+  `NSAllowsArbitraryLoads`, and Android's debug network config is skipped when
+  `usesCleartextTraffic` is on. An Expo app gets a development build instead of Expo Go, GA4 on a
+  mobile source uses its Firebase app stream, and an app the user will not upgrade, or cannot run on
+  any emulator, simulator or device, sends its first event with curl.
+  After review, steps 7 and 8 commit each fix they make, and the undo reverts those commits too, so
+  `git revert` no longer stops on a fix it left out. When step 6 points an app's existing
+  RudderStack SDK at the new source, it first saves each git-ignored file it writes the key to,
+  under the file's own path in the git directory, keeps the first copy, and notes the files it
+  creates. The undo reads that folder, in the same session or a later one, puts the files back and
+  deletes the ones step 6 created. Every validate, dry run and apply runs through a filter that
+  drops the spec lines validate prints, which show secret values. Step 8's probe reads only its two
+  values from `.env.local`, as dotenv reads them, instead of running the file as shell, and gives
+  each request 10 seconds. It stops on any status but 400, 2xx and 401 and prints the data plane's
+  answer, so a disabled source (404), a rate limit (429) or a server error is not taken for a wrong
+  data plane URL. Step 2 no longer offers `rudder-cli import workspace` for another project's
+  resources, which it cannot import; it offers to copy that project's specs, with empty lines for
+  their secrets in the var file. Step 9 copies `rudder/` to the app without the var file. A site
+  without a build keeps its write key in the page. A mobile app skips step 7 in an agent that stops
+  background processes, and reruns after a listener or app failure are bounded. When `/mcp` lists
+  the rudder-core plugin's server, step 1 has the user authenticate it instead of adding a second
+  one. The facts, step 2's probe and the Flutter, React Native and Unity notes moved to references,
+  so SKILL.md is 556 lines, not 593.
+
 - **`rudder-ai-events`** — new plugin that onboards an existing app to RudderStack AI events
   (spec v0.3) with the `@rudderstack/ai` (Node.js), `rudderstack-ai` (Python) and `ai-sdk-go` (Go)
   SDKs, pinned to the release that ships spec v0.3.
