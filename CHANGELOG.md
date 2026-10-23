@@ -9,6 +9,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`rudder-cli` / `rudder-cli-setup`, `rudder-cli-workflow`, `rudder-transformations`,
+  `rudder-import-and-evolve`; `rudder-core` / `rudder-instrumentation-debugging`.**
+  Agents now check auth with `rudder-cli workspace info --json` and read the token
+  from `RUDDERSTACK_ACCESS_TOKEN`. Every place that tells an agent to run
+  `rudder-cli auth login` now says that the command prompts on a terminal, that
+  the agent should ask the user to export the variable instead, and that it must
+  never ask the user to paste a token into the chat. rudder-cli-setup documents
+  that the variable wins over the token saved by `auth login`.
+- **`rudder-cli` / `rudder-cli-workflow`, `rudder-transformations`,
+  `rudder-import-and-evolve`; `rudder-mcp` / `rudder-mcp-workflow`.** Apply
+  commands an agent runs now carry `--confirm=false`. That flag applies with
+  no prompt, and the rudder-cli skills' `allowed-tools` pre-approve
+  `rudder-cli`, so each of these applies says the agent first shows the user
+  the dry run and waits for an explicit yes. The interactive iteration loop in
+  rudder-cli-workflow is labelled as being for a person at a terminal.
+  rudder-import-and-evolve says its reference examples need the same flag and
+  the same yes when an agent runs them. In the multi-workspace flows, an agent
+  checks that `rudder-cli workspace info --json` shows the target workspace ID
+  before each dry run, because `apply` writes to the workspace of the CLI's
+  token. Those flows are rudder-mcp-workflow's Dev and Prod pattern and its
+  Instrumentation Verification Workflow, and the Promote Changes example in
+  rudder-import-and-evolve. The expected ID comes from the user or from the
+  import, never from a spec's `metadata.import`, which a copied spec brings
+  from another workspace. Changing that workspace means the user restarts the
+  agent with that workspace's token. The Promote Changes example now switches
+  workspaces between steps.
+- **`rudder-core` / `rudder-code-first-instrumentation`.** The dev and prod
+  applies in Phase 6 first check that `rudder-cli workspace info --json` shows
+  the target workspace, and the prod step switches the CLI to the prod
+  workspace before it applies.
+- **Versions.** `rudder-cli` 0.0.3 to 0.0.4, `rudder-mcp` 0.0.2 to 0.0.3.
+
 - **Breaking (repo layout):** renamed the top-level `skills/` directory back to
   `plugins/` (reverting the earlier `plugins/` → `skills/` rename). Each plugin
   lives at `plugins/<plugin>/skills/<skill>/SKILL.md`; marketplace `source` fields
@@ -20,6 +52,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`rudder-cli` / `rudder-cli-setup`, `rudder-cli-workflow`, `rudder-transformations`.**
+  Replaced `RUDDER_ACCESS_TOKEN` with `RUDDERSTACK_ACCESS_TOKEN`, the variable
+  rudder-cli reads (rudder-iac `cli/internal/config/config.go:86`).
+- **`rudder-cli` / `rudder-cli-workflow`, `rudder-transformations`.** Removed
+  `rudder-cli plan`, which does not exist; `rudder-cli apply --dry-run` is the
+  plan. Removed `rudder-cli export` from the transformations command table for
+  the same reason.
+- **`rudder-cli` / `rudder-cli-workflow`.** Corrected what `apply` deletes. It
+  plans a delete for every CLI-managed resource (one with an external id) in the
+  workspace that the local project does not declare, across all providers.
+  Resources created in the dashboard have no external id and are never touched.
+  The old text said every remote resource of any kind was deleted.
+
 - **`rudder-profiles` / `rudder-profiles-setup`, `rudder-profiles-update`** —
   quoted the `description` frontmatter. An unquoted `: ` (colon-space) made the
   skills.sh CLI's YAML parser read it as a nested mapping and reject the
@@ -27,6 +72,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`rudder-cli` / `rudder-cli-workflow`, `rudder-transformations`.** A
+  "Variables and secrets" section on `--var-file` for `validate` and `apply`:
+  `{{ .NAME }}` references in single quotes, doubling a `'` inside a value, the
+  `.vars.yaml` / `.vars.yml` name rule, later files winning, `RUDDER_<NAME>`
+  environment variables winning over files, the
+  `error[project/var-substitution]` failure, git-ignoring the var file, and that
+  substitution is on by default only from rudder-cli 0.25.0. The var file's
+  values are single-quoted too, since YAML reads `\` as an escape inside double
+  quotes, and a `'` in a value is written as four inside those quotes. The
+  recipe filters the output of `validate`, the dry run and apply, since each
+  shows a diagnostic's source line after substitution, secrets included,
+  whether the value comes from a var file or a `RUDDER_<NAME>` variable.
+  rudder-transformations says `transformations test` needs the same
+  `--var-file` flags.
+- **`rudder-mcp` / `rudder-mcp-setup`, `rudder-mcp-workflow`.** OAuth setup
+  uses Claude Code's native HTTP transport:
+  `claude mcp add --transport http rudderstack https://mcp.rudderstack.com/mcp`,
+  then `/mcp` and Authenticate, with no `npx` or `mcp-remote`. OAuth is the
+  route for people and coding agents alike. The access-token route,
+  `https://mcp.rudderstack.com/bearer-auth-mcp` with `Authorization: Bearer
+  <token>` and `X-Workspace-ID` headers referenced as
+  `${RUDDERSTACK_ACCESS_TOKEN}` in `.mcp.json`, is documented for sessions that
+  cannot open a browser. The skills say that route has no `user_details` or
+  `user_switch_workspace` tool. A "Choose the workspace" section in
+  rudder-mcp-workflow tells an agent on the OAuth route to pass the workspace
+  ID as `workspace_id` when the workspace tools take that argument, and to call
+  `user_switch_workspace` when they do not. The MCP server is replacing
+  `user_switch_workspace` with a `workspace_id` argument on every workspace
+  tool, so the guidance works with both versions. When `/mcp` already lists
+  `plugin:rudder-core:rudderstack`, both skills authenticate that entry
+  instead of adding a second server, and they give that name for
+  `claude mcp login` and `claude mcp logout`. With the access-token route,
+  rudder-mcp-setup says to disable that entry for the folder in `/mcp`, since
+  its different URL would leave both servers listed. rudder-mcp-setup's
+  `allowed-tools` names only the two `claude mcp add` commands its steps run,
+  and its troubleshooting table maps `403` `insufficient_scope` to a wrong
+  `X-Workspace-ID` and `401` `bearer token authorization failed` to a refused
+  token.
 - **`rudder-ai-events`** — new plugin that onboards an existing app to RudderStack AI events
   (spec v0.3) with the `@rudderstack/ai` (Node.js), `rudderstack-ai` (Python) and `ai-sdk-go` (Go)
   SDKs, pinned to the release that ships spec v0.3.
