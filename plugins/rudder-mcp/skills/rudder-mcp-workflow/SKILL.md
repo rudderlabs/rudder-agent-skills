@@ -91,6 +91,8 @@ After instrumenting events (via CLI, Terraform, or code), verify they reach dest
 
 ```
 1. APPLY TRACKING PLAN
+   └── rudder-cli workspace info --json must show the workspaceID
+       of the workspace that steps 3 and 5 query through MCP
    └── e.g. rudder-cli apply --dry-run -l ./, show it to the user,
        and on their yes rudder-cli apply --confirm=false -l ./
 
@@ -152,7 +154,7 @@ Workflow:
        before the dry run
 ```
 
-The MCP target and the CLI target are separate. `rudder-cli apply` writes to the workspace of the CLI's token, whatever workspace the MCP calls use. Its dry run names that workspace only from rudder-cli 0.28.0, on a first line `Workspace: <name> (<id>)`. Before each dry run, compare the `workspaceID` from `rudder-cli workspace info --json` with the target workspace's ID, and stop if they differ. Changing the CLI's workspace means restarting the agent: the user exports that workspace's token as `RUDDERSTACK_ACCESS_TOKEN` and starts the agent again from that shell.
+In this workflow and the Instrumentation Verification Workflow above, the MCP target and the CLI target are separate. `rudder-cli apply` writes to the workspace of the CLI's token, whatever workspace the MCP calls use. Its dry run names that workspace only from rudder-cli 0.28.0, on a first line `Workspace: <name> (<id>)`. Before each dry run, compare the `workspaceID` from `rudder-cli workspace info --json` with the target workspace's ID, and stop if they differ. Changing the CLI's workspace means restarting the agent: the user exports that workspace's token as `RUDDERSTACK_ACCESS_TOKEN` and starts the agent again from that shell.
 
 **Why two workspaces:**
 - **Safe iteration** — test tracking-plan changes without affecting production

@@ -232,7 +232,7 @@ rudder-cli workspace info --json
 
 ### Promote Changes
 
-`apply` writes to the workspace of the CLI's token, whichever directory you run it in. Switch workspaces (above) before each step, and check that `workspaceID` is the directory's workspace before you apply.
+`apply` writes to the workspace of the CLI's token, whichever directory you run it in. Switch workspaces (above) before each step, and check that `workspaceID` is the directory's workspace before you apply. Take that workspace's ID from the user, or from the `workspace info --json` output recorded when the directory was imported. Never take it from `metadata.import` in the specs, because the `cp -r` steps below copy another workspace's `workspace_id` along with the files.
 
 ```bash
 # 1. Develop and test in dev workspace
