@@ -43,7 +43,7 @@ That command writes this `mcpServers` entry, to your Claude Code config by defau
 }
 ```
 
-Then type `/mcp`, choose `rudderstack` and `Authenticate`, or run `claude mcp login rudderstack` from a terminal. `rudder-mcp-setup` has the full walkthrough. A client without HTTP support runs `npx -y mcp-remote https://mcp.rudderstack.com/mcp` as a stdio command instead.
+Then type `/mcp`, choose `rudderstack` and `Authenticate`, or run `claude mcp login rudderstack` from a terminal. For the plugin's entry, the name in `/mcp` and in `claude mcp login` is `plugin:rudder-core:rudderstack`. `rudder-mcp-setup` has the full walkthrough. A client without HTTP support runs `npx -y mcp-remote https://mcp.rudderstack.com/mcp` as a stdio command instead.
 
 For headless sessions that cannot open a browser, `rudder-mcp-setup` shows the access-token route: `https://mcp.rudderstack.com/bearer-auth-mcp` with `Authorization: Bearer ${RUDDERSTACK_ACCESS_TOKEN}` and `X-Workspace-ID` headers in `.mcp.json`. That route pins one workspace and has no `user_details` or `user_switch_workspace` tools.
 
