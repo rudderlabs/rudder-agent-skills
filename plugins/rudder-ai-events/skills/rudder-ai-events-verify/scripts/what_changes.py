@@ -32,11 +32,16 @@ def load(path):
     return [m for m in msgs if m.get("type", "track") == "track" and m.get("event")]
 
 
-def row_key(m):  # browser AI copies are their own rows, and so is a legacy event that uses an AI SDK name
-    if (m.get("properties") or {}).get("source") == "client" and m["event"] in BROWSER:
-        return m["event"] + " (browser)"
+def row_key(m):
+    """Own rows for browser AI copies, legacy events with AI names, and SDK events with customer names."""
+    name = m["event"]
+    if (m.get("properties") or {}).get("source") == "client" and name in BROWSER:
+        return name + " (browser)"
     sdk = ((m.get("context") or {}).get("wrapperLibrary") or {}).get("name") in SDK_NAMES
-    return m["event"] + (" (legacy)" if not sdk and m["event"].startswith(("ai_", "mcp_")) else "")
+    reserved = name.startswith(("ai_", "mcp_"))
+    if sdk and not reserved:  # a declared tool event may share a legacy event's name
+        return name + " (AI SDK)"
+    return name + (" (legacy)" if not sdk and reserved else "")
 
 
 def redact(value, key=""):

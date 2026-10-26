@@ -301,7 +301,8 @@ for iid, c in by_interaction.items():
         problems.append(f"interaction {iid}: server ai_user_action sent, but the plan opts it out (server_feedback)")
     responses = sum(c[(e, side)] for e in ("ai_response_received", "ai_response_received (paused)")
                     for side in ("server", "client"))
-    for event in ("ai_user_action", "ai_interaction_scored"):
+    # events bound to an answer: without one, the final answer was lost or sent under another ID
+    for event in ("ai_user_action", "ai_interaction_scored", "ai_interaction_classified", "ai_llm_response_received"):
         if (c[(event, "server")] or c[(event, "client")]) and not responses:
             gap(f"interaction {iid}: {event} for an answer not in this capture")
     if declared[iid] and not responses:
