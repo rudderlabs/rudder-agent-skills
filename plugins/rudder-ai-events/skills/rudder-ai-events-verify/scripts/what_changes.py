@@ -14,12 +14,17 @@ import re
 import sys
 
 SDK_NAMES = {"@rudderstack/ai", "rudderstack-ai", "ai-sdk-go"}  # context.wrapperLibrary.name, as in check_events.py
+BROWSER = {"ai_user_prompt_created", "ai_response_received", "ai_user_action", "ai_assistant_opened",
+           "ai_assistant_closed", "ai_conversation_started", "ai_conversation_switched", "ai_conversation_renamed",
+           "ai_conversation_deleted"}  # check_events.py CLIENT_COPIES | CLIENT_ONLY
 DROP = {"messageId", "timestamp", "originalTimestamp", "sentAt", "receivedAt", "_metadata"}
-ID_KEY = re.compile(r"(^|_)id$|Id$|^on_behalf_of$|[eE]mail")
+# \Z, not $: $ also matches before a final newline
+ID_KEY = re.compile(r"(^|_)id\Z|Id\Z|^on_behalf_of\Z|[eE]mail")
 PERSONAL = {"traits"}  # identify() traits (email, name, ...) ride along in context
-EMAIL = re.compile(r"[^\s@\"]+@[^\s@\"]+\.\w+")
-VARY = re.compile(r"^(interaction_id|conversation_id|parent_interaction_id|trace_id|anonymousId|anonymous_id|sessionId)$"
-                  r"|_ms$|[Ll]atency|[Dd]uration|At$|[Tt]imestamp")
+EMAIL = re.compile(r'[^ \t\n\r\f\v@"]+@[^ \t\n\r\f\v@"]+\.[A-Za-z0-9_]+')  # ASCII classes, as in the SDKs
+VARY = re.compile(r"^(interaction_id|conversation_id|parent_interaction_id|trace_id|anonymousId|anonymous_id|sessionId)\Z"
+                  # start_time, end_time (ai_otel_span) and OTLP's startTimeUnixNano vary on every run too
+                  r"|_ms\Z|[Ll]atency|[Dd]uration|At\Z|[Tt]imestamp|(^|_)time\Z|Time(UnixNano)?\Z")
 
 
 def load(path):
@@ -27,8 +32,8 @@ def load(path):
     return [m for m in msgs if m.get("type", "track") == "track" and m.get("event")]
 
 
-def row_key(m):  # browser copies are their own rows, and so is a legacy event that uses an AI SDK name
-    if (m.get("properties") or {}).get("source") == "client":
+def row_key(m):  # browser AI copies are their own rows, and so is a legacy event that uses an AI SDK name
+    if (m.get("properties") or {}).get("source") == "client" and m["event"] in BROWSER:
         return m["event"] + " (browser)"
     sdk = ((m.get("context") or {}).get("wrapperLibrary") or {}).get("name") in SDK_NAMES
     return m["event"] + (" (legacy)" if not sdk and m["event"].startswith(("ai_", "mcp_")) else "")
@@ -66,7 +71,7 @@ def fields(message, prefix=""):
     for k, v in message.items():
         if not prefix and k in DROP:  # envelope only: a payload's own messageId or timestamp is compared by type
             continue
-        path = f"{prefix}{k}"
+        path = prefix + k.replace("\\", "\\\\").replace(".", "\\.")  # a literal dot is not nesting
         if isinstance(v, dict) and v and k not in PERSONAL:
             out.update(fields(v, path + "."))
         else:

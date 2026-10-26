@@ -10,6 +10,7 @@ import json
 import sys
 
 from jsonschema import Draft202012Validator
+from jsonschema.exceptions import SchemaError
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT202012
 
@@ -23,7 +24,10 @@ CLIENT_ONLY = {"ai_assistant_opened", "ai_assistant_closed", "ai_conversation_st
                "ai_conversation_switched", "ai_conversation_renamed", "ai_conversation_deleted"}
 MCP_EVENTS = {"mcp_client_seen", "mcp_tool_called", "mcp_elicitation_completed", "mcp_capability_requested",
               "mcp_resource_read", "mcp_prompt_used", "mcp_event_subscription_changed", "mcp_event_delivered"}
-CONTENT = {"prompt_text", "response_text", "intent_summary", "explanation", "call_reason", "capability_detail"}
+KNOWN_EVENTS = SPEC_EVENTS | MCP_EVENTS | CLIENT_ONLY | {"ai_otel_span"}  # ai_otel_span: the SDKs' tracing export
+TURN_EVENTS = {"ai_user_prompt_created", "ai_response_received"}  # a turn's surface comes from these
+# intent_summary is not here: the classifier's own intent_summary option sends it, whatever the capture switch
+CONTENT = {"prompt_text", "response_text", "explanation", "call_reason", "capability_detail"}
 RAW_MCP = {"arguments", "args", "params", "result", "results", "content", "structuredContent", "uri", "request"}
 
 p = argparse.ArgumentParser()
@@ -60,7 +64,6 @@ p.add_argument("--mcp-intent", action="append", default=[], help="allowed reques
 args = p.parse_args()
 
 
-
 def load_schema(path):
     """A schema file with an $id and an object $defs; exits 2 otherwise."""
     try:
@@ -69,6 +72,11 @@ def load_schema(path):
         schema = None
     if not isinstance(schema, dict) or not isinstance(schema.get("$id"), str) or not isinstance(schema.get("$defs"), dict):
         print(f"{path}: cannot read schema (needs a string $id and an object $defs)", file=sys.stderr)
+        sys.exit(2)
+    try:  # an invalid schema (a bad pattern, say) fails here, not halfway through a capture
+        Draft202012Validator.check_schema(schema)
+    except SchemaError as e:
+        print(f"{path}: cannot read schema ({e.message})", file=sys.stderr)
         sys.exit(2)
     return schema
 
@@ -125,19 +133,19 @@ for i, m in enumerate(tracks):
         continue
     names[name] += 1
     is_mcp = name in MCP_EVENTS or w.get("integration") == "mcp"
-    is_declared = not name.startswith(("ai_", "mcp_")) and "tool_status" in props
-    if not (name.startswith(("ai_", "mcp_")) or is_declared):
-        continue
+    # past the legacy branch, an event with a customer name was sent by an AI SDK: a declared tool event
+    is_declared = not name.startswith(("ai_", "mcp_"))
     if not user and not anon and not is_client:
         problems.append(f"{where}: no userId or anonymousId")
+    if not is_declared and not is_client and name not in KNOWN_EVENTS:
+        problems.append(f"{where}: not an AI events spec name (misspelled?)")
     if name in CLIENT_ONLY and not is_client:
         problems.append(f"{where}: client-only event without source: client")
-    if is_client and client:
-        problems += [f"{where} (client schema): {e.message}" for e in validator(client, name).iter_errors(props)] \
-            if name in client["$defs"] else [f"{where}: not a client event name"]
+    if is_client and client:  # client_names come from the client schema's $defs
+        problems += [f"{where} (client schema): {e.message}" for e in validator(client, name).iter_errors(props)]
     definition = ("mcp_declared_tool_event" if is_mcp else "declared_tool_event") if is_declared else name
     if name in SPEC_EVENTS | MCP_EVENTS or is_declared:  # client copies: spec and client schema
-        if is_client and name not in CLIENT_COPIES:
+        if props.get("source") == "client" and name not in CLIENT_COPIES:
             problems.append(f"{where}: source: client on an event the browser never sends")
         problems += [f"{where} (spec): {e.message}" for e in validator(spec, definition).iter_errors(props)]
         if not is_client and w.get("specVersion") != SPEC_VERSION:
@@ -172,12 +180,13 @@ for i, m in enumerate(tracks):
     # feedback endpoints pass the real user or none (never a placeholder), so only a present one is compared
     if args.user_id and not is_client and name == "ai_user_action" and user and user != args.user_id:
         problems.append(f"{where}: userId {user!r}, expected {args.user_id!r}")
-    if system and name == "ai_response_received":
+    if system and name == "ai_response_received" and not is_client:
         if not props.get("task_name"):
             notes.append(f"{where}: system answer without task_name (a call outside any interaction or task?)")
         runs.append(props)
     if is_mcp:
-        leaked = RAW_MCP & props.keys()
+        # declared tool events carry the properties their rule chose; only SDK-owned events are guarded
+        leaked = RAW_MCP & props.keys() if name in MCP_EVENTS else set()
         if leaked:
             problems.append(f"{where}: raw MCP payload keys {sorted(leaked)}")
         if args.mcp_user_id and not user:
@@ -210,7 +219,7 @@ for i, m in enumerate(tracks):
             declared[iid] += 1
         if name == "ai_user_action":
             actions[iid]["client" if is_client else "server"][props.get("action_type")] += 1
-        if not is_client and props.get("surface") and name in CLIENT_COPIES:
+        if not is_client and props.get("surface") and name in TURN_EVENTS:  # not later feedback
             surfaces[iid] = props["surface"]
         if is_client and props.get("surface"):
             client_surfaces.setdefault(iid, props["surface"])

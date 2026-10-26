@@ -149,7 +149,7 @@ Pass only the flags that apply:
 | `--no-ai-events` | the capture with `ai_events_env` off: no AI SDK event and no browser AI event (`source: client`, names from the client schema) may appear (pair it with `--expect-legacy`) |
 | `--absent <event>` | the capture with `legacy_events_env` off: per legacy event; counts only legacy sends (no `context.wrapperLibrary`, not a browser AI copy), so an AI event with the same name does not fail it |
 
-Server events without `context.wrapperLibrary` were not sent by the AI SDK: the checker skips them, counts them as legacy, and fails one that uses an AI event name unless `--expect-legacy` names it. The `run:` lines list each background answer; compare them with the plan's `task_name`, `trigger_source`, `conversation_id_source`, `account_id_source`, `on_behalf_of_source` and `child_tasks`. The `mcp call:` lines list each tool call, marked `joined` when its `interaction_id` matches a captured answer.
+Server events without `context.wrapperLibrary` were not sent by the AI SDK: the checker skips them, counts them as legacy, and fails one that uses an AI event name unless `--expect-legacy` names it. An SDK-sent event with a customer name is checked as a declared tool event (`tool_name` and `tool_status` required); an SDK-sent `ai_*` or `mcp_*` name outside the spec fails as misspelled. The `run:` lines list each background answer; compare them with the plan's `task_name`, `trigger_source`, `conversation_id_source`, `account_id_source`, `on_behalf_of_source` and `child_tasks`. The `mcp call:` lines list each tool call, marked `joined` when its `interaction_id` matches a captured answer.
 
 ## 4. Cost check
 
@@ -183,7 +183,7 @@ python3 scripts/what_changes.py before.jsonl events.jsonl
 | One answer per turn | each `interaction_id` has exactly one server `ai_response_received` and at most one server `ai_user_prompt_created`; with a client surface, at most one client copy of each |
 | Joins | prompt, answer, actions and declared tool events of a turn share `interaction_id` and `conversation_id`; the browser, driven with the server's returned ID, uses it for its copies and actions (`--expect-joins`) |
 | Identity | chat events carry the planned `userId` and, with cookies, `anonymousId` and `context.sessionId`; background events have no `userId` and carry `account_id` / `on_behalf_of` where planned |
-| Content | no `prompt_text`, `response_text`, `feedback_text` or `intent_summary` unless the plan turns capture on |
+| Content | no `prompt_text`, `response_text` or `feedback_text` unless the plan turns capture on; `intent_summary` only when the plan's classifier sets `intent_summary: true` (the checker does not gate it on capture) |
 | Counted once | no call reported by two integrations (one final answer per turn, not one per model call; a `paused` answer may precede the resumed one under the same `interaction_id`); browser copies carry `source: client` and no generation details (model, tokens, cost, `trace_id`) |
 | Client copies | unless the plan opts out: each driven turn has a client prompt and answer copy, and each feedback click both a server and a client `ai_user_action`; a click-through is a client `ai_user_action` with `clicked_through` and no URL |
 | Background | one `ai_response_received` per run and per planned child task, with `trigger: system`, `task_name`, `trigger_source`; children carry the parent's ID as `parent_interaction_id`; a parent with zero tokens is expected when all calls happen in children |
