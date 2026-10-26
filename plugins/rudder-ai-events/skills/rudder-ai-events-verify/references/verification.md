@@ -53,7 +53,7 @@ Drive, per planned surface (skip what the app does not have):
 
 ### A. Stub client
 
-Point `configure()` at a recorder after importing the app (its own `configure()` may run at import; a later call changes only the keys passed), drive the surfaces, then flush. The recorders write each message as it arrives, so a crash still leaves a capture. The model still needs a stand-in: the app's existing test doubles, or the mock model in option B through the provider's base URL variable.
+Make the recorder the app's own RudderStack client before the app wires it: replace the client where the app builds it (its factory, module or dependency injection; in tests, the existing mock or override for that client), so the app's `configure()`, its switches and its legacy calls all go through the recorder. Calling `configure()` with a recorder after the app starts would replace the AI switch's no-op client and miss legacy calls. Drive the surfaces, then flush. The recorders write each message as it arrives, so a crash still leaves a capture. The model still needs a stand-in: the app's existing test doubles, or the mock model in option B through the provider's base URL variable.
 
 - Node.js: `import { recorder } from '<scratch>/scripts/recorder.mjs'`, then `configure({ analytics: recorder('<scratch>/events.jsonl') })`; `await flush()` at the end.
 - Python: run from the scratch directory with the app's environment (`env PYTHONPATH=<repo>:<scratch>/scripts uv --directory <repo> run python <scratch>/harness.py`), then `from recorder import Recorder` and `rudderstack.ai.configure(analytics=Recorder("<scratch>/events.jsonl"))`; `rudderstack.ai.flush()` at the end.
@@ -138,6 +138,7 @@ Pass only the flags that apply:
 | `--feature`, `--surface` | once per planned feature and channel |
 | `--user-id`, `--expect-session` | the requests carried a user and cookies |
 | `--expect-joins` | the browser was driven with the server's IDs: every client/server gap, either way (a prompt or answer on one side only), fails instead of being a note; background runs are exempt |
+| `--client-surface <surface>` | once per surface with a browser client: only its turns need client copies, so a server-only surface (API, mobile backend) in the same capture is not reported for missing ones |
 | `--client-opt-out <copy>` | `client_prompt` or `client_response` listed in the plan's `client_events.opt_out`: that browser copy is not expected, and fails if sent. Pass one per opted-out copy so only approved omissions are exempt |
 | `--failed-interaction <id>` | per app-detected failure driven: its server answer must not be `success` |
 | `--expect-legacy <event>` | per planned legacy event; also names a legacy event that uses an `ai_*` name |
@@ -180,7 +181,7 @@ python3 scripts/what_changes.py before.jsonl events.jsonl
 | Joins | prompt, answer, actions and declared tool events of a turn share `interaction_id` and `conversation_id`; the browser, driven with the server's returned ID, uses it for its copies and actions (`--expect-joins`) |
 | Identity | chat events carry the planned `userId` and, with cookies, `anonymousId` and `context.sessionId`; background events have no `userId` and carry `account_id` / `on_behalf_of` where planned |
 | Content | no `prompt_text`, `response_text`, `feedback_text` or `intent_summary` unless the plan turns capture on |
-| Counted once | no call reported by two integrations (one answer per turn, not one per model call); browser copies carry `source: client` and no generation details (model, tokens, cost, `trace_id`) |
+| Counted once | no call reported by two integrations (one final answer per turn, not one per model call; a `paused` answer may precede the resumed one under the same `interaction_id`); browser copies carry `source: client` and no generation details (model, tokens, cost, `trace_id`) |
 | Client copies | unless the plan opts out: each driven turn has a client prompt and answer copy, and each feedback click both a server and a client `ai_user_action`; a click-through is a client `ai_user_action` with `clicked_through` and no URL |
 | Background | one `ai_response_received` per run and per planned child task, with `trigger: system`, `task_name`, `trigger_source`; children carry the parent's ID as `parent_interaction_id`; a parent with zero tokens is expected when all calls happen in children |
 | App-detected failures | a failure the app catches and returns from reports `error`, `timeout`, `cancelled` or `incomplete` with an `error_type`, never `success` (`--failed-interaction`) |

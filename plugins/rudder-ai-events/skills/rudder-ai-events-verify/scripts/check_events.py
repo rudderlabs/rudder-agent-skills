@@ -42,6 +42,8 @@ p.add_argument("--user-id", help="userId expected on user-triggered server event
 p.add_argument("--expect-session", action="store_true", help="user-triggered server events carry context.sessionId")
 p.add_argument("--expect-joins", action="store_true",
                help="the client side was driven with the server's interaction IDs: every gap between sides fails")
+p.add_argument("--client-surface", action="append", default=[],
+               help="a surface with a browser client (the plan's client surfaces): only its turns need client copies")
 p.add_argument("--client-opt-out", action="append", default=[], choices=["client_prompt", "client_response"],
                help="a browser copy the plan's client_events.opt_out drops: not expected, and fails if sent")
 p.add_argument("--failed-interaction", action="append", default=[],
@@ -69,7 +71,7 @@ conversations = collections.defaultdict(set)
 names = collections.Counter()
 legacy = collections.Counter()
 clients_seen = collections.Counter()
-answers = {}
+answers, surfaces = {}, {}
 runs, tool_calls = [], []
 
 for i, m in enumerate(tracks):
@@ -80,7 +82,10 @@ for i, m in enumerate(tracks):
     w = context.get("wrapperLibrary") or {}
     is_client = props.get("source") == "client"
     where = f"#{i} {name}"
-    if not w and not is_client:  # not sent through the AI SDK: legacy or other analytics
+    # Provenance: only the AI SDKs' wrapperLibrary marks an AI send; another adapter's tag is still legacy,
+    # unless the event uses an AI name (then it falls through and fails the SDK-name check).
+    foreign = w and w.get("name") not in SDK_NAMES and name not in SPEC_EVENTS | MCP_EVENTS | CLIENT_ONLY
+    if (not w or foreign) and not is_client:  # not sent through the AI SDK: legacy or other analytics
         legacy[name] += 1
         if name in CLIENT_ONLY and name not in args.expect_legacy:  # browser-only: a missing source is the bug
             problems.append(f"{where}: client-only event without source: client "
@@ -155,10 +160,14 @@ for i, m in enumerate(tracks):
         continue  # MCP interaction_id joins the calling answer; it is not an answer of its own
     iid = props.get("interaction_id")
     if iid:
-        by_interaction[iid][(name, "client" if is_client else "server")] += 1
+        # a paused run resumes under the same interaction_id: count only final answers
+        paused = name == "ai_response_received" and props.get("response_status") == "paused"
+        by_interaction[iid][(name + (" (paused)" if paused else ""), "client" if is_client else "server")] += 1
         if props.get("conversation_id"):
             conversations[iid].add(props["conversation_id"])
-        if name == "ai_response_received" and not is_client:
+        if not is_client and props.get("surface") and name in CLIENT_COPIES:
+            surfaces[iid] = props["surface"]
+        if name == "ai_response_received" and not is_client and (not paused or iid not in answers):
             answers[iid] = props
 
 # Server rows are the counted ones; client copies (source: client) sit alongside them, one per side.
@@ -171,9 +180,11 @@ for iid, c in by_interaction.items():
             problems.append(f"interaction {iid}: {c[('ai_response_received', side)]} {side} ai_response_received (expected 1)")
         if c[("ai_user_prompt_created", side)] > 1:
             problems.append(f"interaction {iid}: {c[('ai_user_prompt_created', side)]} {side} ai_user_prompt_created (expected at most 1)")
-    if c[("ai_user_prompt_created", "server")] and not c[("ai_response_received", "server")]:
+    if c[("ai_user_prompt_created", "server")] and not (c[("ai_response_received", "server")]
+                                                        or c[("ai_response_received (paused)", "server")]):
         problems.append(f"interaction {iid}: server prompt without a server ai_response_received")
-    if (has_client_copies or args.expect_joins) and iid not in {r.get("interaction_id") for r in runs}:
+    server_only = args.client_surface and surfaces.get(iid) not in args.client_surface
+    if (has_client_copies or args.expect_joins) and iid not in {r.get("interaction_id") for r in runs} and not server_only:
         if c[("ai_user_prompt_created", "client")] and not c[("ai_user_prompt_created", "server")]:
             gap(f"interaction {iid}: client prompt with no server prompt (request never reached the SDK, or a different ID)")
         if c[("ai_user_prompt_created", "server")] and not c[("ai_user_prompt_created", "client")] \
@@ -189,7 +200,8 @@ for iid, c in by_interaction.items():
         problems.append(f"interaction {iid}: client prompt copy sent, but the plan opts it out")
     if "client_response" in args.client_opt_out and c[("ai_response_received", "client")]:
         problems.append(f"interaction {iid}: client answer copy sent, but the plan opts it out")
-    responses = c[("ai_response_received", "server")] + c[("ai_response_received", "client")]
+    responses = sum(c[(e, side)] for e in ("ai_response_received", "ai_response_received (paused)")
+                    for side in ("server", "client"))
     for event in ("ai_user_action", "ai_interaction_scored"):
         if (c[(event, "server")] or c[(event, "client")]) and not responses:
             gap(f"interaction {iid}: {event} for an answer not in this capture")
@@ -232,7 +244,7 @@ for name in args.absent:  # legacy provenance only: an AI event may share the le
         problems.append(f"legacy {name} sent {legacy[name]} times; its switch is off")
 # browser AI events carry no wrapperLibrary: trackAi must follow the switch too
 client_names = {n for n in client["$defs"] if n.startswith("ai_")} if client else CLIENT_COPIES | CLIENT_ONLY
-sdk_events = sum(1 for m in tracks if (m.get("context") or {}).get("wrapperLibrary"))
+sdk_events = sum(1 for m in tracks if ((m.get("context") or {}).get("wrapperLibrary") or {}).get("name") in SDK_NAMES)
 browser_events = sum(1 for m in tracks if (m.get("properties") or {}).get("source") == "client" and m["event"] in client_names)
 if args.no_ai_events and sdk_events:
     problems.append(f"{sdk_events} AI SDK events sent with the AI events switch off")

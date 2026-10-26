@@ -18,7 +18,7 @@ Scripts in `scripts/`, the client-event schema in `assets/`, procedures and the 
 2. **Scratch directory.** Create one outside the repo (for example `$TMPDIR/ai-events-verify/`), copy `scripts/` and `assets/` into it, and create the checker's environment with `uv venv -p 3.12` (`references/verification.md`). Captures, schemas and the virtualenv stay there, never in the user's source tree.
 3. **Get the spec schema** `ai-events-v0.3.schema.json` at the version the plan pins (section 1): from `node_modules` or the Go module cache, or, for Python apps (the wheel does not ship it), from the public npm tarball.
 4. **Capture** what each planned surface sends (section 2):
-   - **A. Recorder**, when the app has a test runner that can call its routes or job functions: `configure()` with `recorder.mjs`, `recorder.py` or `recorder.go`, then drive the surfaces.
+   - **A. Recorder**, when the app has a test runner that can call its routes or job functions: make `recorder.mjs`, `recorder.py` or `recorder.go` the app's own RudderStack client where the app builds it, before its `configure()` and switches run, then drive the surfaces.
    - **B. Mock data plane and mock model**, when it has no such tests, or is a script or cron job: run the app unchanged with its data plane URL and provider base URL pointed at `mock_server.py`.
    - **C. Live Events**, after A or B passes: a development source in the user's RudderStack workspace, watched in Live Events.
    - **D. MCP servers**: a real MCP client driving the server in its production transport and session mode, stateless included.
