@@ -24,8 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   template does not hold, such as a webhook's header value, step 4 asks one question that names
   them, with No first, and adds the ones the user picks.
   Step 1 probes for both features, not for a version, and stops with upgrade instructions when
-  either is missing; after an install it checks that the new rudder-cli is the one on PATH. The
-  skill never falls back to written-down keys. When no platform is detected, the "What will send
+  either is missing; after an install it probes again, by the full path when a plain `rudder-cli`
+  runs another copy or none, and stops only if the latest release lacks them. The skill never
+  falls back to written-down keys. When no platform is detected, the "What will send
   events" options come from `rudder-cli docs source --json`. `references/destinations.md` keeps
   only the layout, the source and connection specs, how to get a webhook endpoint, and how to
   write values in the var file, JSON keys and `'` included. It gives a command that writes a key
@@ -89,7 +90,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lines, which print secret values. Step 7 needs rudder-cli 0.29.0 or later and is skipped on an
   older one; its one-call recipe exits 5 when the app cannot start. Step 8 builds the curl event
   from the plan. While the installer script is unpublished, step 1 falls back to the latest
-  release's binary.
+  release's binary. After an install, when a plain `rudder-cli` runs another copy or none, the
+  agent runs `"$HOME/.local/bin/rudder-cli"` for the rest of the session, and step 9's summary
+  shows the `export PATH` line for the user's shell profile.
   Step 2 runs a probe that names the app's source type: Flutter and React Native first, because
   their apps also hold `android/` and `ios/` folders, then Android (`android_kotlin`), iOS
   (`ios_swift`, from an Xcode project or a Podfile), web, and only then server languages; a
@@ -127,7 +130,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   background processes, and reruns after a listener or app failure are bounded. When `/mcp` lists
   the rudder-core plugin's server, step 1 has the user authenticate it instead of adding a second
   one. The facts, step 2's probe and the Flutter, React Native and Unity notes moved to references,
-  so SKILL.md is 556 lines, not 593.
+  so SKILL.md is 557 lines, not 593.
 
 - **`rudder-ai-events`** — new plugin that onboards an existing app to RudderStack AI events
   (spec v0.3) with the `@rudderstack/ai` (Node.js), `rudderstack-ai` (Python) and `ai-sdk-go` (Go)

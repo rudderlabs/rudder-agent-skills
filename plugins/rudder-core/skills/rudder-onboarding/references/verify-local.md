@@ -42,8 +42,7 @@ retry can leave a refused request behind.
 `sources listen` first ships in rudder-cli 0.29.0. On exit 4, tell the user: "Your rudder-cli has no `sources
 listen`, which checks events on this machine before anything reaches RudderStack. It needs rudder-cli 0.29.0 or
 later. I will skip this check; step 8 still checks delivery at the destination." Then skip to step 8. Do not
-install or upgrade rudder-cli during the workflow. The installer writes to `~/.local/bin`, and an older rudder-cli
-earlier on PATH would still run.
+install or upgrade rudder-cli during the workflow.
 
 ## Two calls
 
