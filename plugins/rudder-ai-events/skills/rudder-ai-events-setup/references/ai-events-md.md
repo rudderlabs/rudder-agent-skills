@@ -231,7 +231,7 @@ spec:
       on_behalf_of_source: null
       anonymous_id_source: null
       child_tasks:
-        - { task_name: workspace-digest, scope: per workspace (send_digest, thread pool),
+        - { task_name: workspace-digest, scope: "per workspace (send_digest, thread pool)",
             conversation_id_source: '"nightly-digest:" + workspace.id', account_id_source: workspace.id,
             on_behalf_of_source: workspace.owner_id }
       flush: task
@@ -244,7 +244,7 @@ spec:
       type: mcp
       status: instrument
       feature: docs_mcp
-      entry_points: [{ path: src/mcp/server.ts, symbol: server.connect (streamable HTTP, /mcp) }]
+      entry_points: [{ path: src/mcp/server.ts, symbol: "server.connect (streamable HTTP, /mcp)" }]
   identity:
     user_id: { source: "req.user.id (src/middleware/auth.ts)", confirmed: true }
     anonymous_id: { source: "cookie rl_anonymous_id", confirmed: true }
@@ -259,7 +259,7 @@ spec:
     interaction_id_minted_by: app
     events:
       - { event: ai_user_prompt_created, handler: public/app.js (chat form submit) }
-      - { event: ai_response_received, handler: public/app.js (answer rendered, failed or stopped) }
+      - { event: ai_response_received, handler: "public/app.js (answer rendered, failed or stopped)" }
       - { event: ai_user_action, action_type: feedback_given, handler: public/app.js (thumbs buttons) }
       - { event: ai_user_action, action_type: copied_response, handler: public/app.js (copy button) }
     opt_out: []

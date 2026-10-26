@@ -425,8 +425,9 @@ beforeEach(() => {
 it('sends one answer per chat turn', async () => {
   await request(app).post('/api/chat').send({ message: 'hi', conversationId: 'c1' }); // the app's own test client
   await flush();
-  const answer = events.find((e) => e.event === 'ai_response_received');
-  expect(answer?.properties).toMatchObject({ conversation_id: 'c1', feature: 'support_bot', response_status: 'success' });
+  const answers = events.filter((e) => e.event === 'ai_response_received');
+  expect(answers).toHaveLength(1);
+  expect(answers[0].properties).toMatchObject({ conversation_id: 'c1', feature: 'support_bot', response_status: 'success' });
 });
 ```
 
