@@ -1,5 +1,5 @@
 # Compares the events `rudder-cli sources listen` captured with the agreed plan.
-# Shipped with the rudder-onboarding skill. Run it unchanged; never edit it to make a check pass.
+# Shipped with the rudder-setup skill. Run it unchanged; never edit it to make a check pass.
 #
 #   jq -n --slurpfile plan rudder/plan.events.json --rawfile events EVENTS --rawfile log LOG \
 #         --argjson from N --argjson logfrom M -f check-events.jq
