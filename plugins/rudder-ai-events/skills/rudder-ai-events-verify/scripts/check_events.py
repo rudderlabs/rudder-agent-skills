@@ -244,7 +244,7 @@ for i, m in enumerate(tracks):
         if props.get("conversation_id"):
             conversations[iid].add(props["conversation_id"])
         for key in ("feature", "surface"):  # every copy of a turn lands in the same dashboard segment
-            if props.get(key):
+            if isinstance(props.get(key), str) and props[key]:  # a non-string value already fails the schema
                 scopes[iid][key].add(props[key])
         if is_declared:
             declared[iid] += 1
@@ -305,7 +305,8 @@ for iid, c in by_interaction.items():
         if c[("ai_user_prompt_created", "server")] and not c[("ai_user_prompt_created", "client")] \
                 and "client_prompt" not in args.client_opt_out:
             gap(f"interaction {iid}: server prompt with no client copy (browser copy not sent, or a different ID)")
-        if c[("ai_response_received", "server")] and not c[("ai_response_received", "client")] \
+        if (c[("ai_response_received", "server")] or c[("ai_response_received (paused)", "server")]) \
+                and not c[("ai_response_received", "client")] \
                 and "client_response" not in args.client_opt_out:
             gap(f"interaction {iid}: server answer with no client copy (not shown, client left, or client event lost)")
         if c[("ai_response_received", "client")] and not (c[("ai_response_received", "server")]
