@@ -68,6 +68,9 @@ p.add_argument("--mcp-intent", action="append", default=[], help="allowed reques
 args = p.parse_args()
 
 
+DIALECT = "https://json-schema.org/draft/2020-12/schema"
+
+
 def load_schema(path):
     """A schema file with an $id and an object $defs; exits 2 otherwise."""
     try:
@@ -76,6 +79,11 @@ def load_schema(path):
         schema = None
     if not isinstance(schema, dict) or not isinstance(schema.get("$id"), str) or not isinstance(schema.get("$defs"), dict):
         print(f"{path}: cannot read schema (needs a string $id and an object $defs)", file=sys.stderr)
+        sys.exit(2)
+    # only draft 2020-12 is implemented: another dialect would be read with the wrong semantics
+    dialect = schema.get("$schema", DIALECT)
+    if dialect not in (DIALECT, DIALECT + "#"):
+        print(f"{path}: cannot read schema ($schema {schema['$schema']!r}, expected {DIALECT})", file=sys.stderr)
         sys.exit(2)
     try:  # an invalid schema (a bad pattern, say) fails here, not halfway through a capture
         Draft202012Validator.check_schema(schema)
