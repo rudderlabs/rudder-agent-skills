@@ -104,9 +104,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   filters the output of `validate`, the dry run, apply and
   `transformations test`, since each shows a diagnostic's source line after
   substitution, secrets included, whether the value comes from a var file or a
-  `RUDDER_<NAME>` variable. `validate` keeps only its error lines. The others
-  drop each diagnostic's whole source block, so every line of a multi-line
-  value is dropped too, and keep the plan and the test results.
+  `RUDDER_<NAME>` variable. Each filter drops every diagnostic's whole source
+  block, so every line of a multi-line value is dropped too, and keeps the
+  error lines, the plan and the test results.
   rudder-transformations says `transformations test` needs the same
   `--var-file` flags and the same filter.
 - **`rudder-mcp` / `rudder-mcp-setup`, `rudder-mcp-workflow`.** OAuth setup

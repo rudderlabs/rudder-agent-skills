@@ -184,10 +184,10 @@ TLS_CLIENT_KEY: |
 
 Up to rudder-cli 0.28.0 the spec's single quotes still turn the block's line breaks into spaces. Later releases keep them.
 
-`validate`, `apply --dry-run`, `apply` and `transformations test` print the source line of each error and warning after substitution, so a diagnostic on a secret's line shows the secret. A multi-line value prints in full, and only its first line carries the line number. That happens whenever a reference resolves, from a var file or from a `RUDDER_<NAME>` variable. Then filter the output of each of these commands, here, in the steps below and in `rudder-transformations`. `validate` prints only its error lines and the exit status. The other three drop each diagnostic's source block, from the empty `|` line through the `^^^` line, every line of a multi-line value included. They keep the rest: the error lines, the plan, which masks secret fields itself, the test results and the exit status:
+`validate`, `apply --dry-run`, `apply` and `transformations test` print the source line of each error and warning after substitution, so a diagnostic on a secret's line shows the secret. A multi-line value prints in full, and only its first line carries the line number. That happens whenever a reference resolves, from a var file or from a `RUDDER_<NAME>` variable. Then filter the output of each of these commands, here, in the steps below and in `rudder-transformations`. Each filter drops every diagnostic's source block, from the empty `|` line through the `^^^` line, every line of a multi-line value included. It keeps the rest: the error lines, the plan, which masks secret fields itself, the test results and the exit status:
 
 ```bash
-{ rudder-cli validate -l ./ --var-file secrets.vars.yaml 2>&1; echo "exit $?"; } | grep -E '^(error|warning)\[|^ *-->|^(Found|Error:|exit) '
+{ rudder-cli validate -l ./ --var-file secrets.vars.yaml 2>&1; echo "exit $?"; } | awk '/^ +\|$/{g=1;next} g&&/^ +[0-9]+ \| /{h=1} {g=0} h{if(/^ +\| \^+$/)h=0;next} 1'
 { rudder-cli apply --dry-run -l ./ --var-file secrets.vars.yaml 2>&1; echo "exit $?"; } | awk '/^ +\|$/{g=1;next} g&&/^ +[0-9]+ \| /{h=1} {g=0} h{if(/^ +\| \^+$/)h=0;next} 1'
 { rudder-cli apply --confirm=false -l ./ --var-file secrets.vars.yaml 2>&1; echo "exit $?"; } | awk '/^ +\|$/{g=1;next} g&&/^ +[0-9]+ \| /{h=1} {g=0} h{if(/^ +\| \^+$/)h=0;next} 1'
 { rudder-cli transformations test --all -l ./ --var-file secrets.vars.yaml 2>&1; echo "exit $?"; } | awk '/^ +\|$/{g=1;next} g&&/^ +[0-9]+ \| /{h=1} {g=0} h{if(/^ +\| \^+$/)h=0;next} 1'
