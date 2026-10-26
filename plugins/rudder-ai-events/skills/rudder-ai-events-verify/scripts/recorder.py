@@ -11,6 +11,7 @@ class Recorder:
     def __init__(self, path: str = "events.jsonl") -> None:
         self.path = path
         self._lock = threading.Lock()
+        open(path, "a").close()  # a run that sends nothing (AI switch off, new install) still leaves a capture
 
     def track(self, **message) -> None:  # rudder-sdk-python keyword arguments: user_id, anonymous_id, event, ...
         line = json.dumps({"type": "track", **message}, default=str)

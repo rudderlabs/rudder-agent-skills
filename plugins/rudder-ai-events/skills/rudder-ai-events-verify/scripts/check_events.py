@@ -55,6 +55,8 @@ args = p.parse_args()
 spec = json.load(open(args.spec))
 registry = Registry().with_resource(spec["$id"], Resource.from_contents(spec))
 client = json.load(open(args.client_schema)) if args.client_schema else None
+# browser AI event names: only these count as AI traffic when they carry source: client
+client_names = {n for n in client["$defs"] if n.startswith("ai_")} if client else CLIENT_COPIES | CLIENT_ONLY
 if client:
     registry = registry.with_resource(client["$id"], Resource.from_contents(client))
 
@@ -80,7 +82,7 @@ for i, m in enumerate(tracks):
     anon = m.get("anonymousId") or m.get("anonymous_id")
     context = m.get("context") or {}
     w = context.get("wrapperLibrary") or {}
-    is_client = props.get("source") == "client"
+    is_client = props.get("source") == "client" and name in client_names  # a legacy event may use source too
     where = f"#{i} {name}"
     # Provenance: only the AI SDKs' wrapperLibrary marks an AI send; another adapter's tag is still legacy,
     # unless the event uses an AI name (then it falls through and fails the SDK-name check).
@@ -183,7 +185,8 @@ for iid, c in by_interaction.items():
     if c[("ai_user_prompt_created", "server")] and not (c[("ai_response_received", "server")]
                                                         or c[("ai_response_received (paused)", "server")]):
         problems.append(f"interaction {iid}: server prompt without a server ai_response_received")
-    server_only = args.client_surface and surfaces.get(iid) not in args.client_surface
+    # exempt only a known server-only surface; an ID with no server event (stale browser ID) is still checked
+    server_only = args.client_surface and iid in surfaces and surfaces[iid] not in args.client_surface
     if (has_client_copies or args.expect_joins) and iid not in {r.get("interaction_id") for r in runs} and not server_only:
         if c[("ai_user_prompt_created", "client")] and not c[("ai_user_prompt_created", "server")]:
             gap(f"interaction {iid}: client prompt with no server prompt (request never reached the SDK, or a different ID)")
@@ -243,7 +246,6 @@ for name in args.absent:  # legacy provenance only: an AI event may share the le
     if legacy[name]:
         problems.append(f"legacy {name} sent {legacy[name]} times; its switch is off")
 # browser AI events carry no wrapperLibrary: trackAi must follow the switch too
-client_names = {n for n in client["$defs"] if n.startswith("ai_")} if client else CLIENT_COPIES | CLIENT_ONLY
 sdk_events = sum(1 for m in tracks if ((m.get("context") or {}).get("wrapperLibrary") or {}).get("name") in SDK_NAMES)
 browser_events = sum(1 for m in tracks if (m.get("properties") or {}).get("source") == "client" and m["event"] in client_names)
 if args.no_ai_events and sdk_events:
