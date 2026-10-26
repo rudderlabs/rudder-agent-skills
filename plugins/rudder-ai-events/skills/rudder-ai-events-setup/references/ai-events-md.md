@@ -57,7 +57,7 @@ status: draft                      # draft | approved; only an explicit user app
 | support-widget (client) | client copies through `rudderanalytics` | instrument |
 | docs-mcp (mcp) | `wrapMcpServer` with `identify` | instrument |
 
-Branch: `feat/ai-events` (the repo was on `main`). Plan file: kept local in `.git/info/exclude`; instrument and verify resume from it.
+Branch: `feat/ai-events` (the repo was on `main`). Plan file: kept local in the repo's `info/exclude`; instrument and verify resume from it.
 
 Decided from code (override any): legacy `chatTurnCompleted` keeps sending; prices from the rate table in `src/billing/rates.ts`; the chat tool `create_ticket` is a declared tool event (it changes data); intents reuse `ticket.category`.
 
