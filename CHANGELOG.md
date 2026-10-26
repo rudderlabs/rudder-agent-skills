@@ -35,7 +35,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   When the MCP tools are missing, `rudder-destination-debugging` and `rudder-environment-check`
   connect the server that is there before adding one. They find it by its URL under any name with
   `claude mcp list`, keep an access-token entry at `/bearer-auth-mcp` with the plugin's entry
-  disabled, have the user authenticate an entry at `/mcp`, and give the `claude mcp add` command,
+  disabled, and have the user enable that entry in `/mcp` without `Authenticate` if it is
+  disabled, or approve it at Claude Code's next start if it is pending approval. They have the user
+  authenticate an entry at `/mcp`, and give the `claude mcp add` command,
   and a line for other agents, only when there is none. The environment check also looks for
   `list_sources` and `get_source`, which both routes have. Claude Code skips the
   plugin's entry when a hand-added HTTP server has the same URL, but keeps both beside a hand-added
