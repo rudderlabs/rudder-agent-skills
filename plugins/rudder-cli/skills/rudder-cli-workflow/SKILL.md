@@ -171,14 +171,26 @@ Put the values in a var file and pass it to `validate` and to both `apply` runs:
 WEBHOOK_SIGNING_KEY: 'value-goes-here'
 ```
 
-The var file is YAML too, so single-quote its values as well. Inside double quotes YAML reads `\` as an escape: `ab\tc` arrives with a real tab, and `a\d` fails to parse. Write each `'` of the value as four inside the var file's single quotes, for example `DB_PASSWORD: 'it''''s'` for the password `it's`. YAML turns the four into two, and the spec's single quotes turn the two into one. Do not leave such a value unquoted. YAML then cuts it at ` #`, reads a leading `!` or `&` as a tag or an anchor, and drops trailing spaces, so the secret changes with no error.
+The var file is YAML too, so single-quote a one-line value as well. Inside double quotes YAML reads `\` as an escape: `ab\tc` arrives with a real tab, and `a\d` fails to parse. Write each `'` of the value as four inside the var file's single quotes, for example `DB_PASSWORD: 'it''''s'` for the password `it's`. YAML turns the four into two, and the spec's single quotes turn the two into one. Do not leave such a value unquoted. YAML then cuts it at ` #`, reads a leading `!` or `&` as a tag or an anchor, and drops trailing spaces, so the secret changes with no error.
 
-`validate`, `apply --dry-run` and `apply` print the source line of each error and warning after substitution, so a diagnostic on a secret's line shows the secret. That happens whenever a reference resolves, from a var file or from a `RUDDER_<NAME>` variable. Then filter the output of every `validate`, dry run and apply, here and in the steps below. `validate` prints only its error lines and the exit status. The dry run and apply drop the numbered source lines and keep the plan, which masks secret fields itself:
+Write a multi-line value, such as a PEM certificate or key, as a literal block instead. Inside single quotes YAML turns each line break into a space, and the broken one-line value still validates and applies. A block keeps every character as written, so write each `'` in it as `''`, which the spec's single quotes turn into one:
+
+```yaml
+TLS_CLIENT_KEY: |
+  -----BEGIN PRIVATE KEY-----
+  ...
+  -----END PRIVATE KEY-----
+```
+
+Up to rudder-cli 0.28.0 the spec's single quotes still turn the block's line breaks into spaces. Later releases keep them.
+
+`validate`, `apply --dry-run`, `apply` and `transformations test` print the source line of each error and warning after substitution, so a diagnostic on a secret's line shows the secret. A multi-line value prints in full, and only its first line carries the line number. That happens whenever a reference resolves, from a var file or from a `RUDDER_<NAME>` variable. Then filter the output of each of these commands, here, in the steps below and in `rudder-transformations`. `validate` prints only its error lines and the exit status. The other three drop each diagnostic's source block, from the empty `|` line through the `^^^` line, every line of a multi-line value included. They keep the rest: the error lines, the plan, which masks secret fields itself, the test results and the exit status:
 
 ```bash
 { rudder-cli validate -l ./ --var-file secrets.vars.yaml 2>&1; echo "exit $?"; } | grep -E '^(error|warning)\[|^ *-->|^(Found|Error:|exit) '
-{ rudder-cli apply --dry-run -l ./ --var-file secrets.vars.yaml 2>&1; echo "exit $?"; } | grep -vE '^ *[0-9]* \|'
-{ rudder-cli apply --confirm=false -l ./ --var-file secrets.vars.yaml 2>&1; echo "exit $?"; } | grep -vE '^ *[0-9]* \|'
+{ rudder-cli apply --dry-run -l ./ --var-file secrets.vars.yaml 2>&1; echo "exit $?"; } | awk '/^ +\|$/{g=1;next} g&&/^ +[0-9]+ \| /{h=1} {g=0} h{if(/^ +\| \^+$/)h=0;next} 1'
+{ rudder-cli apply --confirm=false -l ./ --var-file secrets.vars.yaml 2>&1; echo "exit $?"; } | awk '/^ +\|$/{g=1;next} g&&/^ +[0-9]+ \| /{h=1} {g=0} h{if(/^ +\| \^+$/)h=0;next} 1'
+{ rudder-cli transformations test --all -l ./ --var-file secrets.vars.yaml 2>&1; echo "exit $?"; } | awk '/^ +\|$/{g=1;next} g&&/^ +[0-9]+ \| /{h=1} {g=0} h{if(/^ +\| \^+$/)h=0;next} 1'
 ```
 
 Substitution is always on from rudder-cli 0.25.0. Before that it ran only behind the `enableVarSubstitution` experimental flag, and without the flag the CLI sends the `{{ .NAME }}` text as the literal value. Check `rudder-cli --version` before relying on it.

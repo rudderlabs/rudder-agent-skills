@@ -1,7 +1,7 @@
 ---
 name: rudder-mcp-setup
 description: Configures Claude Code to connect to RudderStack's MCP server at mcp.rudderstack.com. Use when setting up MCP for rudderstack, connecting claude to rudderstack, or configuring the rudderstack MCP server
-allowed-tools: "Bash(rudder-cli workspace info *), Bash(claude mcp add --transport http rudderstack https://mcp.rudderstack.com/mcp), Bash(claude mcp add --scope project --transport http rudderstack https://mcp.rudderstack.com/bearer-auth-mcp --header 'Authorization: Bearer ${RUDDERSTACK_ACCESS_TOKEN}' --header *), Bash(claude mcp list), Read, Write, Edit"
+allowed-tools: "Bash(rudder-cli workspace info *), Bash(claude mcp add --transport http rudderstack https://mcp.rudderstack.com/mcp), Bash(claude mcp list), Read, Write, Edit"
 ---
 
 # RudderStack MCP Setup
@@ -29,7 +29,7 @@ Use OAuth, coding agents included. Use the access-token route only when the sess
 
 ## Step 1: Add the server
 
-If `/mcp` already lists `plugin:rudder-core:rudderstack`, the rudder-core plugin added this server. Skip this step and authenticate that entry in Step 2. Adding `rudderstack` as well gives you every tool twice, each with its own sign-in.
+Run `claude mcp list` first. If it shows a server at `https://mcp.rudderstack.com/mcp`, under `plugin:rudder-core:rudderstack` (the rudder-core plugin's entry) or any other name, the server is already added. Skip this step and authenticate that entry in Step 2. Adding `rudderstack` as well is redundant. Claude Code hides a plugin's server when a server you added has the same URL, so `/mcp` would then list only `rudderstack`.
 
 Claude Code talks to the server over HTTP and runs the OAuth sign-in itself, so it needs no `npx` or `mcp-remote`:
 
@@ -43,7 +43,7 @@ Other clients take the same URL as an HTTP (streamable HTTP) MCP server in their
 
 ## Step 2: Sign in (OAuth)
 
-Start Claude Code, or restart it if it was running when you added the server. Type `/mcp`, choose `rudderstack` (or `plugin:rudder-core:rudderstack`), then `Authenticate`. The browser opens:
+Start Claude Code, or restart it if it was running when you added the server. Type `/mcp`, choose `rudderstack` (or the entry Step 1 found), then `Authenticate`. The browser opens:
 
 1. Sign in with your RudderStack account
 2. Review and approve the requested access
@@ -151,7 +151,7 @@ The same hosted server works with Claude Desktop, Cursor, VS Code, Windsurf, and
 
 | Issue | Solution |
 |-------|----------|
-| `/mcp` lists neither `rudderstack` nor `plugin:rudder-core:rudderstack` | Run the `claude mcp add` command from Step 1 in the project directory, then restart Claude Code |
+| `claude mcp list` shows no server at `https://mcp.rudderstack.com/mcp` | Run the `claude mcp add` command from Step 1 in the project directory, then restart Claude Code |
 | `rudderstack` or `plugin:rudder-core:rudderstack` shows as needing authentication | Type `/mcp`, choose that entry, then `Authenticate` |
 | MCP server not responding | Verify `https://mcp.rudderstack.com` is reachable; check network/proxy |
 | Authentication failed | Clear browser cookies for the RudderStack domain and retry; verify your account is active |
@@ -159,8 +159,8 @@ The same hosted server works with Claude Desktop, Cursor, VS Code, Windsurf, and
 | `mcp-remote` errors (stdio clients only) | Run `npx -y mcp-remote --help` to verify it loads; check the [mcp-remote npm page](https://www.npmjs.com/package/mcp-remote) for the latest version |
 | Stale session | In Claude Code, run `claude mcp logout rudderstack`, then sign in again with `claude mcp login rudderstack` or from `/mcp`. For the plugin's entry, use the name `plugin:rudder-core:rudderstack` in both commands. With `mcp-remote`, delete `~/.mcp-auth/` and re-authenticate |
 | `401` `missing or malformed bearer token` on `/bearer-auth-mcp` | The `Authorization` header is missing or empty. Export `RUDDERSTACK_ACCESS_TOKEN` in the shell that starts Claude Code and restart it |
-| `401` `bearer token authentication failed` on `/bearer-auth-mcp` | The server did not accept the token. Check that `claude mcp list` shows no missing-variable warning and that `rudder-cli workspace info --json` works with the same token |
-| `401` `bearer token authorization failed` on `/bearer-auth-mcp` | RudderStack refused the token when the server looked up the workspace, for example because the token expired or was revoked. Export a fresh token in `RUDDERSTACK_ACCESS_TOKEN` and restart Claude Code |
+| `401` `bearer token authentication failed` on `/bearer-auth-mcp` | The server did not accept the token, for example because the token expired or was revoked. Check that `claude mcp list` shows no missing-variable warning and that `rudder-cli workspace info --json` works with the same token. If it does not, export a fresh token in `RUDDERSTACK_ACCESS_TOKEN` and restart Claude Code |
+| `401` `bearer token authorization failed` on `/bearer-auth-mcp` | The server accepted the token, then RudderStack refused it when the server looked up the workspace. Check that `rudder-cli workspace info --json` works with the same token, and export a fresh token in `RUDDERSTACK_ACCESS_TOKEN` and restart Claude Code if it does not |
 | `403` `insufficient_scope` on `/bearer-auth-mcp` | The token cannot use the workspace in `X-Workspace-ID`. Use the `workspaceID` that `rudder-cli workspace info --json` prints for the same token |
 | `400` `X-Workspace-ID header is required` | Add the `X-Workspace-ID` header |
 | `401` `invalid_token` from `/mcp` after sending an access token, even when the description says the token expired | `/mcp` accepts only tokens from its own OAuth flow, so it rejects every access token. Use `/bearer-auth-mcp` |

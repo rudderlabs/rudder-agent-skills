@@ -39,7 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   applies in Phase 6 first check that `rudder-cli workspace info --json` shows
   the target workspace, and the prod step switches the CLI to the prod
   workspace before it applies.
-- **Versions.** `rudder-cli` 0.0.3 to 0.0.4, `rudder-mcp` 0.0.2 to 0.0.3.
+- **Versions.** `rudder-cli` 0.0.3 to 0.0.4, `rudder-mcp` 0.0.2 to 0.0.3,
+  `rudder-core` 0.0.6 to 0.0.7.
 
 - **Breaking (repo layout):** renamed the top-level `skills/` directory back to
   `plugins/` (reverting the earlier `plugins/` → `skills/` rename). Each plugin
@@ -95,13 +96,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   environment variables winning over files, the
   `error[project/var-substitution]` failure, git-ignoring the var file, and that
   substitution is on by default only from rudder-cli 0.25.0. The var file's
-  values are single-quoted too, since YAML reads `\` as an escape inside double
-  quotes, and a `'` in a value is written as four inside those quotes. The
-  recipe filters the output of `validate`, the dry run and apply, since each
-  shows a diagnostic's source line after substitution, secrets included,
-  whether the value comes from a var file or a `RUDDER_<NAME>` variable.
+  one-line values are single-quoted too, since YAML reads `\` as an escape
+  inside double quotes, and a `'` in a value is written as four inside those
+  quotes. A multi-line value, such as a PEM key, goes in a `|` block with each
+  `'` written as `''`, since single quotes would turn its line breaks into
+  spaces; up to rudder-cli 0.28.0 the spec's quotes still do. The recipe
+  filters the output of `validate`, the dry run, apply and
+  `transformations test`, since each shows a diagnostic's source line after
+  substitution, secrets included, whether the value comes from a var file or a
+  `RUDDER_<NAME>` variable. `validate` keeps only its error lines. The others
+  drop each diagnostic's whole source block, so every line of a multi-line
+  value is dropped too, and keep the plan and the test results.
   rudder-transformations says `transformations test` needs the same
-  `--var-file` flags.
+  `--var-file` flags and the same filter.
 - **`rudder-mcp` / `rudder-mcp-setup`, `rudder-mcp-workflow`.** OAuth setup
   uses Claude Code's native HTTP transport:
   `claude mcp add --transport http rudderstack https://mcp.rudderstack.com/mcp`,
@@ -116,16 +123,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ID as `workspace_id` when the workspace tools take that argument, and to call
   `user_switch_workspace` when they do not. The MCP server is replacing
   `user_switch_workspace` with a `workspace_id` argument on every workspace
-  tool, so the guidance works with both versions. When `/mcp` already lists
-  `plugin:rudder-core:rudderstack`, both skills authenticate that entry
-  instead of adding a second server, and they give that name for
-  `claude mcp login` and `claude mcp logout`. With the access-token route,
-  rudder-mcp-setup says to disable that entry for the folder in `/mcp`, since
-  its different URL would leave both servers listed. rudder-mcp-setup's
-  `allowed-tools` names only the two `claude mcp add` commands its steps run,
-  and its troubleshooting table maps `403` `insufficient_scope` to a wrong
-  `X-Workspace-ID` and `401` `bearer token authorization failed` to a refused
-  token.
+  tool, so the guidance works with both versions. When `claude mcp list`
+  already shows a server at `https://mcp.rudderstack.com/mcp`, as
+  `plugin:rudder-core:rudderstack` or under any other name, both skills
+  authenticate that entry instead of adding a second server, and they give the
+  plugin entry's name for `claude mcp login` and `claude mcp logout`. With the
+  access-token route, rudder-mcp-setup says to disable that entry for the
+  folder in `/mcp`, since its different URL would leave both servers listed.
+  rudder-mcp-setup's `allowed-tools` pre-approves only the OAuth
+  `claude mcp add` command, so the access-token command waits for the user's
+  approval. Its troubleshooting table maps `403` `insufficient_scope` to a
+  wrong `X-Workspace-ID`, `401` `bearer token authentication failed` to a
+  token that expired or was revoked, and `401`
+  `bearer token authorization failed` to a token refused during the workspace
+  lookup.
 - **`rudder-ai-events`** — new plugin that onboards an existing app to RudderStack AI events
   (spec v0.3) with the `@rudderstack/ai` (Node.js), `rudderstack-ai` (Python) and `ai-sdk-go` (Go)
   SDKs, pinned to the release that ships spec v0.3.

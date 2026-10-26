@@ -22,7 +22,7 @@ Before running any workflow, verify:
 
 ## Client configuration
 
-If `/mcp` already lists `plugin:rudder-core:rudderstack`, the rudder-core plugin added this server. Choose it and `Authenticate` instead of adding another.
+If `claude mcp list` already shows a server at `https://mcp.rudderstack.com/mcp`, under `plugin:rudder-core:rudderstack` (the rudder-core plugin's entry) or any other name, choose that entry in `/mcp` and `Authenticate` instead of adding another.
 
 Otherwise, Claude Code connects over HTTP and runs the OAuth sign-in itself, with no `npx` or `mcp-remote`:
 

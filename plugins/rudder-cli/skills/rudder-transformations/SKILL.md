@@ -208,7 +208,7 @@ export function transformEvent(event, metadata) {
 | `rudder-cli transformations test --modified` | Test only modified |
 | `rudder-cli import` | Import existing from workspace |
 
-When specs use `{{ .NAME }}` references, pass the same `--var-file` flags to `transformations test` that you pass to `validate` and `apply`. `transformations test` accepts `--var-file` from rudder-cli 0.28.0. See Variables and secrets in `rudder-cli-workflow`.
+When specs use `{{ .NAME }}` references, pass the same `--var-file` flags to `transformations test` that you pass to `validate` and `apply`. `transformations test` accepts `--var-file` from rudder-cli 0.28.0. It prints a diagnostic's source line after substitution too, secrets included, so run it through the same filter as the dry run. See Variables and secrets in `rudder-cli-workflow`.
 
 ## Workflow: Adding a New Library
 
