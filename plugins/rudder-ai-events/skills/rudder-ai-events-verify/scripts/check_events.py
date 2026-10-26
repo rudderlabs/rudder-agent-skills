@@ -59,8 +59,8 @@ p.add_argument("--client-opt-out", action="append", default=[],
                choices=["client_prompt", "client_response", "client_feedback", "server_feedback"],
                help="a copy the plan's client_events.opt_out drops: not expected, and fails if sent")
 p.add_argument("--feedback-endpoint", action="append", default=[],
-               help="[surface:]action_type of a planned feedback endpoint (surfaces[].feedback): its browser copy "
-                    "needs a server one, on that surface's turns or, without a surface, on every turn")
+               help="[[feature:]surface:]action_type of a planned feedback endpoint (surfaces[].feedback): its "
+                    "browser copy needs a server one on the turns of that feature and surface (all, when left out)")
 p.add_argument("--failed-interaction", action="append", default=[],
                help="interaction_id of a turn the app failed and caught itself: its answer must not be success")
 p.add_argument("--mcp-server", action="append", default=[], help="allowed server_name values (the plan's MCP servers)")
@@ -125,6 +125,7 @@ names = collections.Counter()
 legacy = collections.Counter()
 clients_seen = collections.Counter()
 answers, surfaces, client_surfaces = {}, {}, {}
+features, client_features = {}, {}  # a turn's feature, like its surface
 declared = collections.Counter()  # non-MCP declared tool events per interaction_id
 actions = collections.defaultdict(lambda: {"server": collections.Counter(), "client": collections.Counter()})
 runs, tool_calls = [], []
@@ -246,6 +247,10 @@ for i, m in enumerate(tracks):
             surfaces[iid] = props["surface"]
         if is_client and props.get("surface"):
             client_surfaces.setdefault(iid, props["surface"])
+        if not is_client and props.get("feature") and name in TURN_EVENTS:
+            features[iid] = props["feature"]
+        if is_client and props.get("feature"):
+            client_features.setdefault(iid, props["feature"])
         if name == "ai_response_received" and not is_client and (not paused or iid not in answers):
             answers[iid] = props
 
@@ -253,19 +258,25 @@ for i, m in enumerate(tracks):
 has_client_copies = any(c[("ai_response_received", "client")] or c[("ai_user_prompt_created", "client")]
                         for c in by_interaction.values())
 gap = problems.append if args.expect_joins else notes.append
-# feedback types with a server endpoint, per surface: planned, or sent by the server on that surface's turns;
-# others are browser-only
-endpoints = collections.defaultdict(set)
+# feedback types with a server endpoint, per (feature, surface): planned ([[feature:]surface:]action_type), or
+# sent by the server on that feature's turns on that surface; others are browser-only
+def turn_scope(iid):
+    return features.get(iid) or client_features.get(iid), surfaces.get(iid) or client_surfaces.get(iid)
+
+
+planned, inferred = collections.defaultdict(set), collections.defaultdict(set)
 for spec_arg in args.feedback_endpoint:
-    where_, _, action = spec_arg.rpartition(":")
-    endpoints[where_ or None].add(action)
+    *scope, action = spec_arg.split(":")
+    scope = [None] * (2 - len(scope)) + scope[-2:]
+    planned[(scope[0] or None, scope[1] or None)].add(action)  # a part left out matches every turn
 for iid, sides in actions.items():
-    endpoints[surfaces.get(iid) or client_surfaces.get(iid)] |= set(sides["server"])
+    inferred[turn_scope(iid)] |= set(sides["server"])  # exact scope, unknown parts included
 
 
 def server_actions(iid):
-    turn = surfaces.get(iid) or client_surfaces.get(iid)
-    return endpoints[None] | (endpoints[turn] if turn else set())
+    feature, surface = turn_scope(iid)
+    return inferred[(feature, surface)].union(*(acts for (f, s), acts in planned.items()
+                                                if f in (None, feature) and s in (None, surface)))
 
 for iid, c in by_interaction.items():
     for side in ("server", "client"):
@@ -287,7 +298,8 @@ for iid, c in by_interaction.items():
         if c[("ai_response_received", "server")] and not c[("ai_response_received", "client")] \
                 and "client_response" not in args.client_opt_out:
             gap(f"interaction {iid}: server answer with no client copy (not shown, client left, or client event lost)")
-        if c[("ai_response_received", "client")] and not c[("ai_response_received", "server")]:
+        if c[("ai_response_received", "client")] and not (c[("ai_response_received", "server")]
+                                                          or c[("ai_response_received (paused)", "server")]):
             gap(f"interaction {iid}: client answer with no server answer (request never reached the SDK, or a different ID)")
         for action in sorted(server_actions(iid)):
             server, browser = actions[iid]["server"][action], actions[iid]["client"][action]
