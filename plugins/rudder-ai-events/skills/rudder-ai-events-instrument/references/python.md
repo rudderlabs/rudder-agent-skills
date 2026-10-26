@@ -306,6 +306,8 @@ if os.environ.get("AI_EVENTS_LEGACY_EVENT", "true").lower() != "false":
 
 `configure()` changes only the arguments passed, so a reloadable config calls it again on change (`classifier=None`, `evaluator=None` when turning off). Wrapped clients and `ai_interaction` stay in place either way.
 
+`configure()` does not reach the browser: expose `ai_events_on` to the page the way the app exposes its other config, and gate `trackAi` on it (`client-events.md`, "Code").
+
 ## 10. MCP server: `wrap_mcp_server`
 
 Needs the `mcp` extra. One call per server, before serving; an app with several MCP endpoints wraps each, with a distinct server `name`, and an `identify` that reads what that endpoint's auth provides. Supported servers:

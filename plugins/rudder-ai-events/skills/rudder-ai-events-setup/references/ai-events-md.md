@@ -46,7 +46,7 @@ status: draft                      # draft | approved; only an explicit user app
 - Identity: chat and feedback use `req.user.id`, cookies give `anonymousId` and session; MCP uses the token `sub`; digest runs send `ai_system` with `on_behalf_of` the workspace owner and `account_id` the workspace.
 - Data that leaves the app: IDs, model, token counts, latency, status, tool names and counts, intent label, MCP tool and argument names (never values). Prompt and answer text: not sent (`capture_content: false`).
 - Impact: +4 events per chat turn beside `chatTurnCompleted`; +1 per digest run and per workspace; no extra model calls; flush on shutdown (up to 10 s) and at the end of each digest task (up to 2 s).
-- Switch off: `AI_EVENTS_ENABLED=false` stops every AI event; `AI_EVENTS_LEGACY_EVENT=false` stops `chatTurnCompleted`; roll back by reverting the instrumentation commit.
+- Switch off: `AI_EVENTS_ENABLED=false` stops every AI event, browser copies included; `AI_EVENTS_LEGACY_EVENT=false` stops `chatTurnCompleted`; roll back by reverting the instrumentation commit.
 
 ## Summary
 
@@ -372,7 +372,7 @@ Ids for Config `known_limits`; the plan's Known limits section names each one th
 - Background `child_tasks`: one entry per nested step that should report its own usage. The parent task then reports only calls made outside the children; per-run totals come from summing the tree by `parent_interaction_id`. Children default to `trigger_source: agent`.
 - `client_events.events[].event`: only the browser events listed in `rudder-ai-events-instrument` `references/client-events.md` ("Who sends what"). Browser-sent actions live here; server-sent ones under `surfaces[].feedback`.
 - Client copies: with a `client` surface to instrument, the browser sends its own `ai_user_prompt_created` and `ai_response_received` (`source: client`) alongside the server's, and feedback goes from both sides. They measure the client/server gap per `interaction_id` and are never sampled. Either side opts out only when the user asks: record it in `client_events.opt_out` and drop that side's entry. Feedback with no server endpoint is browser-only; do not add an endpoint for it.
-- `switches`: instrumentation adds both. `ai_events_env` off stops every AI event; `legacy_events_env` off stops the legacy events; each works without the other. They use the app's config library, reloadable when it supports that.
+- `switches`: instrumentation adds both. `ai_events_env` off stops every AI event, server and browser (the server exposes it to the page); `legacy_events_env` off stops the legacy events; each works without the other. They use the app's config library, reloadable when it supports that.
 - `legacy_events[].migration.remove_after`: `null` by default; the legacy event keeps sending. Removing it is a separate, later change.
 
 ## Breaking-change checks

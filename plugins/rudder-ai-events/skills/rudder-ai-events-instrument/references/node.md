@@ -367,6 +367,8 @@ if (process.env.AI_EVENTS_LEGACY_EVENT !== 'false') {
 
 `configure()` changes only the keys passed, so a reloadable config calls it again on change (pass `classifier: null` / `evaluator: null` when turning off). Wrapped clients and `aiInteraction` stay in place either way.
 
+`configure()` does not reach the browser: expose `aiEventsOn` to the page the way the app exposes its other config, and gate `trackAi` on it (`client-events.md`, "Code").
+
 ## 12. MCP server: `wrapMcpServer`
 
 One call per server, before `connect()`, where the `McpServer` (or low-level `Server`) is created. An app that serves several MCP endpoints wraps each, with a distinct name in each server's constructor, and an `identify` that reads what that endpoint's auth put on the request. The same call covers `@modelcontextprotocol/sdk` 1.x (`McpServer` from `@modelcontextprotocol/sdk/server/mcp.js`, low-level `Server`) and `@modelcontextprotocol/server` 2.x. Tools, resources and prompts stay as written.

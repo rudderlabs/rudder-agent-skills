@@ -27,19 +27,24 @@ Identity: the JavaScript SDK supplies `userId` / `anonymousId` itself; `userId` 
 
 ## Code
 
-One helper, so every client AI event carries `source`, `feature` and `surface`, and unknown IDs are left out rather than sent as `null`. Put it in the app's browser analytics module (exported), or at the top of the page script when there is none:
+One helper, so every client AI event carries `source`, `feature` and `surface`, unknown IDs are left out rather than sent as `null`, and nothing is sent when the AI events switch is off. Put it in the app's browser analytics module (exported), or at the top of the page script when there is none:
 
 ```js
 const AI_FEATURE = 'support_bot'; // the surface's feature from the plan's ## Config
 const AI_SURFACE = 'web'; // the surface's channel from the plan's ## Config (web | mobile | ...)
+// ai_events_env as the server evaluated it, read from wherever the app already exposes config or flags to the page
+const AI_EVENTS_ON = appConfig.aiEventsEnabled !== false;
 
 function trackAi(event, properties = {}) {
+  if (!AI_EVENTS_ON) return; // configure() never reaches the browser, so the switch must
   const defined = Object.fromEntries(Object.entries(properties).filter(([, v]) => v != null));
   window.rudderanalytics?.track(event, { source: 'client', feature: AI_FEATURE, surface: AI_SURFACE, ...defined });
 }
 ```
 
 With `@rudderstack/analytics-js`, call `.track` on the app's existing `RudderAnalytics` instance instead of `window.rudderanalytics`. With the script-tag snippet, check its method stub list includes `track` (calls made before the SDK loads are queued only for stubbed methods).
+
+`appConfig.aiEventsEnabled` stands for the app's own channel: a server-rendered value, the config or flags endpoint the page already fetches, or the flags client it already uses. The server sets it from the same `ai_events_env` value it passes to `configure()`; the page's legacy `track` calls do not read it. With a reloadable switch, the page picks up a change on its next load.
 
 Chat submit: mint the ID, send the client prompt copy, send the request, then send the client answer copy when the turn reaches its final state on screen (completed, failed, or stopped by the user). From the response on, use the ID the server returns (it differs only if the server rejected yours).
 

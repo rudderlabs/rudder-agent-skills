@@ -266,6 +266,8 @@ if os.Getenv("AI_EVENTS_LEGACY_EVENT") != "false" {
 
 `Configure` changes only the options passed, so a reloadable config calls it again on change (`WithClassifier(nil)`, `WithEvaluator(nil)` when turning off). Wrapped clients and `RunInteraction` stay in place either way.
 
+`Configure` does not reach the browser: expose `aiEventsOn` to the page the way the app exposes its other config, and gate `trackAi` on it (`client-events.md`, "Code").
+
 ## 11. MCP server on the official go-sdk: `WrapMCPServer`
 
 Once per server, after the tools are added and before `server.Run` or the HTTP handler. A service with several MCP endpoints wraps each, with its own `ServerName`, and an `Identify` that reads what that endpoint's auth put on the request.
