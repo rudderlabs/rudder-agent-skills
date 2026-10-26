@@ -49,7 +49,8 @@ p.add_argument("--client-opt-out", action="append", default=[],
                choices=["client_prompt", "client_response", "client_feedback", "server_feedback"],
                help="a copy the plan's client_events.opt_out drops: not expected, and fails if sent")
 p.add_argument("--feedback-endpoint", action="append", default=[],
-               help="action_type of a planned feedback endpoint (surfaces[].feedback): its browser copy needs a server one")
+               help="[surface:]action_type of a planned feedback endpoint (surfaces[].feedback): its browser copy "
+                    "needs a server one, on that surface's turns or, without a surface, on every turn")
 p.add_argument("--failed-interaction", action="append", default=[],
                help="interaction_id of a turn the app failed and caught itself: its answer must not be success")
 p.add_argument("--mcp-server", action="append", default=[], help="allowed server_name values (the plan's MCP servers)")
@@ -95,7 +96,7 @@ conversations = collections.defaultdict(set)
 names = collections.Counter()
 legacy = collections.Counter()
 clients_seen = collections.Counter()
-answers, surfaces = {}, {}
+answers, surfaces, client_surfaces = {}, {}, {}
 declared = collections.Counter()  # non-MCP declared tool events per interaction_id
 actions = collections.defaultdict(lambda: {"server": collections.Counter(), "client": collections.Counter()})
 runs, tool_calls = [], []
@@ -202,6 +203,8 @@ for i, m in enumerate(tracks):
             actions[iid]["client" if is_client else "server"][props.get("action_type")] += 1
         if not is_client and props.get("surface") and name in CLIENT_COPIES:
             surfaces[iid] = props["surface"]
+        if is_client and props.get("surface"):
+            client_surfaces.setdefault(iid, props["surface"])
         if name == "ai_response_received" and not is_client and (not paused or iid not in answers):
             answers[iid] = props
 
@@ -209,8 +212,20 @@ for i, m in enumerate(tracks):
 has_client_copies = any(c[("ai_response_received", "client")] or c[("ai_user_prompt_created", "client")]
                         for c in by_interaction.values())
 gap = problems.append if args.expect_joins else notes.append
-# feedback types with a server endpoint: planned, or sent by the server in this capture; others are browser-only
-server_actions = set(args.feedback_endpoint) | {a for sides in actions.values() for a in sides["server"]}
+# feedback types with a server endpoint, per surface: planned, or sent by the server on that surface's turns;
+# others are browser-only
+endpoints = collections.defaultdict(set)
+for spec_arg in args.feedback_endpoint:
+    where_, _, action = spec_arg.rpartition(":")
+    endpoints[where_ or None].add(action)
+for iid, sides in actions.items():
+    endpoints[surfaces.get(iid) or client_surfaces.get(iid)] |= set(sides["server"])
+
+
+def server_actions(iid):
+    turn = surfaces.get(iid) or client_surfaces.get(iid)
+    return endpoints[None] | (endpoints[turn] if turn else set())
+
 for iid, c in by_interaction.items():
     for side in ("server", "client"):
         if c[("ai_response_received", side)] > 1:
@@ -233,18 +248,21 @@ for iid, c in by_interaction.items():
             gap(f"interaction {iid}: server answer with no client copy (not shown, client left, or client event lost)")
         if c[("ai_response_received", "client")] and not c[("ai_response_received", "server")]:
             gap(f"interaction {iid}: client answer with no server answer (request never reached the SDK, or a different ID)")
-        for action in sorted(server_actions):
+        for action in sorted(server_actions(iid)):
             server, browser = actions[iid]["server"][action], actions[iid]["client"][action]
             if server and not browser and "client_feedback" not in args.client_opt_out:
                 gap(f"interaction {iid}: server ai_user_action {action} with no client copy (browser handler not wired?)")
-            if browser and not server and "server_feedback" not in args.client_opt_out:
+            elif browser and not server and "server_feedback" not in args.client_opt_out:
                 gap(f"interaction {iid}: client ai_user_action {action} with no server copy (endpoint not wired, or a different ID)")
+            elif server != browser and not {"client_feedback", "server_feedback"} & set(args.client_opt_out):
+                gap(f"interaction {iid}: {server} server and {browser} client ai_user_action {action} "
+                    f"(one copy per side per click: one lost or sent twice)")
     # An opted-out copy was dropped from the plan, so sending it is a regression, not a gap.
     if "client_prompt" in args.client_opt_out and c[("ai_user_prompt_created", "client")]:
         problems.append(f"interaction {iid}: client prompt copy sent, but the plan opts it out")
     if "client_response" in args.client_opt_out and c[("ai_response_received", "client")]:
         problems.append(f"interaction {iid}: client answer copy sent, but the plan opts it out")
-    if "client_feedback" in args.client_opt_out and any(actions[iid]["client"][a] for a in server_actions):
+    if "client_feedback" in args.client_opt_out and any(actions[iid]["client"][a] for a in server_actions(iid)):
         problems.append(f"interaction {iid}: client feedback copy sent, but the plan opts it out")
     if "server_feedback" in args.client_opt_out and sum(actions[iid]["server"].values()):
         problems.append(f"interaction {iid}: server ai_user_action sent, but the plan opts it out (server_feedback)")
