@@ -3,8 +3,8 @@
 Usage: what_changes.py before.jsonl after.jsonl
 before: AI events switched off (the app as it was); after: AI events on.
 Prints the event table (counts per capture) and, per changed event, a redacted before/after JSON pair
-with the differing fields and values listed. Every occurrence is compared in capture order; the pair shown
-is the first that differs. Fields that differ on every run (IDs, timestamps, durations) count by presence
+with the differing fields and values listed. Every occurrence is compared in capture order, an unmatched one
+with the other capture's first; the pair shown is the first that differs. Fields that differ on every run (IDs, timestamps, durations) count by presence
 and type only, inside lists too. IDs, user and account IDs, on_behalf_of, emails, traits and timestamps
 are redacted; check the rest before sharing.
 """
@@ -24,7 +24,7 @@ PERSONAL = {"traits"}  # identify() traits (email, name, ...) ride along in cont
 EMAIL = re.compile(r'[^ \t\n\r\f\v@"]+@[^ \t\n\r\f\v@"]+\.[A-Za-z0-9_]+')  # ASCII classes, as in the SDKs
 VARY = re.compile(r"^(interaction_id|conversation_id|parent_interaction_id|trace_id|anonymousId|anonymous_id|sessionId)\Z"
                   # start_time, end_time (ai_otel_span) and OTLP's startTimeUnixNano vary on every run too
-                  r"|_ms\Z|[Ll]atency|[Dd]uration|At\Z|[Tt]imestamp|(^|_)time\Z|Time(UnixNano)?\Z")
+                  r"|_ms\Z|[Ll]atency|[Dd]uration|At\Z|_at\Z|[Tt]imestamp|(^|_)time\Z|Time(UnixNano)?\Z")
 
 
 def load(path):
@@ -107,7 +107,10 @@ for name in sorted(by_b.keys() | by_a.keys()):
     else:
         # Compare every occurrence in capture order; a change in a later turn counts too.
         diff, pair = [], (by_b[name][0], by_a[name][0])
-        for mb, ma in zip(by_b[name], by_a[name]):
+        # unmatched occurrences (added or removed turns) are compared with the other side's first one
+        pairs = list(zip(by_b[name], by_a[name])) + [(by_b[name][0], m) for m in by_a[name][nb:]] \
+            + [(m, by_a[name][0]) for m in by_b[name][na:]]
+        for mb, ma in pairs:
             d = diff_of(fields(mb), fields(ma))
             if d and not diff:
                 pair = (mb, ma)  # show the first pair that actually differs
