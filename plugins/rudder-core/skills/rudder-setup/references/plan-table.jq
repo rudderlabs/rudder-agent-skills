@@ -1,5 +1,5 @@
 # Renders the plan's table from rudder/plan.events.json, the only file that names events and their
-# property types. Shipped with the rudder-onboarding skill. Run it unchanged:
+# property types. Shipped with the rudder-setup skill. Run it unchanged:
 #
 #   jq -r --rawfile md rudder/plan.md -f plan-table.jq rudder/plan.events.json
 #
