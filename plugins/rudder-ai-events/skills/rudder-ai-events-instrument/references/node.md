@@ -2,9 +2,9 @@
 
 Node.js 24+. ESM shown; CommonJS works the same with `require('@rudderstack/ai')` and `require('@rudderstack/ai/openai')`. Every entry point: `@rudderstack/ai`, `/openai`, `/anthropic`, `/google-genai`, `/bedrock`, `/vercel-ai-sdk`, `/langchain`, `/claude-agent-sdk`, `/openai-agents`, `/middleware`, `/mcp`, `/tracing` and `/tracing/vercel-ai-sdk` (advanced OpenTelemetry export, not needed for AI events).
 
-`<VERSION>` below is the release that ships spec v0.3: `0.5.0`, the first `@rudderstack/ai` version whose tarball has `spec/ai-events-v0.3.schema.json` (check with `npm view @rudderstack/ai version` and section 1 of the verify skill's `references/verification.md`). 0.4.0 ships spec v0.2 and has no `/mcp`: never install it or a branch build for a v0.3 plan.
+`<VERSION>` below is the plan's `sdks[].version`: 0.6.0 or later.
 
-Runnable references in the SDK repository's `examples/`: `openai`, `openai-responses`, `anthropic`, `google-genai`, `bedrock-converse`, `vercel-ai-sdk`, `langchain`, `claude-agent-sdk`, `openai-agents`, `background-agent`, `manual-interaction` (`recordCall`), `scores-evaluator`, `cost-estimation`, `mcp-server`, `mcp-server-lowlevel`, `mcp-server-v2`, `openai-agents-mcp`.
+Full API reference: the package README, shipped at `node_modules/@rudderstack/ai/README.md` and shown on npmjs.com.
 
 ## 1. Install (exact pins)
 
@@ -15,7 +15,7 @@ Runnable references in the SDK repository's `examples/`: `openai`, `openai-respo
 | yarn | `yarn add --exact @rudderstack/ai@<VERSION>` |
 | bun | `bun add --exact @rudderstack/ai@<VERSION>` |
 
-Only when the plan says `rudderstack.client: new`, add the client too: `@rudderstack/rudder-sdk-node@3.0.16`. The provider and framework packages (`openai`, `@anthropic-ai/sdk`, `ai`, `@langchain/core`, ...) are optional peer dependencies the app already has; do not add or bump them. The same holds for the MCP SDK on MCP servers (supported: `@modelcontextprotocol/sdk` `>=1.31.0 <2.0.0` and `@modelcontextprotocol/server` `>=2.0.0 <3.0.0`). Run the install from the `sdks[].path` directory; the lockfile change belongs in the same diff.
+Only when the plan says `rudderstack.client: new`, add the client too, `@rudderstack/rudder-sdk-node` at its latest release (`>=3.0.16` is the SDK's peer range; an existing older client fails `npm install` with `ERESOLVE`). The provider and framework packages (`openai`, `@anthropic-ai/sdk`, `ai`, `@langchain/core`, ...) are optional peer dependencies the app already has; do not add or bump them. The same holds for the MCP SDK on MCP servers (supported: `@modelcontextprotocol/sdk` `>=1.31.0 <2.0.0` and `@modelcontextprotocol/server` `>=2.0.0 <3.0.0`). Run the install from the `sdks[].path` directory; the lockfile change belongs in the same diff.
 
 ## 2. Configure once at startup
 
@@ -75,14 +75,34 @@ export const openai = wrapOpenAI(new OpenAI());
 |---|---|
 | Anthropic | `wrapAnthropic(new Anthropic())` from `@rudderstack/ai/anthropic`; `AnthropicBedrock`: `{ provider: 'aws.bedrock' }`, `AnthropicVertex`: `{ provider: 'gcp.vertex_ai' }` |
 | Google Gen AI | `wrapGoogleGenAI(new GoogleGenAI({ ... }))` from `@rudderstack/ai/google-genai` |
-| Bedrock | `wrapBedrock(new BedrockRuntimeClient({ region }))` from `@rudderstack/ai/bedrock` |
+| Bedrock | `wrapBedrock(new BedrockRuntimeClient({ region }))` from `@rudderstack/ai/bedrock`: tracks `Converse` / `ConverseStream`; `InvokeModel` passes through untracked (`recordCall` below) |
 | Vercel AI SDK | `wrapLanguageModel({ model, middleware: rudderstackMiddleware({ agentName }) })` from `ai` + `@rudderstack/ai/vercel-ai-sdk` |
 | LangChain / LangGraph | `const handler = new RudderStackCallbackHandler({ agentName: 'support_agent' })` from `@rudderstack/ai/langchain`; pass it in the `invoke` / `stream` config (`{ callbacks: [handler] }`), never in a model constructor |
-| Claude Agent SDK | replace `query(params)` with `trackedQuery(params, { userId, conversationId })` from `@rudderstack/ai/claude-agent-sdk` (same messages); when the app has its own `query()` chokepoint or its tests mock `query`, wrap the stream instead: `trackMessages(query(params), { userId, conversationId, resumed })` (`trackedQuery` calls the SDK's `query()` inside the package, where a `vi.mock` of the SDK does not reach) |
+| Claude Agent SDK | replace `query(params)` with `trackedQuery(params, { userId, conversationId })` from `@rudderstack/ai/claude-agent-sdk` (same messages); when the app has its own `query()` chokepoint or its tests mock `query`, wrap the stream instead: `trackMessages(query(params), { userId, conversationId, resumed })` (`trackedQuery` calls the SDK's `query()` inside the package, where a `vi.mock` of the SDK does not reach). Known limit: usage is read only from the `result` message, so a turn that throws after the model answered reports `llm_call_count: 0` and no tokens |
 | OpenAI Agents SDK | `trackedRun(runner, agent, input, runOptions, { userId, feature })` from `@rudderstack/ai/openai-agents` |
-| Anything else | inside the interaction: `interaction.recordCall({ provider, model, inputTokens, outputTokens, responseId })` (example `manual-interaction`) |
+| Anything else | inside the interaction: `interaction.recordCall({ provider, model, inputTokens, outputTokens, responseId })` |
 
 One integration per call path: do not add a LangChain handler around a wrapped client on purpose.
+
+Bedrock `InvokeModel` with an Anthropic model: report the call from the response body. `model` is the `modelId` sent (an inference-profile ID such as `us.anthropic.claude-...` prices once its prefix is stripped); leave `requestedModel` unset, or every call reports a routed model.
+
+```ts
+const res = await bedrock.send(new InvokeModelCommand({ modelId, body: JSON.stringify(request) }));
+const body = JSON.parse(new TextDecoder().decode(res.body));
+const u = body.usage ?? {};
+const cached = u.cache_read_input_tokens ?? 0;
+const written = u.cache_creation_input_tokens ?? 0;
+interaction.recordCall({ // the aiInteraction / aiTask callback's interaction, or currentInteraction()
+  provider: 'aws.bedrock',
+  model: modelId,
+  inputTokens: (u.input_tokens ?? 0) + cached + written, // includes cache reads and writes
+  outputTokens: u.output_tokens ?? 0,
+  cachedInputTokens: cached,
+  cacheWriteTokens: written,
+  responseId: body.id,
+  finishReason: body.stop_reason,
+});
+```
 
 Claude Agent SDK: construct `query()` inside the `aiInteraction` / `aiTask` callback, not before it, or in-process MCP tools and hooks are counted outside the interaction.
 
@@ -172,7 +192,7 @@ app.post('/api/chat', async (req, res) => {
 - `client_disconnected: true` is sent automatically when the request closes under `aiContextMiddleware()` / `withAiContext()` or a bound stream is cancelled before the answer ends; elsewhere pass `interaction.end({ clientDisconnected: true })` from the app's own close handler, if it has one.
 - Statuses need no code: the integrations report `paused` with `pause_reason` (tool approval, LangGraph `interrupt()`, Claude Agent SDK defer), `incomplete` with `error_type` (`max_turns`, `max_budget_usd`, `length`: a last call cut off at the token limit, including Anthropic `stop_reason: max_tokens`) and `content_filter` as an error.
 - Business-specific extras ride on the answer: `interaction.end({ extraProperties: { ... } })`; SDK-owned names are ignored.
-- Stop / abort: an abort error thrown out of the callback already ends the answer as `cancelled`. When the app's stop handler catches it and returns normally, call `interaction.end({ status: 'cancelled' })` there.
+- App-detected failures: an error thrown out of the callback already sets the status (an abort: `cancelled`). When the app catches its own failure and returns normally (stop button, empty stream, its own deadline, a lost lease), end the answer there, inside the callback: `interaction.end({ status: 'cancelled' })`, or `interaction.end({ status: 'error', errorType: 'empty_response' })` (`timeout`, `incomplete` likewise). App-only error codes go in `extraProperties`. The callback's own end afterwards is a no-op.
 - Tracing side effects: `registerTracing()` / `createSpanProcessor()` also export AI spans as `ai_otel_span` events and add `user.id`, `gen_ai.conversation.id` and the interaction ID to AI spans, which every other exporter on that provider (Langfuse, ...) then receives. When another tool owns tracing, register neither: pass `traceId: trace.getActiveSpan()?.spanContext().traceId` (from `@opentelemetry/api`).
 
 Streaming: return the stream from the callback, or bind the one you pipe after the callback returns.
@@ -239,19 +259,19 @@ await aiContext({ accountId: job.workspaceId, onBehalfOf: job.requestedBy }, () 
 
 | Process | Do |
 |---|---|
-| Long-running server | `await flush()` in the existing shutdown hook (SIGTERM handler, `server.close` callback), before the app's own client flush, which stays; add a hook only if none exists |
-| Serverless handler, script, CLI | `await flush()` before returning or exiting (a top-level `aiTask` already does it) |
+| Long-running server | `await shutdown()` in the existing shutdown hook (SIGTERM handler, `server.close` callback), before the app's own client flush, which stays; add a hook only if none exists |
+| Serverless handler, script, CLI | `await flush()` before returning or exiting (a top-level `aiTask` already does it, within 2 s: `aiTask(name, { flush: { timeoutMs } }, fn)`) |
 
 ```ts
-import { flush } from '@rudderstack/ai';
+import { shutdown } from '@rudderstack/ai';
 
 process.on('SIGTERM', async () => {
-  await flush(); // waits for classifications, then flushes every RudderStack client the SDK used
+  await shutdown(); // ends open interactions as incomplete, then flushes every client the SDK used
   process.exit(0);
 });
 ```
 
-`flush()` is bounded: pending classifications and evaluations wait up to the classifier timeout plus 1 s (or `flush({ timeoutMs })`), and each client flush up to 10 s. It never throws and resolves `false` when something did not finish in time, so a slow data plane cannot hold up shutdown.
+`flush()` and `shutdown()` share one deadline for classifications and every client (10 s, or `{ timeoutMs }`), never throw, never close the client, and resolve `false` when time ran out (`flush_timeout`). `configure({ flushOnExit })` (on by default) also flushes for up to 2 s when the event loop empties; it installs no signal handler.
 
 ## 8. Declared tool events (`spec.config.event_rules`)
 
@@ -299,8 +319,6 @@ import { trackScore } from '@rudderstack/ai';
 trackScore({ interactionId, conversationId, evaluationName: 'groundedness', scoreValue: 0.82, evaluator: 'model' }); // or scoreLabel; evaluator: model | code | human
 ```
 
-Both are shown in example `scores-evaluator`.
-
 The app's own evaluator on every successful answer (runs after the answer, 5 s timeout, never blocks it; `flush()` waits for it):
 
 ```ts
@@ -328,22 +346,30 @@ configure({
 });
 ```
 
-Register each model the app uses; a family name never prices another model (`gpt-4o` does not price `gpt-4o-mini`). Gemini API calls report provider `gcp.gemini`, Vertex AI calls `gcp.vertex_ai`, and they are priced separately: register each one the app calls with its `provider` (`registerPrice(model, { ..., provider: 'gcp.vertex_ai' })`); a price with no `provider` covers both. `google` and `google.vertex` (the labels before 0.5.0) still work as aliases of `gcp.gemini` and `gcp.vertex_ai`. Example `cost-estimation` shows `registerPrices` and `estimateCost`. Service tier, 1-hour cache writes and provider-hosted tool calls are read from responses automatically; the price options above only turn them into cost.
+Register each model the app uses; a family name never prices another model (`gpt-4o` does not price `gpt-4o-mini`). Gemini API calls report provider `gcp.gemini`, Vertex AI calls `gcp.vertex_ai`, and they are priced separately: register each one the app calls with its `provider` (`registerPrice(model, { ..., provider: 'gcp.vertex_ai' })`); a price with no `provider` covers both. `google` and `google.vertex` still work as aliases of `gcp.gemini` and `gcp.vertex_ai`. Service tier, 1-hour cache writes and provider-hosted tool calls are read from responses automatically; the price options above only turn them into cost.
 
-## 11. Legacy event behind a flag
+## 11. Switches (`spec.switches`)
+
+Read both through the app's config library when it has one; env names from the plan.
 
 ```ts
-// Old hand-built event, kept for the migration window (the plan's legacy_events).
+const aiEventsOn = process.env.AI_EVENTS_ENABLED !== 'false'; // ai_events_env, default on
+
+// Off: a client that sends nothing, and no classifier, evaluator or other options.
+configure(aiEventsOn ? { analytics, captureContent: false /* , ... */ } : { analytics: { track() {} } });
+if (aiEventsOn) wrapMcpServer(server, { identify /* , ... */ }); // also gate registerTracing()
+
+// legacy_events_env, default on: the old call, unchanged
 if (process.env.AI_EVENTS_LEGACY_EVENT !== 'false') {
-  analytics.track({ userId, event: 'chatTurnCompleted', properties: { ... } }); // unchanged
+  analytics.track({ userId, event: 'chatTurnCompleted', properties: { ... } });
 }
 ```
 
-Leave the old call's properties as they are; only wrap it in the flag.
+`configure()` changes only the keys passed, so a reloadable config calls it again on change (pass `classifier: null` / `evaluator: null` when turning off). Wrapped clients and `aiInteraction` stay in place either way.
 
 ## 12. MCP server: `wrapMcpServer`
 
-One call per server, before `connect()`, where the `McpServer` (or low-level `Server`) is created. The same call covers `@modelcontextprotocol/sdk` 1.x (`McpServer` from `@modelcontextprotocol/sdk/server/mcp.js`, low-level `Server`) and `@modelcontextprotocol/server` 2.x. Tools, resources and prompts stay as written.
+One call per server, before `connect()`, where the `McpServer` (or low-level `Server`) is created. An app that serves several MCP endpoints wraps each, with a distinct name in each server's constructor, and an `identify` that reads what that endpoint's auth put on the request. The same call covers `@modelcontextprotocol/sdk` 1.x (`McpServer` from `@modelcontextprotocol/sdk/server/mcp.js`, low-level `Server`) and `@modelcontextprotocol/server` 2.x. Tools, resources and prompts stay as written.
 
 ```ts
 import { wrapMcpServer } from '@rudderstack/ai/mcp';
@@ -373,12 +399,12 @@ const handler = createMcpHandler(buildServer);
 
 - `identify(authInfo)` runs per request and returns any of `userId`, `anonymousId`, `accountId`, `oauthClientId`, `tokenScopes`, `authMethod`, `country`. Without auth (stdio) events go out as `ai_system`, attributed to the session.
 - `request_context` is added to every tool's input schema and stripped before the tool runs; the model fills `intent` (from the list, or `other`) and `user_sentiment`. `call_reason` and `capability_detail` only with `captureContent`.
-- Supported: `@modelcontextprotocol/sdk` `>=1.31.0 <2.0.0` (protocol up to 2025-11-25) and `@modelcontextprotocol/server` `>=2.0.0 <3.0.0` (also the stateless 2026-07-28, with elicitation through `input_required`), on stdio, Streamable HTTP and HTTP+SSE. Examples: `mcp-server` (`McpServer`), `mcp-server-lowlevel` (low-level `Server`), `mcp-server-v2` (2.x, both protocol revisions).
+- Supported: `@modelcontextprotocol/sdk` `>=1.31.0 <2.0.0` (protocol up to 2025-11-25) and `@modelcontextprotocol/server` `>=2.0.0 <3.0.0` (also the stateless 2026-07-28, with elicitation through `input_required`), on stdio and Streamable HTTP, plus the deprecated HTTP+SSE on 1.x only.
 - State (`mcp_client_seen` window, call counters, retry hashes, pending elicitations) is in memory per server name, per process: servers rebuilt per request under one name share it, so give each distinct server a unique name. Each replica reports its own `mcp_client_seen`.
-- Flush when the process stops (section 7): the existing shutdown hook for HTTP servers; for stdio, the transport's `onclose`.
+- Flush when the process stops (section 7): the existing shutdown hook for HTTP servers; for stdio, on stdin `end` and `SIGTERM`.
 - `call_index` counts reported calls with no gaps: on 2026-07-28 the `input_required` leg sends no `mcp_tool_called`, and the elicitation retry keeps that leg's `call_index`.
 - A declared tool event follows its `mcp_tool_called` on success and on failure, including a call whose arguments failed validation (`tool_status: error`).
-- An agent built with this SDK and the OpenAI Agents SDK passes its `interaction_id` to MCP servers with `toolMetaResolver: rudderStackMcpToolMeta()` (from `@rudderstack/ai/openai-agents`) on `MCPServerStdio` / `MCPServerStreamableHttp` / `MCPServerSSE`, so each `mcp_tool_called` joins the answer that made it (example `openai-agents-mcp`). It adds `com.rudderstack/trace_id` only when the interaction has a `trace_id`, and `traceparent` only with `linkTraceId: true`. The agent's `tool_breakdown` entries for those tools carry `mcp_server`, read from the Agents SDK function span: keep Agents SDK tracing on (no `tracingDisabled`, no `OPENAI_AGENTS_DISABLE_TRACING`).
+- An agent built with this SDK and the OpenAI Agents SDK passes its `interaction_id` to MCP servers with `toolMetaResolver: rudderStackMcpToolMeta()` (from `@rudderstack/ai/openai-agents`) on `MCPServerStdio` / `MCPServerStreamableHttp` / `MCPServerSSE`, so each `mcp_tool_called` joins the answer that made it. It adds `com.rudderstack/trace_id` only when the interaction has a `trace_id`, and `traceparent` only with `linkTraceId: true`. The agent's `tool_breakdown` entries for those tools carry `mcp_server`, read from the Agents SDK function span: keep Agents SDK tracing on (no `tracingDisabled`, no `OPENAI_AGENTS_DISABLE_TRACING`).
 - MCP Events (`mcpEvents: true`, `trackMcpEventSubscription`, `wrapMcpEventSender`) only when the plan turns it on: experimental. A delivery without `subscriptionId` or `eventId` is dropped with one warning per process; a missing `eventName` is sent as `unknown`.
 
 ## 13. Tests
@@ -410,7 +436,7 @@ it('sends one answer per chat turn', async () => {
 | One answer split into several `ai_response_received` | calls outside `aiInteraction`, a stream read after the callback returned without `bind`, or a LangChain handler on a model constructor |
 | Events missing from a script or Lambda | `await flush()` before exit |
 | No `total_cost_usd` | no registered price for the model (for Gemini, for its provider `gcp.gemini` / `gcp.vertex_ai`) and no provider-reported cost |
-| No `trace_id` | opt-in since 0.5.0: pass `traceId` / `setTraceId()`, or register the span processor with `linkTraceId: true` |
+| No `trace_id` | opt-in: pass `traceId` / `setTraceId()`, or register the span processor with `linkTraceId: true` |
 | `response_text` / `tool_breakdown` entries missing on a large answer | the event was over 30,000 bytes of properties: captured text is dropped first, then breakdown entries from the end |
 
 `RUDDERSTACK_AI_DEBUG=1` logs everything the SDK drops or ignores.

@@ -23,7 +23,7 @@ Each side reports what it saw: never forward model, provider, tokens, cost, tool
 
 `interaction_id`: the browser mints one per prompt (`crypto.randomUUID()`), sends it with the chat request (`x-interaction-id` header or a body field), and uses it for later actions on that answer. The server validates it is a UUID and passes it as `interactionId` / `interaction_id`; if invalid it lets the SDK mint one and returns that. When the plan says `interaction_id_source: sdk` or `app`, the browser instead reads the ID from the chat response.
 
-Identity: the JavaScript SDK supplies `userId` / `anonymousId` itself; `userId` only after the page calls `rudderanalytics.identify(userId)`. Without it, browser events carry only `anonymousId` and join the server's events through that and the cookies; adding `identify()` on login is a separate change the user decides. Its cookies (`rl_anonymous_id`, `rl_session`) reach same-origin server routes, which is how the server's events join the same profile and session. Cross-origin chat APIs need `credentials: 'include'` and a cookie domain the API can read.
+Identity: the JavaScript SDK supplies `userId` / `anonymousId` itself; `userId` only after the page calls `rudderanalytics.identify(userId)`. Without it, browser events carry only `anonymousId` and join the server's events through that and the cookies; adding `identify()` on login is a separate change, out of scope here. Its cookies (`rl_anonymous_id`, `rl_session`) reach same-origin server routes, which is how the server's events join the same profile and session. Cross-origin chat APIs need `credentials: 'include'` and a cookie domain the API can read.
 
 ## Code
 
@@ -82,7 +82,7 @@ trackAi('ai_response_received', {
 });
 ```
 
-Fit this into the app's existing submit handler; do not restructure it. With `interaction_id_source: sdk` or `app` the browser learns the ID only from the response: send the prompt copy then, just before the answer copy. An error reported inside a successful HTTP response or stream is `client_error_kind: 'agent_error'`.
+Fit this into the app's existing submit handler; do not restructure it. With `interaction_id_source: sdk` or `app` the browser learns the ID only from the response: send the prompt copy then, just before the answer copy. An error reported inside a successful HTTP response or stream is `client_error_kind: 'agent_error'`. When the first message of a new thread fails before the server returns a `conversation_id`, skip the answer copy: both schemas require `conversation_id` on `ai_response_received`.
 
 A chat API on another origin needs `credentials: 'include'` (and CORS that allows credentials) for the cookies to arrive.
 
@@ -135,99 +135,4 @@ Never send prompt, answer, feedback text or conversation titles from the browser
 
 ## Schema
 
-The AI events v0.3 JSON Schema (`ai-events-v0.3.schema.json`) defines the client copies' fields (`source`, `prompt_source`, `client_error_kind`, `clicked_through`, `card_kind`) but not the engagement events, and it cannot tell a client copy that carries generation details from a server row. Validate client events against both: the v0.3 schema for the three copies, and this schema for the client-only rules: `source: client`, no text, no generation details, and the engagement events.
-
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://rudderstack.com/schemas/ai-client-events/0.2.0",
-  "title": "RudderStack AI client events v0.2.0 (draft, follows AI events spec v0.3)",
-  "$defs": {
-    "common": {
-      "type": "object",
-      "required": ["source"],
-      "properties": {
-        "source": { "const": "client" },
-        "feature": { "type": "string", "minLength": 1 },
-        "surface": { "enum": ["web", "mobile", "slack", "teams", "email", "chatgpt_app", "claude_app", "ide", "api", "other"] },
-        "conversation_id": { "type": "string", "minLength": 1 }
-      }
-    },
-    "with_conversation": {
-      "allOf": [{ "$ref": "#/$defs/common" }],
-      "required": ["conversation_id"]
-    },
-    "with_interaction": {
-      "allOf": [{ "$ref": "#/$defs/with_conversation" }],
-      "required": ["interaction_id"],
-      "properties": { "interaction_id": { "type": "string", "minLength": 1 } }
-    },
-    "ai_assistant_opened": {
-      "allOf": [{ "$ref": "#/$defs/common" }],
-      "properties": { "entry_point": { "type": "string", "examples": ["launcher", "shortcut", "deep_link", "auto"] } }
-    },
-    "ai_assistant_closed": {
-      "allOf": [{ "$ref": "#/$defs/common" }],
-      "properties": { "open_duration_ms": { "type": "integer", "minimum": 0 } }
-    },
-    "ai_conversation_started": { "allOf": [{ "$ref": "#/$defs/common" }] },
-    "ai_conversation_switched": {
-      "allOf": [{ "$ref": "#/$defs/with_conversation" }],
-      "required": ["from_conversation_id"],
-      "properties": { "from_conversation_id": { "type": "string", "minLength": 1 } }
-    },
-    "ai_conversation_renamed": {
-      "allOf": [{ "$ref": "#/$defs/with_conversation" }],
-      "not": { "anyOf": [{ "required": ["title"] }, { "required": ["name"] }] }
-    },
-    "ai_conversation_deleted": { "allOf": [{ "$ref": "#/$defs/with_conversation" }] },
-    "ai_user_action": {
-      "allOf": [{ "$ref": "#/$defs/with_interaction" }],
-      "required": ["action_type"],
-      "properties": {
-        "action_type": {
-          "enum": ["feedback_given", "feedback_retracted", "copied_response", "shared", "reported", "regenerated", "accepted", "rejected", "edited", "clicked_through"]
-        },
-        "action_details": {
-          "type": "object",
-          "properties": {
-            "feedback_type": { "type": "string" },
-            "card_kind": { "type": "string" },
-            "target_type": { "type": "string", "not": { "pattern": "[/?=]" } }
-          },
-          "not": { "anyOf": [{ "required": ["feedback_text"] }, { "required": ["url"] }, { "required": ["target_url"] }] }
-        }
-      }
-    },
-    "ai_user_prompt_created": {
-      "allOf": [{ "$ref": "#/$defs/common" }],
-      "required": ["interaction_id"],
-      "properties": {
-        "interaction_id": { "type": "string", "minLength": 1 },
-        "prompt_source": { "enum": ["composer", "starter_suggestion", "follow_up_action", "retry"] },
-        "suggestion_id": { "type": "string", "minLength": 1 },
-        "prompt_length": { "type": "integer", "minimum": 0 }
-      },
-      "not": { "required": ["prompt_text"] }
-    },
-    "ai_response_received": {
-      "allOf": [{ "$ref": "#/$defs/with_interaction" }],
-      "required": ["response_status"],
-      "properties": {
-        "response_status": { "enum": ["success", "error", "timeout", "cancelled"] },
-        "client_error_kind": { "enum": ["offline", "interrupted", "http_4xx", "http_5xx", "agent_error", "unknown"] },
-        "time_to_first_render_ms": { "type": "integer", "minimum": 0 }
-      },
-      "not": {
-        "anyOf": [
-          { "required": ["response_text"] }, { "required": ["primary_model"] }, { "required": ["primary_provider"] },
-          { "required": ["total_tokens"] }, { "required": ["total_cost_usd"] }, { "required": ["llm_call_count"] },
-          { "required": ["tool_call_count"] }, { "required": ["usage_breakdown"] }, { "required": ["tool_breakdown"] },
-          { "required": ["finish_reason"] }, { "required": ["trace_id"] }, { "required": ["client_disconnected"] },
-          { "required": ["total_input_tokens"] }, { "required": ["total_output_tokens"] }, { "required": ["error_type"] }
-        ]
-      }
-    }
-  }
-}
-```
+The AI events v0.3 JSON Schema (`ai-events-v0.3.schema.json`) defines the client copies' fields (`source`, `prompt_source`, `client_error_kind`, `clicked_through`, `card_kind`) but not the engagement events, and it cannot tell a client copy that carries generation details from a server row. The client-only rules (`source: client`, no text, no generation details, the engagement events) are in `assets/ai-client-events.schema.json` of the sibling `rudder-ai-events-verify` skill (`../rudder-ai-events-verify/assets/ai-client-events.schema.json` from this skill's directory); verify validates client events against both.
