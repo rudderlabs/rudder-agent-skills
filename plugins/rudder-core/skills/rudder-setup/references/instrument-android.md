@@ -272,14 +272,19 @@ security config allows the host. Allow that one host in the debug build, with tw
 </manifest>
 ```
 
-If a manifest the debug build uses already sets `android:usesCleartextTraffic="true"`, add neither file. Plain HTTP
-to `10.0.2.2` is allowed already, and Android 7.0 and later ignore that attribute once a network security config is
-present, so the config would block plain HTTP to every other host in the debug build.
+Android 7.0 and later ignore `android:usesCleartextTraffic` once a network security config is present. So first
+look for `android:networkSecurityConfig` in every manifest the debug build uses.
+
+- **No manifest sets it.** If one sets `android:usesCleartextTraffic="true"`, add neither file: plain HTTP to
+  `10.0.2.2` is allowed already, and a new config would block plain HTTP to every other host in the debug build.
+  Otherwise add both files.
+- **A manifest sets it.** That config decides, whatever `usesCleartextTraffic` says. If it already permits
+  cleartext for `10.0.2.2` or in its `base-config`, add neither file. Otherwise copy its rules into the debug file,
+  add the `10.0.2.2` `domain-config` above beside them, add `xmlns:tools="http://schemas.android.com/tools"` to the
+  debug `<manifest>`, and add `tools:replace="android:networkSecurityConfig"` to the debug `<application>`.
 
 If `app/src/debug/AndroidManifest.xml` already exists, add the attribute to its `<application>` instead of
-replacing the file. If the main manifest already sets `android:networkSecurityConfig`, copy that file's rules into
-the debug file, add `xmlns:tools="http://schemas.android.com/tools"` to the debug `<manifest>`, and add
-`tools:replace="android:networkSecurityConfig"` to the debug `<application>`.
+replacing the file.
 
 ## Check
 

@@ -174,6 +174,13 @@ WEBHOOK_AUTH:
   reports an unescaped one as an error.
 - Every referenced variable must be defined, even for `validate`. A missing one fails with
   `error[project/var-substitution]` and the file, line and column.
+- A value that spans lines, such as a PEM private key or certificate, keeps its line breaks only from rudder-cli
+  0.29.0. Older releases paste it into the spec's text inside the quotes, where YAML turns each line break into a
+  space, and validate still passes, so RudderStack stores a key that does not work. Snowflake's key-pair
+  `private_key` is such a value. With 0.28.0 or earlier, offer the type's other way to sign in, such as a password
+  for Snowflake, or say that this rudder-cli cannot connect that destination. From 0.29.0, ask the user to write
+  the value in the var file as a YAML literal block, `NAME: |` with the value's lines below it, each indented by
+  two spaces. The reference in the spec keeps its single quotes.
 
 ## Errors you will meet
 

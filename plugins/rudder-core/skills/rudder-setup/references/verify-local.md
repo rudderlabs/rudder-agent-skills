@@ -104,6 +104,7 @@ for i in $(seq 50); do
 done
 jq -r .table "$d/report.json"
 jq -e .pass "$d/report.json" >/dev/null && exit 0
+kill -0 "$pid" 2>/dev/null || { echo 'the listener stopped during the check'; tail -n 3 "$d/log" >&2; exit 3; }
 echo; echo 'Failed requests since the mark:'
 curl -fsS "$url/_dev/v1/requests?kind=all&failed=true&since=$cur&view=compact" | jq -c '.requests[] | {seq, route, statusCode, kind, reason: .rejection.reason}'
 echo 'Diagnosis:'
@@ -112,7 +113,9 @@ exit 1
 ```
 
 The loop waits up to 10 seconds for events still in flight, and stops early once every planned event has
-arrived. A last line the listener is still writing is left for the next read, never parsed half-written.
+arrived. A last line the listener is still writing is left for the next read, never parsed half-written. When
+the check does not pass, it tests the listener again before the diagnosis, so a listener that stopped during the
+wait exits 3, not 1.
 
 ### 5. Stop
 
@@ -158,6 +161,7 @@ while :; do
 done
 jq -r .table "$d/report.json"
 jq -e .pass "$d/report.json" >/dev/null && exit 0
+kill -0 "$pid" 2>/dev/null || { echo 'the listener stopped during the check'; tail -n 3 "$d/log" >&2; exit 3; }
 echo; echo 'Failed requests:'
 curl -fsS "$url/_dev/v1/requests?kind=all&failed=true&view=compact" | jq -c '.requests[] | {seq, route, statusCode, kind, reason: .rejection.reason}'
 echo 'Diagnosis:'
