@@ -59,6 +59,8 @@ npx skills update
 
 Non-interactive equivalent: `claude plugin marketplace add rudderlabs/rudder-agent-skills` then `claude plugin install <plugin>@rudder-agent-skills`. Update with `/plugin marketplace update rudder-agent-skills`.
 
+To try a plugin from an unmerged branch, clone that branch and either start `claude --plugin-dir ./rudder-agent-skills/plugins/<plugin>` (this session only) or run `claude plugin marketplace add ./rudder-agent-skills`, then install as above.
+
 ### Cursor
 
 Add it straight from the [cursor.directory listing](https://cursor.directory/plugins/rudder-agent-skills) with **Add to Cursor**, or use the Skills CLI:
