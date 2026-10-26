@@ -26,6 +26,7 @@ CLIENT_ONLY = {"ai_assistant_opened", "ai_assistant_closed", "ai_conversation_st
 MCP_EVENTS = {"mcp_client_seen", "mcp_tool_called", "mcp_elicitation_completed", "mcp_capability_requested",
               "mcp_resource_read", "mcp_prompt_used", "mcp_event_subscription_changed", "mcp_event_delivered"}
 KNOWN_EVENTS = SPEC_EVENTS | MCP_EVENTS | CLIENT_ONLY | {"ai_otel_span"}  # ai_otel_span: the SDKs' tracing export
+TRACING = {"tracing", "tracing/vercel-ai-sdk"}  # integrations of span events, which carry no specVersion
 TURN_EVENTS = {"ai_user_prompt_created", "ai_response_received"}  # a turn's surface comes from these
 # intent_summary is not here: the classifier's own intent_summary option sends it, whatever the capture switch
 CONTENT = {"prompt_text", "response_text", "explanation", "call_reason", "capability_detail"}
@@ -126,6 +127,7 @@ legacy = collections.Counter()
 clients_seen = collections.Counter()
 answers, surfaces, client_surfaces = {}, {}, {}
 features, client_features = {}, {}  # a turn's feature, like its surface
+scopes = collections.defaultdict(lambda: {"feature": set(), "surface": set()})
 declared = collections.Counter()  # non-MCP declared tool events per interaction_id
 actions = collections.defaultdict(lambda: {"server": collections.Counter(), "client": collections.Counter()})
 runs, tool_calls = [], []
@@ -152,11 +154,13 @@ for i, m in enumerate(tracks):
         continue
     names[name] += 1
     is_mcp = name in MCP_EVENTS or w.get("integration") == "mcp"
-    # past the legacy branch, an event with a customer name was sent by an AI SDK: a declared tool event
-    is_declared = not name.startswith(("ai_", "mcp_"))
+    # a raw tracing span may carry a custom eventName; past the legacy branch, any other event with a
+    # customer name was sent by an AI SDK as a declared tool event
+    is_span = name == "ai_otel_span" or (w.get("integration") in TRACING and name not in KNOWN_EVENTS)
+    is_declared = not name.startswith(("ai_", "mcp_")) and not is_span
     if not user and not anon and not is_client:
         problems.append(f"{where}: no userId or anonymousId")
-    if not is_declared and not is_client and name not in KNOWN_EVENTS:
+    if not is_declared and not is_span and not is_client and name not in KNOWN_EVENTS:
         problems.append(f"{where}: not an AI events spec name (misspelled?)")
     if name in CLIENT_ONLY and not is_client:
         problems.append(f"{where}: client-only event without source: client")
@@ -167,15 +171,15 @@ for i, m in enumerate(tracks):
         if props.get("source") == "client" and name not in CLIENT_COPIES:
             problems.append(f"{where}: source: client on an event the browser never sends")
         problems += [f"{where} (spec): {e}" for e in schema_errors(spec, args.spec, definition, props)]
-    # wrapper metadata on every SDK event; tracing spans (ai_otel_span) carry no specVersion
-    if not is_client and w.get("integration") != "tracing" and w.get("specVersion") != SPEC_VERSION:
+    # wrapper metadata on every SDK event; tracing spans carry no specVersion
+    if not is_client and w.get("integration") not in TRACING and w.get("specVersion") != SPEC_VERSION:
         problems.append(f"{where}: context.wrapperLibrary.specVersion is {w.get('specVersion')!r}")
     if not is_client and w.get("name") not in SDK_NAMES:
         problems.append(f"{where}: context.wrapperLibrary.name is {w.get('name')!r}, not one of {sorted(SDK_NAMES)}")
     # trackAction takes no feature, so server ai_user_action has none; MCP events have none either;
-    # a standalone score carries one only when given, and ai_otel_span (tracing) none by default:
+    # a standalone score carries one only when given, and tracing spans none by default:
     # check it only when present
-    optional_feature = name in {"ai_interaction_scored", "ai_otel_span"} and "feature" not in props
+    optional_feature = (name == "ai_interaction_scored" or is_span) and "feature" not in props
     if args.feature and not is_mcp and not optional_feature and (is_client or name != "ai_user_action") \
             and props.get("feature") not in args.feature:
         problems.append(f"{where}: feature {props.get('feature')!r} not in {args.feature}")
@@ -239,6 +243,9 @@ for i, m in enumerate(tracks):
         by_interaction[iid][(name + (" (paused)" if paused else ""), "client" if is_client else "server")] += 1
         if props.get("conversation_id"):
             conversations[iid].add(props["conversation_id"])
+        for key in ("feature", "surface"):  # every copy of a turn lands in the same dashboard segment
+            if props.get(key):
+                scopes[iid][key].add(props[key])
         if is_declared:
             declared[iid] += 1
         if name == "ai_user_action":
@@ -279,9 +286,12 @@ def server_actions(iid):
                                                 if f in (None, feature) and s in (None, surface)))
 
 for iid, c in by_interaction.items():
-    for side in ("server", "client"):
-        if c[("ai_response_received", side)] > 1:
-            problems.append(f"interaction {iid}: {c[('ai_response_received', side)]} {side} ai_response_received (expected 1)")
+    # one browser copy per answer the browser rendered: a paused one and the resumed final one
+    shown = max(1, c[("ai_response_received", "server")] + c[("ai_response_received (paused)", "server")])
+    for side, limit in (("server", 1), ("client", shown)):
+        if c[("ai_response_received", side)] > limit:
+            problems.append(f"interaction {iid}: {c[('ai_response_received', side)]} {side} ai_response_received "
+                            f"(expected {'at most ' if limit > 1 else ''}{limit})")
         if c[("ai_user_prompt_created", side)] > 1:
             problems.append(f"interaction {iid}: {c[('ai_user_prompt_created', side)]} {side} ai_user_prompt_created (expected at most 1)")
     if c[("ai_user_prompt_created", "server")] and not (c[("ai_response_received", "server")]
@@ -328,6 +338,9 @@ for iid, c in by_interaction.items():
     if declared[iid] and not responses:
         gap(f"interaction {iid}: declared tool event {sorted(n for (n, _) in c if n not in SPEC_EVENTS)} "
             f"for an answer not in this capture")
+    for key in ("feature", "surface"):
+        if len(scopes[iid][key]) > 1:
+            problems.append(f"interaction {iid}: several {key} values {sorted(scopes[iid][key])}")
     if len(conversations[iid]) > 1:
         problems.append(f"interaction {iid}: several conversation_id values {sorted(conversations[iid])}")
 

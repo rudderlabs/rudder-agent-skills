@@ -7,7 +7,7 @@ export function recorder(path = 'events.jsonl') {
   appendFileSync(path, ''); // a run that sends nothing (AI switch off, new install) still leaves a capture
   return {
     track(message) {
-      appendFileSync(path, JSON.stringify({ type: 'track', ...message }) + '\n');
+      appendFileSync(path, JSON.stringify({ ...message, type: 'track' }) + '\n'); // the method called wins
     },
     async flush() {},
   };
