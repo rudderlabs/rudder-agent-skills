@@ -49,15 +49,15 @@ Never install rudder-cli with npm, npx or Homebrew. No npm package or Homebrew t
 
 ### Run the install script
 
-Download the script, then run it. Do not pipe it into a shell.
+Download the script into a new temporary folder, then run it. Do not pipe it into a shell.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/rudderlabs/rudder-iac/main/install.sh -o /tmp/install-rudder-cli.sh && sh /tmp/install-rudder-cli.sh
+d=$(mktemp -d) && curl -fsSL https://raw.githubusercontent.com/rudderlabs/rudder-iac/main/install.sh -o "$d/install.sh" && sh "$d/install.sh"
 ```
 
 ### If the script download fails with 404
 
-The script is not published yet. Install the release archive directly instead. This block does what the script does. It runs in a subshell, so an error ends the block and leaves the shell running:
+The script is not published yet. Install the release archive directly instead. This block does what the script does, including the arm64 build under Rosetta. It runs in a subshell, so an error ends the block and leaves the shell running:
 
 ```bash
 (
@@ -70,6 +70,7 @@ The script is not published yet. Install the release archive directly instead. T
     i386 | i486 | i586 | i686) arch=i386 ;;
     *) echo "no rudder-cli build for $(uname -m)" >&2; exit 1 ;;
   esac
+  if [ "$(uname -s)" = Darwin ] && [ "$arch" = x86_64 ] && [ "$(sysctl -in hw.optional.arm64 2>/dev/null)" = 1 ]; then arch=arm64; fi
   archive="rudder-cli_$(uname -s)_$arch.tar.gz"
   d=$(mktemp -d); trap 'rm -rf "$d"' EXIT
   curl -fsSL -o "$d/$archive" "$releases/download/$tag/$archive"
@@ -96,8 +97,8 @@ command -v rudder-cli
 If it prints the path of `~/.local/bin/rudder-cli`, go on. If it prints nothing, `~/.local/bin` is not on PATH. If it prints another path, an older copy comes first on PATH. In both cases:
 
 - Do not stop, and do not ask the user to edit their shell profile or restart you now. The install script prints an `export PATH` line for the profile and says to open a new terminal. That line goes in your closing summary instead.
-- For the rest of the session, run `"$HOME/.local/bin/rudder-cli"` wherever this skill or another RudderStack skill says `rudder-cli`.
-- In your closing summary, show the line the user adds to their shell profile (`~/.zshrc`, `~/.bashrc` or `~/.profile`) so that a new terminal runs this copy:
+- For the rest of the session, run `"$HOME/.local/bin/rudder-cli"` wherever this skill or another RudderStack skill says `rudder-cli`. When you ask the user to run a rudder-cli command, such as `rudder-cli auth login`, give it with the full path as well.
+- In your closing summary, or in your last message if you stop before it, show the line the user adds to their shell profile (`~/.zshrc`, `~/.bash_profile` for bash on macOS, `~/.bashrc` for bash on Linux, or `~/.profile`) so that a new terminal runs this copy:
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"

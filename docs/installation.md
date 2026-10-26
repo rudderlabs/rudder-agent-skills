@@ -9,10 +9,10 @@ This guide covers installing RudderStack agent skills for various coding agents.
 Install `rudder-cli` from the [rudder-iac releases](https://github.com/rudderlabs/rudder-iac/releases). On macOS and Linux, the install script picks the archive for your OS and CPU from the latest release, checks it against the release's checksums file, and puts `rudder-cli` in `~/.local/bin` without `sudo`:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/rudderlabs/rudder-iac/main/install.sh -o /tmp/install-rudder-cli.sh && sh /tmp/install-rudder-cli.sh
+d=$(mktemp -d) && curl -fsSL https://raw.githubusercontent.com/rudderlabs/rudder-iac/main/install.sh -o "$d/install.sh" && sh "$d/install.sh"
 ```
 
-If the first command fails with a 404, the script is not published yet. This block installs the same archive with the same checksum check. It runs in a subshell, so an error ends the block and leaves your shell open:
+If the first command fails with a 404, the script is not published yet. This block installs the same archive with the same checksum check, and the arm64 build under Rosetta as the script does. It runs in a subshell, so an error ends the block and leaves your shell open:
 
 ```bash
 (
@@ -25,6 +25,7 @@ If the first command fails with a 404, the script is not published yet. This blo
     i386 | i486 | i586 | i686) arch=i386 ;;
     *) echo "no rudder-cli build for $(uname -m)" >&2; exit 1 ;;
   esac
+  if [ "$(uname -s)" = Darwin ] && [ "$arch" = x86_64 ] && [ "$(sysctl -in hw.optional.arm64 2>/dev/null)" = 1 ]; then arch=arm64; fi
   archive="rudder-cli_$(uname -s)_$arch.tar.gz"
   d=$(mktemp -d); trap 'rm -rf "$d"' EXIT
   curl -fsSL -o "$d/$archive" "$releases/download/$tag/$archive"
