@@ -1,6 +1,6 @@
 ---
 name: rudder-ai-events-setup
-description: "Onboards an existing app to RudderStack AI events: discovers chat, background-agent, browser and MCP surfaces, then drafts the ai-events.md plan for approval. Use when adding AI events, @rudderstack/ai, rudderstack-ai or ai-sdk-go to an app, or tracking LLM or agent usage in RudderStack."
+description: "Onboards an app to RudderStack AI events, including moving existing RudderStack LLM, chat or agent events to them: discovers chat, agent, browser and MCP surfaces and drafts ai-events.md. Use when adding @rudderstack/ai, rudderstack-ai or ai-sdk-go, or replacing custom AI tracking."
 allowed-tools: "Bash(rg *), Bash(grep *), Bash(node --version), Bash(python3 --version), Bash(uv run python --version), Bash(*/.venv/bin/python --version), Bash(go version), Bash(npm view *), Bash(pip index versions *), Bash(go list -m *), Bash(git status), Bash(git fetch *), Bash(git log *), Bash(git rev-parse *), Bash(git branch *), Read, Write, Edit, Glob, Grep"
 ---
 

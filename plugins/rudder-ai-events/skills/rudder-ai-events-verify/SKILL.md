@@ -1,6 +1,6 @@
 ---
 name: rudder-ai-events-verify
-description: "Verifies RudderStack AI events locally: captures what an instrumented app or MCP server sends, validates it against the AI events v0.3 schema, and checks joins, counts, identity, content and switches. Use when testing AI events, or when AI or MCP events look wrong or missing."
+description: "Verifies RudderStack AI events locally and checks a move from existing RudderStack events: validates captures against the v0.3 schema, joins, switches and legacy events. Use when testing AI events, comparing old and new tracking, or when AI or MCP events look wrong or missing."
 allowed-tools: "Bash(python3 *), Bash(python *), Bash(*/.venv/bin/python *), Bash(npm *), Bash(npx *), Bash(pnpm *), Bash(yarn *), Bash(bun *), Bash(node *), Bash(uv *), Bash(poetry *), Bash(pytest *), Bash(env *), Bash(curl *), Bash(tar *), Bash(cp *), Bash(mkdir *), Bash(lsof *), Bash(kill *), Bash(go build *), Bash(go run *), Bash(go test *), Bash(go -C *), Bash(date *), Read, Write, Edit, Glob, Grep"
 ---
 
@@ -9,6 +9,8 @@ allowed-tools: "Bash(python3 *), Bash(python *), Bash(*/.venv/bin/python *), Bas
 Proves the instrumentation sends what `ai-events.md` promises, before any real traffic. Runs offline: a recorder or mock RudderStack client, a mock model, no provider keys. Verification is not optional: it runs, and passes, before a commit or PR is proposed. If the user commits first, say plainly that verify has not run.
 
 Scripts in `scripts/`, the client-event schema in `assets/`, procedures and the checklist in `references/verification.md`.
+
+**Migration or new install.** When the plan lists legacy events (the app already sends its own AI-related events through a RudderStack SDK), run every check below. With no legacy events, skip the legacy-switch capture, the legacy and breaking-change checks and the before/after diff: every event in `## What changes` is new, taken from the switch-on capture.
 
 ## Workflow
 
