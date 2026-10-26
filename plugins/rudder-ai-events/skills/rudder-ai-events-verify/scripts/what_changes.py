@@ -18,7 +18,7 @@ ID_KEY = re.compile(r"(^|_)id$|Id$|^on_behalf_of$|[eE]mail")
 PERSONAL = {"traits"}  # identify() traits (email, name, ...) ride along in context
 EMAIL = re.compile(r"[^\s@\"]+@[^\s@\"]+\.\w+")
 VARY = re.compile(r"^(interaction_id|conversation_id|parent_interaction_id|trace_id|anonymousId|anonymous_id|sessionId)$"
-                  r"|_ms$|[Ll]atency|[Dd]uration|At$")
+                  r"|_ms$|[Ll]atency|[Dd]uration|At$|[Tt]imestamp")
 
 
 def load(path):
@@ -34,7 +34,7 @@ def redact(value, key=""):
     if key in PERSONAL or (value is not None and not isinstance(value, (dict, list)) and ID_KEY.search(key)):
         return f"<{key}>"
     if isinstance(value, dict):
-        return {k: redact(v, k) for k, v in value.items() if k not in DROP}
+        return {k: redact(v, k) for k, v in value.items()}
     if isinstance(value, list):
         return [redact(v, key) for v in value]
     if isinstance(value, str):
@@ -42,12 +42,16 @@ def redact(value, key=""):
     return value
 
 
+def shown(message):  # envelope fields are per send; nested ones are payload and stay
+    return redact({k: v for k, v in message.items() if k not in DROP})
+
+
 def norm(value, key=""):
     """Comparable form: run-varying and redacted fields keep only their type, at any depth (lists included)."""
     if VARY.search(key) or ID_KEY.search(key) or key in PERSONAL:
         return type(value).__name__
     if isinstance(value, dict):
-        return {k: norm(v, k) for k, v in value.items() if k not in DROP}
+        return {k: norm(v, k) for k, v in value.items()}
     if isinstance(value, list):
         return [norm(v, key) for v in value]
     return redact(value, key)
@@ -56,7 +60,7 @@ def norm(value, key=""):
 def fields(message, prefix=""):
     out = {}
     for k, v in message.items():
-        if k in DROP:
+        if not prefix and k in DROP:  # envelope only: a payload's own messageId or timestamp is compared by type
             continue
         path = f"{prefix}{k}"
         if isinstance(v, dict) and v and k not in PERSONAL:
@@ -101,5 +105,5 @@ for name in sorted(by_b.keys() | by_a.keys()):
 
 for name, diff, (mb, ma) in changed:
     print(f"\n#### `{name}`\n\nDiffering fields: {', '.join(diff) or 'count only'}\n")
-    print("Before:\n```json\n" + json.dumps(redact(mb), indent=2, sort_keys=True) + "\n```")
-    print("After:\n```json\n" + json.dumps(redact(ma), indent=2, sort_keys=True) + "\n```")
+    print("Before:\n```json\n" + json.dumps(shown(mb), indent=2, sort_keys=True) + "\n```")
+    print("After:\n```json\n" + json.dumps(shown(ma), indent=2, sort_keys=True) + "\n```")

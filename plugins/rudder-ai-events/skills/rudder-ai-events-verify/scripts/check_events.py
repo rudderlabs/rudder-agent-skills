@@ -17,6 +17,7 @@ SDK_NAMES = {"@rudderstack/ai", "rudderstack-ai", "ai-sdk-go"}  # context.wrappe
 SPEC_EVENTS = {"ai_user_prompt_created", "ai_response_received", "ai_user_action", "ai_interaction_classified",
                "ai_interaction_scored", "ai_llm_response_received"}
 CLIENT_COPIES = {"ai_user_prompt_created", "ai_response_received", "ai_user_action"}
+FAILURE_STATUSES = {"error", "timeout", "cancelled", "incomplete"}  # what an app-caught failure may report
 CLIENT_ONLY = {"ai_assistant_opened", "ai_assistant_closed", "ai_conversation_started",
                "ai_conversation_switched", "ai_conversation_renamed", "ai_conversation_deleted"}
 MCP_EVENTS = {"mcp_client_seen", "mcp_tool_called", "mcp_elicitation_completed", "mcp_capability_requested",
@@ -194,8 +195,11 @@ for iid in args.failed_interaction:
     answer = answers.get(iid)
     if answer is None:
         problems.append(f"failed interaction {iid}: no server ai_response_received")
-    elif answer.get("response_status") == "success":
-        problems.append(f"failed interaction {iid}: response_status success (end it with a status and error type)")
+    elif answer.get("response_status") not in FAILURE_STATUSES:
+        problems.append(f"failed interaction {iid}: response_status {answer.get('response_status')!r}, "
+                        f"expected one of {sorted(FAILURE_STATUSES)}")
+    elif not answer.get("error_type"):
+        problems.append(f"failed interaction {iid}: no error_type (end it with a status and error type)")
 
 for r in runs:
     parent = r.get("parent_interaction_id")
