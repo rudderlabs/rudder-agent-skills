@@ -3,7 +3,9 @@
 Usage: what_changes.py before.jsonl after.jsonl
 before: AI events switched off (the app as it was); after: AI events on.
 Prints the event table (counts per capture) and, per changed event, a redacted before/after JSON pair
-with the differing fields listed. IDs, user IDs and timestamps are redacted; check the rest before sharing.
+with the differing fields and values listed. Fields that differ on every run (IDs, timestamps, durations)
+count by presence and type only. IDs, user and account IDs, on_behalf_of, emails, traits and timestamps
+are redacted; check the rest before sharing.
 """
 import collections
 import json
@@ -11,7 +13,11 @@ import re
 import sys
 
 DROP = {"messageId", "timestamp", "originalTimestamp", "sentAt", "receivedAt", "_metadata"}
-ID_KEY = re.compile(r"(^|_)id$|Id$")
+ID_KEY = re.compile(r"(^|_)id$|Id$|^on_behalf_of$|[eE]mail")
+PERSONAL = {"traits"}  # identify() traits (email, name, ...) ride along in context
+EMAIL = re.compile(r"[^\s@\"]+@[^\s@\"]+\.\w+")
+VARY = re.compile(r"^(interaction_id|conversation_id|parent_interaction_id|trace_id|anonymousId|anonymous_id|sessionId)$"
+                  r"|_ms$|[Ll]atency|[Dd]uration|At$")
 
 
 def load(path):
@@ -24,12 +30,14 @@ def row_key(m):  # browser copies are their own rows
 
 
 def redact(value, key=""):
+    if key in PERSONAL or (value is not None and not isinstance(value, (dict, list)) and ID_KEY.search(key)):
+        return f"<{key}>"
     if isinstance(value, dict):
         return {k: redact(v, k) for k, v in value.items() if k not in DROP}
     if isinstance(value, list):
         return [redact(v, key) for v in value]
-    if isinstance(value, str) and ID_KEY.search(key):
-        return f"<{key}>"
+    if isinstance(value, str):
+        return EMAIL.sub("<email>", value)
     return value
 
 
@@ -39,10 +47,12 @@ def fields(message, prefix=""):
         if k in DROP:
             continue
         path = f"{prefix}{k}"
-        if isinstance(v, dict) and v:
+        if isinstance(v, dict) and v and k not in PERSONAL:
             out.update(fields(v, path + "."))
-        else:
+        elif VARY.search(k) or ID_KEY.search(k) or k in PERSONAL:  # differs per run, or redacted: type only
             out[path] = type(v).__name__
+        else:
+            out[path] = json.dumps(redact(v, k), sort_keys=True)
     return out
 
 

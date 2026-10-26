@@ -21,7 +21,7 @@ Scripts in `scripts/`, the client-event schema in `assets/`, procedures and the 
    - **C. Live Events**, after A or B passes: a development source in the user's RudderStack workspace, watched in Live Events.
    - **D. MCP servers**: a real MCP client driving the server in its production transport and session mode, stateless included.
    - Browser events: a recorder in place of `rudderanalytics`, driven with the interaction ID the server returned, appended to the same capture.
-   - Always drive one app-detected failure per surface that has one, and capture the same traffic with each switch off.
+   - Always drive one app-detected failure per surface that has one, and capture the same traffic, browser included, with each switch off.
 5. **Run the app's own tests** too: instrumentation must not break them, and the new server-side tests that assert the captured AI events must exist and pass. Missing tests are a FAIL that goes back to `rudder-ai-events-instrument`.
 6. **Validate** with `check_events.py` and the flags that match the plan (section 3): schema, SDK and `specVersion` per event, one server answer per `interaction_id`, client copies, joins, feature, surface, identity, content, background runs, MCP, legacy events, app-detected failures, switches. A `requested_model` on Anthropic models served through Bedrock or Vertex AI IDs, no `requested_model` from Bedrock, LangChain, the OpenAI Agents SDK or the Claude Agent SDK, and `argument_keys` in any order are not failures. Then the plan checks:
    - **Cost:** every model ID constant the app can send is priced; `unpriced_models` get dummy prices, so missing rates never fail (section 4).

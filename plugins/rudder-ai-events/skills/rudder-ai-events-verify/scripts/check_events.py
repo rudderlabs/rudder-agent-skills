@@ -30,8 +30,11 @@ p.add_argument("--spec", required=True, help="ai-events-v0.3.schema.json")
 p.add_argument("--client-schema", help="assets/ai-client-events.schema.json")
 p.add_argument("--capture-content", action="store_true", help="the plan sets capture_content: true")
 p.add_argument("--expect-legacy", action="append", default=[], help="legacy event that must still be sent")
-p.add_argument("--no-ai-events", action="store_true", help="captured with the AI events switch off: no SDK event may appear")
-p.add_argument("--absent", action="append", default=[], help="event that must not appear (a switched-off legacy event)")
+p.add_argument("--no-ai-events", action="store_true",
+               help="captured with the AI events switch off: no SDK event and no browser AI event may appear")
+p.add_argument("--absent", action="append", default=[],
+               help="legacy event that must not appear (its switch is off); AI SDK events and browser AI copies "
+                    "of the same name do not count")
 p.add_argument("--feature", action="append", default=[], help="allowed feature values (the plan's surfaces)")
 p.add_argument("--surface", action="append", default=[], help="allowed surface values (the plan's surfaces)")
 p.add_argument("--user-id", help="userId expected on user-triggered server events that carry one")
@@ -162,8 +165,12 @@ for iid, c in by_interaction.items():
     if (has_client_copies or args.expect_joins) and iid not in {r.get("interaction_id") for r in runs}:
         if c[("ai_user_prompt_created", "client")] and not c[("ai_user_prompt_created", "server")]:
             gap(f"interaction {iid}: client prompt with no server prompt (request never reached the SDK, or a different ID)")
+        if c[("ai_user_prompt_created", "server")] and not c[("ai_user_prompt_created", "client")]:
+            gap(f"interaction {iid}: server prompt with no client copy (browser copy not sent, or a different ID)")
         if c[("ai_response_received", "server")] and not c[("ai_response_received", "client")]:
             gap(f"interaction {iid}: server answer with no client copy (not shown, client left, or client event lost)")
+        if c[("ai_response_received", "client")] and not c[("ai_response_received", "server")]:
+            gap(f"interaction {iid}: client answer with no server answer (request never reached the SDK, or a different ID)")
     responses = c[("ai_response_received", "server")] + c[("ai_response_received", "client")]
     for event in ("ai_user_action", "ai_interaction_scored"):
         if (c[(event, "server")] or c[(event, "client")]) and not responses:
@@ -199,12 +206,17 @@ if tool_calls:
 for name in args.expect_legacy:
     if not legacy[name]:
         problems.append(f"legacy event {name} was not sent (it must keep sending during migration)")
-for name in args.absent:
-    if names[name] or legacy[name]:
-        problems.append(f"{name} sent {names[name] + legacy[name]} times; its switch is off")
+for name in args.absent:  # legacy provenance only: an AI event may share the legacy event's name
+    if legacy[name]:
+        problems.append(f"legacy {name} sent {legacy[name]} times; its switch is off")
+# browser AI events carry no wrapperLibrary: trackAi must follow the switch too
+client_names = {n for n in client["$defs"] if n.startswith("ai_")} if client else CLIENT_COPIES | CLIENT_ONLY
 sdk_events = sum(1 for m in tracks if (m.get("context") or {}).get("wrapperLibrary"))
+browser_events = sum(1 for m in tracks if (m.get("properties") or {}).get("source") == "client" and m["event"] in client_names)
 if args.no_ai_events and sdk_events:
     problems.append(f"{sdk_events} AI SDK events sent with the AI events switch off")
+if args.no_ai_events and browser_events:
+    problems.append(f"{browser_events} browser AI events sent with the AI events switch off (trackAi not gated on it)")
 
 print("events:", dict(names))
 print("legacy or other events (no wrapperLibrary):", dict(legacy))

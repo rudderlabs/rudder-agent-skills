@@ -137,12 +137,12 @@ Pass only the flags that apply:
 | `--capture-content` | the plan turns capture on |
 | `--feature`, `--surface` | once per planned feature and channel |
 | `--user-id`, `--expect-session` | the requests carried a user and cookies |
-| `--expect-joins` | the browser was driven with the server's IDs: every client/server gap fails instead of being a note |
+| `--expect-joins` | the browser was driven with the server's IDs: every client/server gap, either way (a prompt or answer on one side only), fails instead of being a note; background runs are exempt |
 | `--failed-interaction <id>` | per app-detected failure driven: its server answer must not be `success` |
 | `--expect-legacy <event>` | per planned legacy event; also names a legacy event that uses an `ai_*` name |
 | `--mcp-server`, `--mcp-intent` | per planned server name, and per entry of its `request_context.intents` (without `other`) |
-| `--no-ai-events` | the capture with `ai_events_env` off: no AI SDK event may appear (pair it with `--expect-legacy`) |
-| `--absent <event>` | the capture with `legacy_events_env` off: per legacy event |
+| `--no-ai-events` | the capture with `ai_events_env` off: no AI SDK event and no browser AI event (`source: client`, names from the client schema) may appear (pair it with `--expect-legacy`) |
+| `--absent <event>` | the capture with `legacy_events_env` off: per legacy event; counts only legacy sends (no `context.wrapperLibrary`, not a browser AI copy), so an AI event with the same name does not fail it |
 
 Server events without `context.wrapperLibrary` were not sent by the AI SDK: the checker skips them, counts them as legacy, and fails one that uses an AI event name unless `--expect-legacy` names it. The `run:` lines list each background answer; compare them with the plan's `task_name`, `trigger_source`, `conversation_id_source`, `account_id_source`, `on_behalf_of_source` and `child_tasks`. The `mcp call:` lines list each tool call, marked `joined` when its `interaction_id` matches a captured answer.
 
@@ -168,7 +168,7 @@ After the first PASS, rebuild the plan's `## What changes` from what was capture
 python3 scripts/what_changes.py before.jsonl events.jsonl
 ```
 
-`before.jsonl` is the same traffic with `ai_events_env` off. The script prints the events table (`new`, `changed`, `unchanged`, `removed`, with counts; browser copies on their own rows) and, per changed event, one redacted before/after JSON pair with the differing fields listed. IDs, user IDs and timestamps are redacted; check the remaining values before sharing. Add the "When it fires" column and the other five parts (code touched, identity, data that leaves the app, impact, switch off and roll back) from the plan, corrected by what the capture showed.
+`before.jsonl` is the same traffic with `ai_events_env` off. The script prints the events table (`new`, `changed`, `unchanged`, `removed`, with counts; browser copies on their own rows) and, per changed event, one redacted before/after JSON pair with the differing fields and their before and after values listed. A value change counts (status, model, cost); fields that differ on every run (interaction, conversation and session IDs, `anonymousId`, timestamps, durations and latency) count only when added, removed or retyped. IDs, user and account IDs, `on_behalf_of`, emails, `traits` and timestamps are redacted; check the remaining values before sharing. Add the "When it fires" column and the other five parts (code touched, identity, data that leaves the app, impact, switch off and roll back) from the plan, corrected by what the capture showed.
 
 ## 6. Checklist
 
@@ -184,7 +184,7 @@ python3 scripts/what_changes.py before.jsonl events.jsonl
 | Background | one `ai_response_received` per run and per planned child task, with `trigger: system`, `task_name`, `trigger_source`; children carry the parent's ID as `parent_interaction_id`; a parent with zero tokens is expected when all calls happen in children |
 | App-detected failures | a failure the app catches and returns from reports `error`, `timeout`, `cancelled` or `incomplete` with an `error_type`, never `success` (`--failed-interaction`) |
 | Flush | a script or job run delivers its events before exit |
-| Switches | `ai_events_env` off: no AI event, legacy events unchanged (`--no-ai-events`); `legacy_events_env` off: no legacy event, AI events unchanged (`--absent`) |
+| Switches | `ai_events_env` off: no AI event, server or browser, legacy events unchanged (`--no-ai-events`); `legacy_events_env` off: no legacy event, AI events unchanged (`--absent`) |
 | Legacy | each legacy event still sends, unchanged unless `## Breaking and semantic changes` says otherwise, while its switch is on |
 | Scoping | `surface` on chat and client events matches the plan; `feature` too, except server `ai_user_action` |
 | MCP | driven by a real client in the production session mode; one `mcp_client_seen` per client per run; one `mcp_tool_called` per call with `server_name`, `tool_status` and, on errors, `error_type`; `client_name` present, or absent as known limit `mcp_stateless_no_client`; `call_index` from 0 with no gaps per `mcp_session_id`, else `interaction_id` (a 2026-07-28 elicitation retry keeps its leg's index); `request_context` in each listed tool schema but never in `argument_keys`, compared as a set; `intent` from the plan's list or `other`; no argument values, results, URIs or tokens; `identify` puts the authenticated subject in `userId` and the workspace in `account_id` (stdio without auth: `ai_system`); a call sent with `_meta` `com.rudderstack/interaction_id` carries that ID; declared tool events per the server's `event_rules`, also for a call that failed validation (`tool_status: error`) |
@@ -205,7 +205,7 @@ A row is `n/a` only when the app has no surface it applies to. Page-load is `n/a
 | Several `ai_response_received` for one turn | model calls outside `aiInteraction` / `ai_interaction` / `RunInteraction` (Go: a call made with a context that is not the interaction's), a stream not returned or bound, a Python thread pool without `propagate`, a LangChain handler on the model constructor |
 | `ai_user_action` without a matching answer | the client sent a different ID than the server used; check the `x-interaction-id` hand-off |
 | App-detected failure reported as `success` | the entry point catches the failure and returns normally without `end({ status, errorType })` (Python `end(status=..., error_type=...)`, Go `End(EndOptions{...})`) inside the callback |
-| AI events with the AI switch off | the switch is read after `configure()`, or one entry point builds its own client |
+| AI events with the AI switch off | the switch is read after `configure()`, or one entry point builds its own client; browser AI events: `trackAi` does not read the switch the server exposes to the page |
 | `prompt_text` / `response_text` present | `captureContent` on, globally or per interaction |
 | `userId` on a background run | `aiTask` / `ai_task` / `RunTask` not used, or a plain interaction opened inside the job |
 | No events from a script or job | no flush before exit: Node.js / Python `flush()` or `shutdown()`, Go `Flush(ctx)` or `Shutdown(ctx)` and then `client.Close()`; a `false` result means a client did not finish in time (10 s by default) |
