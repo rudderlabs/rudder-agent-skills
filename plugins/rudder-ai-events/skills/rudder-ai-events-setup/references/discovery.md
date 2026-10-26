@@ -8,7 +8,7 @@ Read-only. Use Glob and Grep (or `rg` / `grep -rn`) over source files; skip `nod
 |---|---|---|
 | Node.js version | `engines.node` in `package.json`, `.nvmrc`, `.node-version`, `Dockerfile` `FROM node:` | below 24 (`@rudderstack/ai` needs Node.js 24+) |
 | Python version | `requires-python` in `pyproject.toml`, `.python-version`, `runtime.txt`, `Dockerfile` `FROM python:` | below 3.12 (`rudderstack-ai` needs 3.12+) |
-| Go version | the `go` line in `go.mod`, `Dockerfile` `FROM golang:` | below 1.26 (`github.com/rudderlabs/ai-sdk-go` and its integration modules need 1.26+) |
+| Go version | the `go` line in `go.mod`, `Dockerfile` `FROM golang:` | below the `go` line of the chosen `ai-sdk-go` version's `go.mod` (v0.2.0: `go 1.26.10`); read it, never assume |
 | Package manager | `package-lock.json` (npm), `pnpm-lock.yaml`, `yarn.lock`, `bun.lock`; `uv.lock`, `poetry.lock`, `Pipfile.lock`, `requirements*.txt`; `go.sum` | |
 
 Manifests give a floor; the interpreter in use comes from `node --version`, `.venv/bin/python --version`, `uv run python --version` or `go version` (read-only commands). Record where the version came from. A blocked surface stays in the plan with `status: blocked` and the reason; do not upgrade the runtime yourself.
@@ -38,7 +38,7 @@ Go (`github.com/rudderlabs/ai-sdk-go`, one module per integration; read the vers
 |---|---|---|
 | OpenAI (Chat Completions, Responses; gateways) | `github.com/openai/openai-go/v3` (v3.70.0) | `rudderopenai.WithTracking()` |
 | Anthropic (also its Bedrock and Vertex AI clients) | `github.com/anthropics/anthropic-sdk-go` (v1.78.0) | `rudderanthropic.WithTracking()` |
-| Google Gen AI (Gemini API and Vertex AI) | `google.golang.org/genai` (v1.72.0) | `ruddergenai.HTTPClient()` |
+| Google Gen AI (Gemini API and Vertex AI) | `google.golang.org/genai` (v1.72.0) | `ruddergenai.HTTPClient(nil)` |
 | Amazon Bedrock (`Converse`, `ConverseStream`) | `github.com/aws/aws-sdk-go-v2/service/bedrockruntime` (v1.63.1) | `rudderbedrock.WithTracking()` |
 | MCP servers, official SDK | `github.com/modelcontextprotocol/go-sdk` (v1.8.0) | `rudderstackai.WrapMCPServer` (section 5) |
 | MCP servers, mcp-go | `github.com/mark3labs/mcp-go` (v0.55.1 or later; tested to v1.2.1) | `ruddermcpgo.WrapServer` (section 5) |
@@ -46,15 +46,15 @@ Go (`github.com/rudderlabs/ai-sdk-go`, one module per integration; read the vers
 
 ### Install preflight
 
-Find what would stop the install before any code is written; record each under Dependencies and blockers.
+Find what would stop the install before any code is written; record each under Dependencies and blockers and raise it before approval.
 
 | Check | Where |
 |---|---|
 | Release-age gates | pnpm `minimumReleaseAge` / `minimumReleaseAgeExclude` (`pnpm-workspace.yaml`, `.npmrc`); npm `min-release-age` / `before` (`.npmrc`); uv `exclude-newer` (`pyproject.toml` `[tool.uv]`, `uv.toml`). An SDK release newer than the gate needs an exemption with a removal date. |
-| Private registries and auth | `registry=` / `@scope:registry=` in `.npmrc`, `.yarnrc.yml` `npmRegistryServer`, `[[tool.uv.index]]`, `pip.conf` `index-url`, CodeArtifact login scripts (`aws codeartifact login`, `codeartifact` in `package.json` scripts or CI); Go `GOPRIVATE` / `GOPROXY` in CI and `go env` files. Record the registry and how auth is obtained, never a token. |
-| Peer ranges | the SDK's `peerDependencies` (`npm view @rudderstack/ai peerDependencies`) against the app's resolved versions; a conflict is a blocker. |
+| Private registries and auth | `registry=` / `@scope:registry=` in `.npmrc`, `.yarnrc.yml` `npmRegistryServer`, `[[tool.uv.index]]`, `pip.conf` `index-url`, CodeArtifact login scripts (`aws codeartifact login`, `codeartifact` in `package.json` scripts or CI); Go `GOPROXY` in CI and `go env` files. The SDKs are public (npm, PyPI, proxy.golang.org); a mirror or proxy the app forces must serve them. Record the registry and how auth is obtained, never a token. |
+| Peer ranges | the SDK's `peerDependencies` (`npm view @rudderstack/ai peerDependencies`, from a scratch directory) against the app's resolved versions; a conflict is a blocker. Node.js 0.6.0 declares `@rudderstack/rudder-sdk-node >=3.0.16`: an older core SDK fails `npm install` with `ERESOLVE`, so plan its upgrade. |
 
-A library outside its supported range is a blocker for that integration: record it and ask the user whether to upgrade the library or use `recordCall` / `record_call` instead. These ranges are from `@rudderstack/ai` 0.5.0, `rudderstack-ai` 0.5.0 and `ai-sdk-go` v0.1.0; for a later release, re-read its README compatibility table and trust it over this one.
+A library outside its supported range is a blocker for that integration: record it and, in the one batched round, ask whether to upgrade the library or use `recordCall` / `record_call` instead. These ranges are from `@rudderstack/ai` 0.6.0, `rudderstack-ai` 0.6.0 and `ai-sdk-go` v0.2.0; for a later release, re-read its README compatibility table and trust it over this one.
 
 ## 2. Call sites to entry points
 
@@ -80,7 +80,7 @@ Then walk callers up to the entry point and classify the surface:
 | HTTP route that a person's UI calls: `app.post(`, `router.post(`, Next.js `route.ts` `export async function POST`, Hono/Fastify routes, FastAPI `@app.post`, Django views, Flask `@app.route`, Go `http.HandleFunc(` / `mux.HandleFunc(` / chi, gin, echo routes, WebSocket/SSE handlers | `chat` | one interaction per user turn |
 | Cron or scheduler (`node-cron`, `cron.schedule`, `@Cron`, `APScheduler`, `celery beat`, `schedule.every`, GitHub Actions `schedule:`), queue consumer (`bullmq Worker`, `sqs`, `kafka` consumer, `celery @task`, `rq`), webhook route called by another system, Lambda / Cloud Function `handler`, CLI script `if __name__ == "__main__"` / `bin/` scripts / Go `cmd/` binaries, Slack bot event handlers | `background` | one task per job or run (`aiTask` / `ai_task`) |
 | A UI call that fires on page load or render without a typed prompt (suggestions, summaries, auto-titles) | `background` | one task per call (`trigger_source: user`) |
-| An HTTP route used by another service rather than a person | ask the user: chat if a person waits for the answer, else background | |
+| An HTTP route used by another service rather than a person | chat if a person waits for the answer, else background; ask in the one batched round (SKILL.md step 2.5) only when the code cannot tell | |
 
 One code path can serve both (a function called from a route and from a cron): record both entry points; the interaction or task is opened at the entry point, not in the shared function.
 
@@ -90,7 +90,9 @@ Thread pools (Python): `ThreadPoolExecutor`, `run_in_executor` inside a backgrou
 
 Tool loops: when requests pass `tools`, check whether the app executes the returned tool calls and sends results back (a `role: "tool"` / `tool_result` message in a follow-up call, or a framework agent loop). If it only passes `tools` and ignores the calls, an event rule can fire only with `when: always`.
 
-Background granularity: note what one run is (the whole cron invocation, one queue message) and whether it fans out per item (per workspace, per document). Per-item steps that should report their own usage become `child_tasks`; ask the user which level they want.
+Background granularity: note what one run is (the whole cron invocation, one queue message) and whether it fans out per item (per workspace, per document). Per-item steps that report their own usage (separate tenant or `on_behalf_of`) become `child_tasks`; propose the level from the code.
+
+Failures the app handles itself: for each entry point, note where it catches a failure and returns normally (empty stream, deadline, lost lease, a job runner that swallows errors) and where it already records it (log, metric, legacy `status`, app error codes). Those turns must end as failed, not `success`. Note turns that can fail before the interaction would open (validation, auth, rate limit): they send no AI event.
 
 ## 3. Browser client
 
@@ -114,14 +116,16 @@ No RudderStack JavaScript SDK on the page: the `client` surface is `status: skip
 | Server RudderStack client (Python) | `rudder-sdk-python`, `rudderstack.analytics`, `rudder_analytics.write_key`, `Client(write_key=` |
 | Server RudderStack client (Go) | `github.com/rudderlabs/analytics-go/v4`, `analytics.NewWithConfig(` / `analytics.New(` |
 | Env var names for the key and URL | the identifier passed to the client (`process.env.X`, `os.environ["X"]`, `os.Getenv("X")`): record the variable NAME only |
+| Privacy or data-handling doc | `PRIVACY*`, `docs/*privacy*`, `docs/*data*`, a telemetry or analytics section in README: it must list the new fields |
+| Config and flags library | how the app reads flags (env, `config`, `convict`, LaunchDarkly, `pydantic-settings`, `viper`) and whether it reloads at runtime: the two switches use it |
 | Hand-built AI events | `track(` / `.track(` calls whose event name or properties mention `ai`, `llm`, `gpt`, `chat`, `prompt`, `completion`, `answer`, `assistant`, `turn`, `message`, `tokens`, `model`, `cost`, `feedback`; Segment/PostHog `capture(` calls with the same |
 | Tracing tools | `langfuse` (`@langfuse/*`, `langfuse`), `langsmith` (`LANGCHAIN_TRACING_V2`, `langsmith`), OpenTelemetry (`@opentelemetry/*`, `opentelemetry-*`, `NodeSDK`, `TracerProvider`), `traceloop`, `openinference`, `braintrust`, `helicone`, `@vercel/otel` |
 
-For each hand-built AI event, record the event name, `path:line`, its properties, and propose a mapping to the standard events (see `ai-events-md.md`, "Mapping hand-built events"). Then compare each field by meaning, not name, against the checks in `ai-events-md.md` ("Breaking-change checks"): cumulative vs per-turn cost, status vocabulary, requested vs served model, latency start point, which turns emit, client-only fields, and event-name casing. Read how the field is computed, not just its name. Note tracking-plan codegen (RudderTyper output, a generated `analytics` module, `ruddertyper.yml`) and the repo's event-name casing.
+For each hand-built AI event, record the event name, `path:line`, its properties, its `context` (a workspace in `context.groupId`, the `userId` it uses for background work, `'anonymous'` placeholders), and propose a mapping to the standard events (see `ai-events-md.md`, "Mapping hand-built events"). Then run every check in `ai-events-md.md` ("Breaking-change checks") and read how each field is computed, not just its name. Note tracking-plan codegen (RudderTyper output, a generated `analytics` module, `ruddertyper.yml`) and the repo's event-name casing.
 
-Cost: when a legacy event carries cost, or the app calls several models in one turn, list every model ID constant the app can send (config, env defaults, constants), Bedrock cross-region IDs with their prefix (`us.`, `eu.`, `apac.`, `global.`, ...) included; each needs a price.
+Cost: when a legacy event carries cost, or the app calls several models in one turn, list every model ID constant the app can send (config, env defaults, constants), Bedrock cross-region IDs with their prefix (`us.`, `us-gov.`, `eu.`, `apac.`, `jp.`, `au.`, `in.`, `global.`) included. A rate table the app already uses to compute cost supplies prices; any model without one gets a `TODO` (see `ai-events-md.md`, `spec.config.prices`). Never look rates up.
 
-For a tracing tool, find how the current trace ID is read (`langfuse.getCurrentTraceId()`, `get_current_trace_id()`, `trace.getActiveSpan()?.spanContext().traceId`, LangSmith run tree `trace_id`) and offer it as `tracing.trace_id_source`. It is optional and opt-in. OpenTelemetry apps: Node.js and Python fill `trace_id` from the first span inside the interaction only when the SDK's span processor is registered with `linkTraceId: true` / `link_trace_id=True` (`registerTracing` / `register_tracing`, `createSpanProcessor` / `create_span_processor`), Go with `WithTraceIDFrom(rudderotel.TraceID)`. Other tools: the app passes it (`traceId` / `trace_id` / `TraceID`), and that value always wins. No tracing tool: `tracing.tool: none`, and do not suggest adding one.
+For a tracing tool, find how the current trace ID is read (`langfuse.getCurrentTraceId()`, `get_current_trace_id()`, `trace.getActiveSpan()?.spanContext().traceId`, LangSmith run tree `trace_id`) and who registers the global tracer provider (`NodeSDK`, `registerOTel`, Langfuse's own setup, `trace.set_tracer_provider`). Plan that ID as `tracing.trace_id_source`; when another exporter owns the provider, pass it directly rather than registering the SDK's span processor. It is optional and opt-in. OpenTelemetry apps: Node.js and Python fill `trace_id` from the first span inside the interaction only when the SDK's span processor is registered with `linkTraceId: true` / `link_trace_id=True` (`registerTracing` / `register_tracing`, `createSpanProcessor` / `create_span_processor`), Go with `WithTraceIDFrom(rudderotel.TraceID)`. Other tools: the app passes it (`traceId` / `trace_id` / `TraceID`), and that value always wins. No tracing tool: `tracing.tool: none`, and do not suggest adding one.
 
 ## 5. MCP servers
 
@@ -137,17 +141,27 @@ For a tracing tool, find how the current trace ID is read (`langfuse.getCurrentT
 
 For each server record, as `path` plus `symbol`:
 
-- name and version (the `Implementation` / constructor arguments), file, and where it connects (`server.connect(`, `server.run(`, `server.Run(`, `NewStreamableHTTPHandler`).
+- every endpoint that serves it (`/mcp`, `/mcp/admin`, a stdio binary), each with its own wrap and a distinct server name; name and version (the `Implementation` / constructor arguments), file, and where it connects (`server.connect(`, `server.run(`, `server.Run(`, `NewStreamableHTTPHandler`).
+- session mode per endpoint: stateful (session IDs: `sessionIdGenerator`, an `Mcp-Session-Id` store) or stateless (`sessionIdGenerator: undefined`, `stateless_http=True`, go-sdk `StreamableHTTPOptions{Stateless: true}`, mcp-go `WithStateLess(true)`, or a server built per request). Stateless endpoints lose client details (Known limits).
 - transport: `stdio` (`StdioServerTransport`, `run("stdio")`, `mcp.StdioTransport`), `streamable_http` (`StreamableHTTPServerTransport`, `streamable-http`, `NewStreamableHTTPHandler`), or `sse` (deprecated HTTP+SSE). Several processes or replicas behind a load balancer: note it (per-process state, see Known limits). Several distinct servers built with the same name in one process: note it; each needs a unique name (state is per server name).
 - auth: the OAuth or API-key verifier (`requireBearerAuth`, `authInfo`, `TokenVerifier`, `auth.RequireBearerToken`; mcp-go: the app's own check, often `server.WithHTTPContextFunc`), which claim holds the user (usually `sub`) and which the workspace or tenant. No auth (typical for stdio): events go out as `ai_system`.
 - tool, resource and prompt names, and their descriptions (inputs for the server's intent list).
-- tools whose call is itself a product action (creates, updates, sends): candidates for declared tool events.
+- tools whose call changes data (creates, updates, sends; no `readOnlyHint: true` annotation): the default declared tool events.
 - hand-built analytics already sent from handlers (`mcp_<method>_success`, raw request or result properties): legacy events to map and flag.
 - elicitation calls (`elicitInput(`, `ctx.elicit(`, `session.Elicit(`, mcp-go `RequestElicitation(`), and MCP Events subscription or webhook code (experimental, off unless asked).
 
 An app that is an MCP *client* (an agent calling MCP tools) is covered by its chat or background integration: those calls appear in `tool_breakdown` with `mcp_server` (OpenAI Agents SDK: only with its tracing on). When the agent uses the OpenAI Agents SDK and the server is also tracked, plan `rudderStackMcpToolMeta()` / `rudderstack_mcp_tool_meta()` so `mcp_tool_called` joins the calling answer. A Go agent sends `Interaction.ID()` as `com.rudderstack/interaction_id` in the request `_meta` itself.
 
 ## 6. Identity
+
+Build this table for every entry point and endpoint, and show it before asking anything about identity:
+
+| Entry point | Caller | Auth | `userId` today (`path:line`) | Proposed source | Tradeoff |
+|---|---|---|---|---|---|
+| `POST /api/chat` | web app user | session cookie | `req.user.id` (`src/middleware/auth.ts:42`) | same | none |
+| `/mcp` | MCP client (IDE agent) | OAuth bearer | none: legacy sends `'anonymous'` | token `sub` | needs `identify`; stateless: no `client_name` |
+
+Where to look:
 
 | Need | Where to look |
 |---|---|
@@ -157,12 +171,12 @@ An app that is an MCP *client* (an agent calling MCP tools) is covered by its ch
 | Background jobs | who the job is for (`on_behalf_of`), which customer (`account_id`), a stable per-job or per-thread conversation key |
 | Logout | does the page call `rudderanalytics.reset()` on logout? If not, `rl_user_id` can name the previous user: prefer the server's own user ID |
 
-Identity is ambiguous when: there are two plausible user IDs (internal DB id vs auth-provider id), the chat route has no auth, the browser SDK `identify()` uses a different ID than the server or is never called (browser events then carry only `anonymousId` while server events carry `userId`; ask whether the user wants an `identify()` call on login, as a separate change), a legacy event falls back to a placeholder user (`'anonymous'`: do not carry it over; the SDK uses cookies or `ai_system`), or a background job has no clear tenant. Ask the user, one question at a time; never guess.
+Identity is ambiguous when: there are two plausible user IDs (internal DB id vs auth-provider id), the chat route has no auth, the browser SDK `identify()` uses a different ID than the server or is never called (browser events then carry only `anonymousId` while server events carry `userId`; note an `identify()` call on login under Identity as a separate follow-up, do not ask), a legacy event falls back to a placeholder user (`'anonymous'`: do not carry it over; the SDK uses cookies or `ai_system`), or a background job has no clear tenant. Each ambiguity is a row in the table and a question in the one batched round (SKILL.md step 2.5); never guess.
 
 ## 7. Intent and surface sources
 
-Channel (`surface`): web or mobile UI, Slack or Teams bot handlers, email ingestion, an app inside ChatGPT or Claude, an IDE extension, or a plain API. One route serving several channels needs the channel per request; ask where it comes from.
+Channel (`surface`): web or mobile UI, Slack or Teams bot handlers, email ingestion, an app inside ChatGPT or Claude, an IDE extension, or a plain API. One route serving several channels needs the channel per request; take it from the request (header, client ID, route prefix) when the code shows one.
 
 Attachments: upload handlers or multimodal message parts (`image_url`, `input_image`, `document`, `file` content blocks) on the chat route: plan `attachment_count` / `attachment_types`.
 
-Intents: read, never execute: system prompts (`system:` / `role: "system"` / `SystemMessage(` / prompt template files), tool and function names and their descriptions, route names, feature flags, README and docs pages describing what the assistant does, existing support categories or enums. When the app already computes a per-turn category or outcome (a classifier call, a ticket category, a resolution flag), record where: ask whether to reuse it (`setIntent` / `setOutcome`, or `trackScore`) or turn the classifier on. Never query production data, logs, transcripts or analytics to infer intents.
+Intents: read, never execute: system prompts (`system:` / `role: "system"` / `SystemMessage(` / prompt template files), tool and function names and their descriptions, route names, feature flags, README and docs pages describing what the assistant does, existing support categories or enums. When the app already computes a per-turn category or outcome (a classifier call, a ticket category, a resolution flag), record where and propose reusing it (`setIntent` / `setOutcome`, or `trackScore`) as a decision from code; the classifier stays off. Never query production data, logs, transcripts or analytics to infer intents.
