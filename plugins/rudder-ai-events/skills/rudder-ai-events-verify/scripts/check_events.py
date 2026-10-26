@@ -12,6 +12,7 @@ import sys
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError
 from referencing import Registry, Resource
+from referencing.exceptions import Unresolvable
 from referencing.jsonschema import DRAFT202012
 
 SPEC_VERSION = "0.3.0"
@@ -97,8 +98,14 @@ if client:
     registry = registry.with_resource(client["$id"], resource(client))
 
 
-def validator(schema, name):
-    return Draft202012Validator({"$ref": f"{schema['$id']}#/$defs/{name}"}, registry=registry)
+def schema_errors(schema, path, name, instance):
+    """Messages for instance against schema's $defs/<name>; an override that cannot resolve it exits 2."""
+    v = Draft202012Validator({"$ref": f"{schema['$id']}#/$defs/{name}"}, registry=registry)
+    try:
+        return [e.message for e in v.iter_errors(instance)]
+    except Unresolvable as e:  # a missing $defs entry or a dangling $ref in an override
+        print(f"{path}: cannot read schema ({e})"[:300], file=sys.stderr)
+        sys.exit(2)
 
 
 problems, notes = [], []
@@ -145,12 +152,12 @@ for i, m in enumerate(tracks):
     if name in CLIENT_ONLY and not is_client:
         problems.append(f"{where}: client-only event without source: client")
     if is_client and client:  # client_names come from the client schema's $defs
-        problems += [f"{where} (client schema): {e.message}" for e in validator(client, name).iter_errors(props)]
+        problems += [f"{where} (client schema): {e}" for e in schema_errors(client, args.client_schema, name, props)]
     definition = ("mcp_declared_tool_event" if is_mcp else "declared_tool_event") if is_declared else name
     if name in SPEC_EVENTS | MCP_EVENTS or is_declared:  # client copies: spec and client schema
         if props.get("source") == "client" and name not in CLIENT_COPIES:
             problems.append(f"{where}: source: client on an event the browser never sends")
-        problems += [f"{where} (spec): {e.message}" for e in validator(spec, definition).iter_errors(props)]
+        problems += [f"{where} (spec): {e}" for e in schema_errors(spec, args.spec, definition, props)]
     # wrapper metadata on every SDK event; tracing spans (ai_otel_span) carry no specVersion
     if not is_client and w.get("integration") != "tracing" and w.get("specVersion") != SPEC_VERSION:
         problems.append(f"{where}: context.wrapperLibrary.specVersion is {w.get('specVersion')!r}")
