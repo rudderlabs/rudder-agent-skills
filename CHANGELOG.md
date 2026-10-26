@@ -52,6 +52,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`rudder-cli` / `rudder-cli-setup`, `rudder-typer-workflow`; `docs/installation.md`;
+  `examples/typer-workflow`.** The rudder-cli install instructions now point at
+  files that exist. rudder-cli-setup named raw binaries such as
+  `rudder-cli_darwin_arm64` that no release has. It now runs rudder-iac's
+  `install.sh` from `main`, and while that answers 404, it installs the latest
+  release's archive after checking it against the release's checksums file.
+  Both put `rudder-cli` in `~/.local/bin`. When that folder is not on PATH, the
+  agent runs `"$HOME/.local/bin/rudder-cli"` for the rest of the session and
+  shows the `export PATH` line in its closing summary. The installation guide
+  named a Homebrew tap that does not exist, the typer example installed
+  `@rudderlabs/rudder-cli` from npm, which does not exist, and
+  rudder-typer-workflow's CI reference used a `rudderstack/setup-rudder-cli`
+  action that does not exist. The guide now gives the same two installs, and
+  both CI examples download the release archive and check its checksum.
 - **`rudder-cli` / `rudder-cli-setup`, `rudder-cli-workflow`, `rudder-transformations`.**
   Replaced `RUDDER_ACCESS_TOKEN` with `RUDDERSTACK_ACCESS_TOKEN`, the variable
   rudder-cli reads (rudder-iac `cli/internal/config/config.go:86`).
