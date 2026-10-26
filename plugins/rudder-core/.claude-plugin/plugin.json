@@ -1,7 +1,7 @@
 {
   "name": "rudder-core",
   "description": "Cross-tool RudderStack domain knowledge: data catalog, data graphs, tracking plans, instrumentation planning, instrumentation debugging, and destination delivery debugging.",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "author": {
     "name": "RudderStack"
   },

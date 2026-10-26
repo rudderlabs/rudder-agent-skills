@@ -33,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   write values in the var file, JSON keys and `'` included. It gives a command that writes a key
   file into the var file without printing it, and says that a multi-line secret, such as a PEM
   private key, cannot go through the var file yet. It names no destination keys, samples or secret
-  names. `rudder-core` 0.0.9.
+  names. `rudder-core` 0.0.10.
 - **Breaking (repo layout):** renamed the top-level `skills/` directory back to
   `plugins/` (reverting the earlier `plugins/` → `skills/` rename). Each plugin
   lives at `plugins/<plugin>/skills/<skill>/SKILL.md`; marketplace `source` fields
