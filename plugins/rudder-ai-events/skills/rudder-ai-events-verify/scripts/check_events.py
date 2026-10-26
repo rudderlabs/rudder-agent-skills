@@ -81,7 +81,10 @@ for i, m in enumerate(tracks):
     where = f"#{i} {name}"
     if not w and not is_client:  # not sent through the AI SDK: legacy or other analytics
         legacy[name] += 1
-        if name in SPEC_EVENTS | MCP_EVENTS and name not in args.expect_legacy:
+        if name in CLIENT_ONLY and name not in args.expect_legacy:  # browser-only: a missing source is the bug
+            problems.append(f"{where}: client-only event without source: client "
+                            f"(pass --expect-legacy {name} if it is a legacy event)")
+        elif name in SPEC_EVENTS | MCP_EVENTS and name not in args.expect_legacy:
             problems.append(f"{where}: no context.wrapperLibrary (not sent by the AI SDK; "
                             f"pass --expect-legacy {name} if it is a legacy event)")
         continue

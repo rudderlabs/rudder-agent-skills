@@ -3,8 +3,9 @@
 Usage: what_changes.py before.jsonl after.jsonl
 before: AI events switched off (the app as it was); after: AI events on.
 Prints the event table (counts per capture) and, per changed event, a redacted before/after JSON pair
-with the differing fields and values listed. Fields that differ on every run (IDs, timestamps, durations)
-count by presence and type only. IDs, user and account IDs, on_behalf_of, emails, traits and timestamps
+with the differing fields and values listed. Every occurrence is compared in capture order; the pair shown
+is the first that differs. Fields that differ on every run (IDs, timestamps, durations) count by presence
+and type only, inside lists too. IDs, user and account IDs, on_behalf_of, emails, traits and timestamps
 are redacted; check the rest before sharing.
 """
 import collections
@@ -41,6 +42,17 @@ def redact(value, key=""):
     return value
 
 
+def norm(value, key=""):
+    """Comparable form: run-varying and redacted fields keep only their type, at any depth (lists included)."""
+    if VARY.search(key) or ID_KEY.search(key) or key in PERSONAL:
+        return type(value).__name__
+    if isinstance(value, dict):
+        return {k: norm(v, k) for k, v in value.items() if k not in DROP}
+    if isinstance(value, list):
+        return [norm(v, key) for v in value]
+    return redact(value, key)
+
+
 def fields(message, prefix=""):
     out = {}
     for k, v in message.items():
@@ -49,36 +61,45 @@ def fields(message, prefix=""):
         path = f"{prefix}{k}"
         if isinstance(v, dict) and v and k not in PERSONAL:
             out.update(fields(v, path + "."))
-        elif VARY.search(k) or ID_KEY.search(k) or k in PERSONAL:  # differs per run, or redacted: type only
-            out[path] = type(v).__name__
         else:
-            out[path] = json.dumps(redact(v, k), sort_keys=True)
+            out[path] = json.dumps(norm(v, k), sort_keys=True)
     return out
 
 
+def diff_of(fb, fa):
+    return ([f"+ {k}" for k in sorted(fa.keys() - fb.keys())] + [f"- {k}" for k in sorted(fb.keys() - fa.keys())]
+            + [f"~ {k} ({fb[k]} -> {fa[k]})" for k in sorted(fb.keys() & fa.keys()) if fb[k] != fa[k]])
+
+
 before, after = load(sys.argv[1]), load(sys.argv[2])
-nb = collections.Counter(row_key(m) for m in before)
-na = collections.Counter(row_key(m) for m in after)
-first_b = {row_key(m): m for m in reversed(before)}
-first_a = {row_key(m): m for m in reversed(after)}
+by_b, by_a = collections.defaultdict(list), collections.defaultdict(list)
+for m in before:
+    by_b[row_key(m)].append(m)
+for m in after:
+    by_a[row_key(m)].append(m)
 
 print("| Event | Status | Before | After |\n|---|---|---|---|")
 changed = []
-for name in sorted(nb.keys() | na.keys()):
-    if not nb[name]:
+for name in sorted(by_b.keys() | by_a.keys()):
+    nb, na = len(by_b[name]), len(by_a[name])
+    if not nb:
         status = "new"
-    elif not na[name]:
+    elif not na:
         status = "removed"
     else:
-        fb, fa = fields(first_b[name]), fields(first_a[name])
-        diff = ([f"+ {k}" for k in sorted(fa.keys() - fb.keys())] + [f"- {k}" for k in sorted(fb.keys() - fa.keys())]
-                + [f"~ {k} ({fb[k]} -> {fa[k]})" for k in sorted(fb.keys() & fa.keys()) if fb[k] != fa[k]])
-        status = "changed" if diff or nb[name] != na[name] else "unchanged"
+        # Compare every occurrence in capture order; a change in a later turn counts too.
+        diff, pair = [], (by_b[name][0], by_a[name][0])
+        for mb, ma in zip(by_b[name], by_a[name]):
+            d = diff_of(fields(mb), fields(ma))
+            if d and not diff:
+                pair = (mb, ma)  # show the first pair that actually differs
+            diff += [line for line in d if line not in diff]
+        status = "changed" if diff or nb != na else "unchanged"
         if status == "changed":
-            changed.append((name, diff))
-    print(f"| `{name}` | {status} | {nb[name]} | {na[name]} |")
+            changed.append((name, diff, pair))
+    print(f"| `{name}` | {status} | {nb} | {na} |")
 
-for name, diff in changed:
+for name, diff, (mb, ma) in changed:
     print(f"\n#### `{name}`\n\nDiffering fields: {', '.join(diff) or 'count only'}\n")
-    print("Before:\n```json\n" + json.dumps(redact(first_b[name]), indent=2, sort_keys=True) + "\n```")
-    print("After:\n```json\n" + json.dumps(redact(first_a[name]), indent=2, sort_keys=True) + "\n```")
+    print("Before:\n```json\n" + json.dumps(redact(mb), indent=2, sort_keys=True) + "\n```")
+    print("After:\n```json\n" + json.dumps(redact(ma), indent=2, sort_keys=True) + "\n```")
