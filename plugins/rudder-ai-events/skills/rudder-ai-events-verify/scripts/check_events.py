@@ -55,7 +55,8 @@ p.add_argument("--expect-session", action="store_true", help="user-triggered ser
 p.add_argument("--expect-joins", action="store_true",
                help="the client side was driven with the server's interaction IDs: every gap between sides fails")
 p.add_argument("--client-surface", action="append", default=[],
-               help="a surface with a browser client (the plan's client surfaces): only its turns need client copies")
+               help="[feature:]surface with a browser client (the plan's client surfaces): only its turns need "
+                    "client copies")
 p.add_argument("--client-opt-out", action="append", default=[],
                choices=["client_prompt", "client_response", "client_feedback", "server_feedback"],
                help="a copy the plan's client_events.opt_out drops: not expected, and fails if sent")
@@ -267,6 +268,10 @@ has_client_copies = any(c[("ai_response_received", "client")] or c[("ai_user_pro
 gap = problems.append if args.expect_joins else notes.append
 # feedback types with a server endpoint, per (feature, surface): planned ([[feature:]surface:]action_type), or
 # sent by the server on that feature's turns on that surface; others are browser-only
+# --client-surface [feature:]surface: the turns that have a browser client
+client_scopes = [(f or None, s) for f, _, s in (c.rpartition(":") for c in args.client_surface)]
+
+
 def turn_scope(iid):
     return features.get(iid) or client_features.get(iid), surfaces.get(iid) or client_surfaces.get(iid)
 
@@ -298,7 +303,8 @@ for iid, c in by_interaction.items():
                                                         or c[("ai_response_received (paused)", "server")]):
         problems.append(f"interaction {iid}: server prompt without a server ai_response_received")
     # exempt only a known server-only surface; an ID with no server event (stale browser ID) is still checked
-    server_only = args.client_surface and iid in surfaces and surfaces[iid] not in args.client_surface
+    server_only = args.client_surface and iid in surfaces and not any(
+        s == surfaces[iid] and f in (None, features.get(iid)) for f, s in client_scopes)
     if (has_client_copies or args.expect_joins) and iid not in {r.get("interaction_id") for r in runs} and not server_only:
         if c[("ai_user_prompt_created", "client")] and not c[("ai_user_prompt_created", "server")]:
             gap(f"interaction {iid}: client prompt with no server prompt (request never reached the SDK, or a different ID)")
