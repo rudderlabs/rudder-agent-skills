@@ -56,7 +56,9 @@ case $code in 400|2??) exit 0 ;; 401) exit 1 ;; *) echo "data plane URL: ${dp%/}
 - Exit 2: `.env.local` has no write key or no data plane URL under these names.
 
 When the app is in a subfolder, set `f` to its `.env.local`. In a framework with other names for the two values,
-such as `NEXT_PUBLIC_` in Next.js, put those names in the `key=` and `dp=` lines.
+such as `NEXT_PUBLIC_` in Next.js, put those names in the `key=` and `dp=` lines. When step 6 wrote the two values
+to `rudder/first-event.vars.yaml`, because the user kept an app's RudderStack SDK on its old source, set `f` to that
+file, here and in the send below. `val` reads its `NAME: value` lines the same way.
 
 ## 3. Send real events
 
