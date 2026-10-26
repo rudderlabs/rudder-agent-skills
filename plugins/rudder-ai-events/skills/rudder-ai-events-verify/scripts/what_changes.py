@@ -27,9 +27,16 @@ VARY = re.compile(r"^(interaction_id|conversation_id|parent_interaction_id|trace
                   r"|_ms\Z|[Ll]atency|[Dd]uration|At\Z|_at\Z|[Tt]imestamp|(^|_)time\Z|Time(UnixNano)?\Z")
 
 
+def without_otlp(m):  # OTLP attributes hold identities as key/value pairs the name-based redaction misses
+    props = m.get("properties")
+    if isinstance(props, dict) and "otlp" in props:
+        m = {**m, "properties": {k: v for k, v in props.items() if k != "otlp"}}
+    return m
+
+
 def load(path):
     msgs = [json.loads(line) for line in open(path) if line.strip()]
-    return [m for m in msgs if m.get("type", "track") == "track" and m.get("event")]
+    return [without_otlp(m) for m in msgs if m.get("type", "track") == "track" and m.get("event")]
 
 
 def row_key(m):
