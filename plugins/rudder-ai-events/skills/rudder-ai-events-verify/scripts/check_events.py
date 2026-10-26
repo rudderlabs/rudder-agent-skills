@@ -45,7 +45,10 @@ p.add_argument("--feature", action="append", default=[], help="allowed feature v
 p.add_argument("--surface", action="append", default=[], help="allowed surface values (the plan's surfaces)")
 p.add_argument("--user-id", help="userId expected on user-triggered server prompts and answers, and on server "
                                   "feedback that carries one")
-p.add_argument("--mcp-user-id", help="userId every MCP event carries: the identified subject (ai_system without auth)")
+mcp_identity = p.add_mutually_exclusive_group()
+mcp_identity.add_argument("--mcp-user-id", help="userId every MCP event carries: the authenticated subject")
+mcp_identity.add_argument("--mcp-anonymous", action="store_true",
+                          help="the MCP server runs without auth: MCP events carry no userId and anonymousId ai_system")
 p.add_argument("--expect-session", action="store_true", help="user-triggered server events carry context.sessionId")
 p.add_argument("--expect-joins", action="store_true",
                help="the client side was driven with the server's interaction IDs: every gap between sides fails")
@@ -148,10 +151,11 @@ for i, m in enumerate(tracks):
         if props.get("source") == "client" and name not in CLIENT_COPIES:
             problems.append(f"{where}: source: client on an event the browser never sends")
         problems += [f"{where} (spec): {e.message}" for e in validator(spec, definition).iter_errors(props)]
-        if not is_client and w.get("specVersion") != SPEC_VERSION:
-            problems.append(f"{where}: context.wrapperLibrary.specVersion is {w.get('specVersion')!r}")
-        if not is_client and w.get("name") not in SDK_NAMES:
-            problems.append(f"{where}: context.wrapperLibrary.name is {w.get('name')!r}, not one of {sorted(SDK_NAMES)}")
+    # wrapper metadata on every SDK event; tracing spans (ai_otel_span) carry no specVersion
+    if not is_client and w.get("integration") != "tracing" and w.get("specVersion") != SPEC_VERSION:
+        problems.append(f"{where}: context.wrapperLibrary.specVersion is {w.get('specVersion')!r}")
+    if not is_client and w.get("name") not in SDK_NAMES:
+        problems.append(f"{where}: context.wrapperLibrary.name is {w.get('name')!r}, not one of {sorted(SDK_NAMES)}")
     # trackAction takes no feature, so server ai_user_action has none; MCP events have none either;
     # a standalone score carries one only when given, and ai_otel_span (tracing) none by default:
     # check it only when present
@@ -193,6 +197,10 @@ for i, m in enumerate(tracks):
             problems.append(f"{where}: no userId, expected {args.mcp_user_id!r} (identify not wired?)")
         elif args.mcp_user_id and user != args.mcp_user_id:
             problems.append(f"{where}: userId {user!r}, expected {args.mcp_user_id!r}")
+        if args.mcp_anonymous and user:
+            problems.append(f"{where}: userId {user!r} on an unauthenticated MCP server (expected none)")
+        elif args.mcp_anonymous and anon != "ai_system":
+            problems.append(f"{where}: anonymousId {anon!r}, expected 'ai_system'")
         if args.mcp_server and props.get("server_name") not in args.mcp_server:
             problems.append(f"{where}: server_name {props.get('server_name')!r} not in {args.mcp_server}")
         if "request_context" in (props.get("argument_keys") or []):
