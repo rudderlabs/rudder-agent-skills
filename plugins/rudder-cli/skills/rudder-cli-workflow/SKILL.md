@@ -184,12 +184,11 @@ TLS_CLIENT_KEY: |
 
 Up to rudder-cli 0.28.0 the spec's single quotes still turn the block's line breaks into spaces. Later releases keep them.
 
-`validate`, `apply --dry-run`, `apply` and `transformations test` print the source line of each error and warning after substitution, so a diagnostic on a secret's line shows the secret. A multi-line value prints in full, and only its first line carries the line number. That happens whenever a reference resolves, from a var file or from a `RUDDER_<NAME>` variable. Then filter the output of each of these commands, here, in the steps below and in `rudder-transformations`. Each filter drops every diagnostic's source block, from the empty `|` line through the `^^^` line, every line of a multi-line value included. It keeps the rest: the error lines, the plan, which masks secret fields itself, the test results and the exit status:
+`validate`, `apply --dry-run`, `apply` and `transformations test` print the source line of each error and warning after substitution, so a diagnostic on a secret's line shows the secret. A multi-line value prints in full, and only its first line carries the line number. That happens whenever a reference resolves, from a var file or from a `RUDDER_<NAME>` variable. Then filter the output of each of these commands, here, in the steps below and in `rudder-transformations`. Each filter drops every diagnostic's source block, from the empty `|` line through the `^^^` line, every line of a multi-line value included. It keeps the rest: the error lines, the plan, which masks secret fields itself, the test results and the exit status. `apply` takes the same filter in Step 3, which runs it only after the dry run printed `exit 0` and the user agreed to its plan. Run each line below as its own command, not the block as one script:
 
 ```bash
 { rudder-cli validate -l ./ --var-file secrets.vars.yaml 2>&1; echo "exit $?"; } | awk '/^ +\|$/{g=1;next} g&&/^ +[0-9]+ \| /{h=1} {g=0} h{if(/^ +\| \^+$/)h=0;next} 1'
 { rudder-cli apply --dry-run -l ./ --var-file secrets.vars.yaml 2>&1; echo "exit $?"; } | awk '/^ +\|$/{g=1;next} g&&/^ +[0-9]+ \| /{h=1} {g=0} h{if(/^ +\| \^+$/)h=0;next} 1'
-{ rudder-cli apply --confirm=false -l ./ --var-file secrets.vars.yaml 2>&1; echo "exit $?"; } | awk '/^ +\|$/{g=1;next} g&&/^ +[0-9]+ \| /{h=1} {g=0} h{if(/^ +\| \^+$/)h=0;next} 1'
 { rudder-cli transformations test --all -l ./ --var-file secrets.vars.yaml 2>&1; echo "exit $?"; } | awk '/^ +\|$/{g=1;next} g&&/^ +[0-9]+ \| /{h=1} {g=0} h{if(/^ +\| \^+$/)h=0;next} 1'
 ```
 
@@ -285,17 +284,18 @@ Updated resources:
 ## Step 3: Apply
 
 ```bash
-rudder-cli apply --confirm=false -l ./
+rudder-cli apply --confirm=false -l ./  # without a var file
+{ rudder-cli apply --confirm=false -l ./ --var-file secrets.vars.yaml 2>&1; echo "exit $?"; } | awk '/^ +\|$/{g=1;next} g&&/^ +[0-9]+ \| /{h=1} {g=0} h{if(/^ +\| \^+$/)h=0;next} 1'  # with one
 ```
 
 Only run after:
 1. `validate` passes
-2. `--dry-run` shows expected changes
+2. `--dry-run` exits 0 and shows expected changes
 3. For an agent, the user has seen the dry-run output and agreed to it
 
 **Why `--confirm=false`:** the default `--confirm=true` opens an interactive confirmation prompt. In a non-interactive context (piped output, CI, agent), that prompt **auto-declines, applies nothing, and reports no error**. The dry-run review replaces the prompt. A person at a terminal can run `rudder-cli apply -l ./` and answer the prompt instead.
 
-Pass the same `--var-file` flags to `apply` that you passed to `validate` and the dry-run.
+Run one of the two lines. With a var file, pass the same `--var-file` flags that you passed to `validate` and the dry-run, and filter the output the same way, as the second line does.
 
 ## Workflow Examples
 

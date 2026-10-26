@@ -106,7 +106,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   substitution, secrets included, whether the value comes from a var file or a
   `RUDDER_<NAME>` variable. Each filter drops every diagnostic's whole source
   block, so every line of a multi-line value is dropped too, and keeps the
-  error lines, the plan and the test results.
+  error lines, the plan and the test results. The filtered apply is in Step 3,
+  apart from the others, so it runs only after a dry run that exits 0 and the
+  user's yes.
   rudder-transformations says `transformations test` needs the same
   `--var-file` flags and the same filter.
 - **`rudder-mcp` / `rudder-mcp-setup`, `rudder-mcp-workflow`.** OAuth setup
@@ -127,7 +129,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   already shows a server at `https://mcp.rudderstack.com/mcp`, as
   `plugin:rudder-core:rudderstack` or under any other name, both skills
   authenticate that entry instead of adding a second server, and they give the
-  plugin entry's name for `claude mcp login` and `claude mcp logout`. With the
+  plugin entry's name for `claude mcp login` and `claude mcp logout`.
+  rudder-mcp-workflow also uses an entry at
+  `https://mcp.rudderstack.com/bearer-auth-mcp` as it is, since adding a server
+  under the name a project's `.mcp.json` already uses hides that entry. With the
   access-token route, rudder-mcp-setup says to disable that entry for the
   folder in `/mcp`, since its different URL would leave both servers listed.
   rudder-mcp-setup's `allowed-tools` pre-approves only the OAuth

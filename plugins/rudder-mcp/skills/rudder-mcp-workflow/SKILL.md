@@ -22,7 +22,7 @@ Before running any workflow, verify:
 
 ## Client configuration
 
-If `claude mcp list` already shows a server at `https://mcp.rudderstack.com/mcp`, under `plugin:rudder-core:rudderstack` (the rudder-core plugin's entry) or any other name, choose that entry in `/mcp` and `Authenticate` instead of adding another.
+If `claude mcp list` already shows a server at `https://mcp.rudderstack.com/mcp` or `https://mcp.rudderstack.com/bearer-auth-mcp`, under `plugin:rudder-core:rudderstack` (the rudder-core plugin's entry) or any other name, use it and add nothing. For an `/mcp` entry, choose it in `/mcp` and `Authenticate`. A `/bearer-auth-mcp` entry has no sign-in, so check that `RUDDERSTACK_ACCESS_TOKEN` is exported in the shell that started the client, as the access-token route in `rudder-mcp-setup` says. Adding a server under a name that the project's `.mcp.json` already uses writes a local entry that hides the project's one.
 
 Otherwise, Claude Code connects over HTTP and runs the OAuth sign-in itself, with no `npx` or `mcp-remote`:
 

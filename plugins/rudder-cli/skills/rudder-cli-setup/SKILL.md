@@ -76,7 +76,7 @@ The script is not published yet. Install the release archive directly instead. T
   curl -fsSL -o "$d/$archive" "$releases/download/$tag/$archive"
   curl -fsSL -o "$d/checksums.txt" "$releases/download/$tag/rudder-cli_${tag#v}_checksums.txt"
   want=$(awk -v f="$archive" '$2 == f { print $1 }' "$d/checksums.txt")
-  got=$(sha256sum "$d/$archive" 2>/dev/null || shasum -a 256 "$d/$archive"); got=${got%% *}
+  got=$(sha256sum <"$d/$archive" 2>/dev/null || shasum -a 256 <"$d/$archive"); got=${got%% *}
   [ -n "$want" ] && [ "$got" = "$want" ] || { echo "checksum mismatch for $archive; not installing" >&2; exit 1; }
   tar -xzf "$d/$archive" -C "$d" rudder-cli
   mkdir -p "$HOME/.local/bin" && mv "$d/rudder-cli" "$HOME/.local/bin/rudder-cli"
