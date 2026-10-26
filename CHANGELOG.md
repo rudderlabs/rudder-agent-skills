@@ -88,14 +88,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   checks them against that file with a jq program shipped beside the references, in two shell
   calls, or in one for agents that stop background processes when a call returns. The destination
   reference leaves unfilled secrets as `NAME:` with no value, names every secret key of Amplitude
-  and Mixpanel, and lists the 24 verified destination types. Step 4 asks whether a webhook needs
-  an authentication header and, on yes, for its name, `Authorization` by default; the user fills
-  its value, such as `Bearer <token>`, in the var file.
+  and Mixpanel, and lists the 24 verified destination types. It says a secret that spans lines,
+  such as a PEM key, keeps its line breaks only from rudder-cli 0.29.0, as a `|` block. Step 4 asks
+  whether a webhook needs an authentication header and, on yes, for its name, `Authorization` by
+  default; the user fills its value, such as `Bearer <token>`, in the var file.
   Step 1 runs its read-only checks before it changes the folder, and commits the `.gitignore` lines
   for the var file and `.env.local` on their own, so the undo (revert the instrumentation and specs
   commits, then apply) never un-ignores a secret. Step 5 shows validate's errors without the source
-  lines, which print secret values. Step 7 needs rudder-cli 0.29.0 or later and is skipped on an
-  older one; its one-call recipe exits 5 when the app cannot start. Step 8 builds the curl event
+  lines, which print secret values. The skill needs rudder-cli 0.26.0 or later, the first release
+  that accepts its destination specs without experimental flags, and step 1 installs the latest
+  release when the copy it finds is older. Step 7 needs 0.29.0 or later and is skipped on an older
+  one; its one-call recipe exits 5 when the app cannot start, and both recipes exit 3 when the
+  listener stops during a check. Step 8 builds the curl event
   from the plan. Step 1 downloads the installer into a new temporary folder. While the installer
   is unpublished, it runs a script shipped with the skill instead, which installs the latest
   release's archive (the arm64 build under Rosetta) after checking it against the release's
@@ -107,25 +111,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Step 2 runs a probe that names the app's source type: Flutter and React Native first, because
   their apps also hold `android/` and `ios/` folders, then Android (`android_kotlin`), iOS
   (`ios_swift`, from an Xcode project or a Podfile), web, and only then server languages; a
-  `Package.swift` or a `package.json` alone makes it ask. When it finds several apps it lists them
-  and asks which one sends events; when it finds none it asks "What will send events to
-  RudderStack?", the question step 1 asks outside an app, now defined once. It also lists the
-  RudderStack and Segment SDKs the dependencies name, the legacy Android (Java) and iOS
-  (Objective-C) SDKs included. New Android (Kotlin SDK) and iOS (Swift SDK) references add the
+  `Package.swift` or a `package.json` alone makes it ask. When it finds several apps, of one type or
+  several, it lists each with its folder and asks which one sends events, and an app in a subfolder
+  gets its `.env.local` and its build commands in that folder; when it finds none it asks "What
+  will send events to RudderStack?", the question step 1 asks outside an app, now defined once. It
+  also lists the RudderStack and Segment SDKs the dependencies name, the legacy Android (Java) and
+  iOS (Objective-C) SDKs included. New Android (Kotlin SDK) and iOS (Swift SDK) references add the
   dependency, keep the write key out of git, load the SDK once and give each agreed event a typed
   function, in Kotlin or Java and in Swift or Objective-C. Step 7 checks a mobile app on an Android
   emulator (`10.0.2.2`) or the iOS Simulator, or is skipped without one, and step 8 runs the app
   against the real data plane. A Capacitor or Cordova app gets the JavaScript SDK, and a Unity game
-  the Unity SDK. An app that already uses a RudderStack SDK keeps its current source unless the user
-  agrees to move it, and a legacy SDK is replaced only on a yes. When the app keeps its source,
-  step 6 writes the new write key to `rudder/first-event.vars.yaml`, not to the app's `.env.local`,
-  and step 8's probe and curl send read it from there. The iOS reference never edits
-  `project.pbxproj` and gives the user its Xcode changes in one list. Neither mobile reference turns
-  off plain HTTP an app already allows: iOS gets `NSAllowsLocalNetworking` only without
+  the Unity SDK. An app that already uses a RudderStack SDK keeps its current source unless the
+  user agrees to move it, and a legacy SDK is replaced only on a yes. When the app keeps its
+  source, step 6 writes the new write key to `rudder/first-event.vars.yaml`, not to the app's
+  `.env.local`, and step 8's probe and curl send read it from there. The iOS reference never edits
+  `project.pbxproj` and gives the user its Xcode changes in one list. Neither mobile reference
+  turns off plain HTTP an app already allows: iOS gets `NSAllowsLocalNetworking` only without
   `NSAllowsArbitraryLoads`, and Android's debug network config is skipped when
-  `usesCleartextTraffic` is on. An Expo app gets a development build instead of Expo Go, GA4 on a
-  mobile source uses its Firebase app stream, and an app the user will not upgrade, or cannot run on
-  any emulator, simulator or device, sends its first event with curl.
+  `usesCleartextTraffic` is on and no network security config is set. With one, which Android 7.0
+  and later obey over that attribute, the debug config copies its rules and adds `10.0.2.2`. An
+  Expo app gets a development build instead of Expo Go, GA4 on a mobile source uses its Firebase
+  app stream, and an app the user will not upgrade, or cannot run on any emulator, simulator or
+  device, sends its first event with curl.
   Steps 7 and 8 commit each fix they make, and the undo reverts those commits with the rest. Before
   step 6 writes the write key or data plane URL to a git-ignored file, such as `.env.local` or an
   iOS app's `RudderStack.local.xcconfig`, on any path, it saves the file in the git directory under
@@ -135,7 +142,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   drops its copies of each file it dealt with, so a later onboarding saves the file as it is then.
   The undo starts with a dry run and stops if it would remove anything, because the workspace then
   holds resources that `rudder/` does not, such as another project's. After its reverts it stops
-  again if the dry run would remove a resource that the reverts did not take out of `rudder/`.
+  again if the dry run would remove a resource that the reverts did not take out of `rudder/`,
+  comparing kind and id, since ids are unique only per kind.
   Every validate, dry run and apply runs through a filter that keeps only the lines
   rudder-cli is known to print, because validate shows the spec line a message is about with secrets
   filled in, and a multi-line secret runs over several lines. Step 8's probe reads only its two
@@ -147,7 +155,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   offers an empty workspace: `rudder-cli import workspace` cannot take them over, and specs copied
   from that project would be deleted by the undo. On resume, step 1 makes git ignore the var file
   before it writes it. After any uncommitted changes are dealt with, it commits specs it finds in
-  `rudder/` that no commit holds yet, on their own, and the undo never reverts that commit.
+  `rudder/` that no commit holds yet, on their own, and the undo never reverts that commit. When
+  the app's source type differs from the resumed source's, it adds a source of the new type beside
+  the old one, which keeps its write key, so neither step 5 nor the undo removes a source.
   Step 9 copies `rudder/` to the app without the var file. A site without a
   build keeps its write key in the page. A mobile app skips step 7 in an agent that stops background
   processes, and reruns after a listener or app failure are bounded. When `claude mcp list` shows a
