@@ -23,9 +23,19 @@ type Recorder struct {
 }
 
 func NewRecorder(path string) (*Recorder, error) {
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0o600)
 	if err != nil {
 		return nil, err
+	}
+	// an existing capture without a final newline gets one, so the next record starts its own line
+	last := make([]byte, 1)
+	if info, err := f.Stat(); err == nil && info.Size() > 0 {
+		if _, err := f.ReadAt(last, info.Size()-1); err == nil && last[0] != '\n' && last[0] != '\r' {
+			if _, err := f.Write([]byte{'\n'}); err != nil {
+				f.Close()
+				return nil, err
+			}
+		}
 	}
 	return &Recorder{f: f}, nil
 }

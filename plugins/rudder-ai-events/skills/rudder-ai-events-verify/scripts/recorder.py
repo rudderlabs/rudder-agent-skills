@@ -11,7 +11,14 @@ class Recorder:
     def __init__(self, path: str = "events.jsonl") -> None:
         self.path = path
         self._lock = threading.Lock()
-        open(path, "a").close()  # a run that sends nothing (AI switch off, new install) still leaves a capture
+        # a run that sends nothing (AI switch off, new install) still leaves a capture; an existing one that
+        # does not end in a newline gets one, so the next record starts its own line
+        with open(path, "ab+") as f:
+            f.seek(0, 2)
+            if f.tell():
+                f.seek(-1, 2)
+                if f.read(1) not in (b"\n", b"\r"):
+                    f.write(b"\n")
 
     # rudder-sdk-python Client.track: same parameters and order, returns (success, message)
     def track(self, user_id=None, event=None, properties=None, context=None, timestamp=None,

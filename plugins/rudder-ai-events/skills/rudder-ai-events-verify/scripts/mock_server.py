@@ -5,7 +5,14 @@ import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 OUT = sys.argv[2] if len(sys.argv) > 2 else "events.jsonl"
-open(OUT, "a").close()  # a run that sends nothing (AI switch off, new install) still leaves a capture
+# a run that sends nothing (AI switch off, new install) still leaves a capture; an existing one that does not
+# end in a newline gets one, so the next record starts its own line
+with open(OUT, "ab+") as f:
+    f.seek(0, 2)
+    if f.tell():
+        f.seek(-1, 2)
+        if f.read(1) not in (b"\n", b"\r"):
+            f.write(b"\n")
 
 
 class Handler(BaseHTTPRequestHandler):
