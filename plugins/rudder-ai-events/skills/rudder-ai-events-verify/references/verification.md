@@ -137,7 +137,8 @@ Pass only the flags that apply:
 |---|---|
 | `--capture-content` | the plan turns capture on |
 | `--feature`, `--surface` | once per planned feature and channel |
-| `--user-id`, `--expect-session` | the requests carried a user and cookies |
+| `--user-id`, `--expect-session` | the requests carried a user and cookies: prompts and answers carry that `userId` and a session; server feedback that carries a `userId` carries that one |
+| `--mcp-user-id <id>` | the MCP client was driven as a known subject: every MCP event carries it as `userId` (`ai_system` for stdio without auth); no session is expected |
 | `--expect-joins` | the browser was driven with the server's IDs: every client/server gap, either way (a prompt, answer or feedback `ai_user_action` on one side only), and every action, score or declared tool event with no captured answer, fails instead of being a note; background runs are exempt |
 | `--client-surface <surface>` | once per surface with a browser client: only its turns need client copies, so a server-only surface (API, mobile backend) in the same capture is not reported for missing ones |
 | `--client-opt-out <copy>` | `client_prompt`, `client_response`, `client_feedback` or `server_feedback` listed in the plan's `client_events.opt_out`: that copy is not expected, and fails if sent. Pass one per opted-out copy so only approved omissions are exempt |
@@ -172,7 +173,7 @@ After the first PASS, rebuild the plan's `## What changes` from what was capture
 python3 scripts/what_changes.py before.jsonl events.jsonl
 ```
 
-`before.jsonl` is the same traffic with `ai_events_env` off. The script prints the events table (`new`, `changed`, `unchanged`, `removed`, with counts; browser copies on their own rows) and, per changed event, one redacted before/after JSON pair with the differing fields and their before and after values listed. A value change counts (status, model, cost); fields that differ on every run (interaction, conversation and session IDs, `anonymousId`, timestamps, durations and latency) count only when added, removed or retyped. IDs, user and account IDs, `on_behalf_of`, emails, `traits` and timestamps are redacted; check the remaining values before sharing. Add the "When it fires" column and the other five parts (code touched, identity, data that leaves the app, impact, switch off and roll back) from the plan, corrected by what the capture showed.
+`before.jsonl` is the same traffic with `ai_events_env` off. The script prints the events table (`new`, `changed`, `unchanged`, `removed`, with counts; browser copies, and legacy events that use an `ai_*` or `mcp_*` name, on their own rows) and, per changed event, one redacted before/after JSON pair with the differing fields and their before and after values listed. A value change counts (status, model, cost); fields that differ on every run (interaction, conversation and session IDs, `anonymousId`, timestamps, durations and latency) count only when added, removed or retyped. IDs, user and account IDs, `on_behalf_of`, emails, `traits` and timestamps are redacted; check the remaining values before sharing. Add the "When it fires" column and the other five parts (code touched, identity, data that leaves the app, impact, switch off and roll back) from the plan, corrected by what the capture showed.
 
 ## 6. Checklist
 

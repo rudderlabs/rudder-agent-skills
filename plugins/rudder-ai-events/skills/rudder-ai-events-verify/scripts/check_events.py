@@ -39,7 +39,9 @@ p.add_argument("--absent", action="append", default=[],
                     "of the same name do not count")
 p.add_argument("--feature", action="append", default=[], help="allowed feature values (the plan's surfaces)")
 p.add_argument("--surface", action="append", default=[], help="allowed surface values (the plan's surfaces)")
-p.add_argument("--user-id", help="userId expected on user-triggered server events that carry one")
+p.add_argument("--user-id", help="userId expected on user-triggered server prompts and answers, and on server "
+                                  "feedback that carries one")
+p.add_argument("--mcp-user-id", help="userId every MCP event carries: the identified subject (ai_system without auth)")
 p.add_argument("--expect-session", action="store_true", help="user-triggered server events carry context.sessionId")
 p.add_argument("--expect-joins", action="store_true",
                help="the client side was driven with the server's interaction IDs: every gap between sides fails")
@@ -167,6 +169,9 @@ for i, m in enumerate(tracks):
             problems.append(f"{where}: userId {user!r}, expected {args.user_id!r}")
         if args.expect_session and not context.get("sessionId"):
             problems.append(f"{where}: no context.sessionId (cookies not read?)")
+    # feedback endpoints pass the real user or none (never a placeholder), so only a present one is compared
+    if args.user_id and not is_client and name == "ai_user_action" and user and user != args.user_id:
+        problems.append(f"{where}: userId {user!r}, expected {args.user_id!r}")
     if system and name == "ai_response_received":
         if not props.get("task_name"):
             notes.append(f"{where}: system answer without task_name (a call outside any interaction or task?)")
@@ -175,6 +180,10 @@ for i, m in enumerate(tracks):
         leaked = RAW_MCP & props.keys()
         if leaked:
             problems.append(f"{where}: raw MCP payload keys {sorted(leaked)}")
+        if args.mcp_user_id and not user:
+            problems.append(f"{where}: no userId, expected {args.mcp_user_id!r} (identify not wired?)")
+        elif args.mcp_user_id and user != args.mcp_user_id:
+            problems.append(f"{where}: userId {user!r}, expected {args.mcp_user_id!r}")
         if args.mcp_server and props.get("server_name") not in args.mcp_server:
             problems.append(f"{where}: server_name {props.get('server_name')!r} not in {args.mcp_server}")
         if "request_context" in (props.get("argument_keys") or []):

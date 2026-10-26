@@ -13,6 +13,7 @@ import json
 import re
 import sys
 
+SDK_NAMES = {"@rudderstack/ai", "rudderstack-ai", "ai-sdk-go"}  # context.wrapperLibrary.name, as in check_events.py
 DROP = {"messageId", "timestamp", "originalTimestamp", "sentAt", "receivedAt", "_metadata"}
 ID_KEY = re.compile(r"(^|_)id$|Id$|^on_behalf_of$|[eE]mail")
 PERSONAL = {"traits"}  # identify() traits (email, name, ...) ride along in context
@@ -26,8 +27,11 @@ def load(path):
     return [m for m in msgs if m.get("type", "track") == "track" and m.get("event")]
 
 
-def row_key(m):  # browser copies are their own rows
-    return m["event"] + (" (browser)" if (m.get("properties") or {}).get("source") == "client" else "")
+def row_key(m):  # browser copies are their own rows, and so is a legacy event that uses an AI SDK name
+    if (m.get("properties") or {}).get("source") == "client":
+        return m["event"] + " (browser)"
+    sdk = ((m.get("context") or {}).get("wrapperLibrary") or {}).get("name") in SDK_NAMES
+    return m["event"] + (" (legacy)" if not sdk and m["event"].startswith(("ai_", "mcp_")) else "")
 
 
 def redact(value, key=""):
