@@ -75,7 +75,7 @@ Do one surface at a time; after each, run the app's type check (and its tests wh
 
 ## Delivery
 
-Suggest stacked PRs: (1) the dependency, `configure()`, both switches, flush and `ai-events.md` (land the dependency with its first use: `go mod tidy` and unused-dependency checks strip it otherwise); (2) one PR per surface group. Each PR body carries the `## What changes` table built from that PR's captured payloads.
+Suggest stacked PRs: (1) the dependency, `configure()`, both switches and flush (land the dependency with its first use: `go mod tidy` and unused-dependency checks strip it otherwise); (2) one PR per surface group. Each PR body carries the `## What changes` table built from that PR's captured payloads.
 
 ## Credential Security
 
