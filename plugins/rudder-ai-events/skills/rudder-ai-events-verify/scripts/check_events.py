@@ -110,8 +110,11 @@ for i, m in enumerate(tracks):
             problems.append(f"{where}: context.wrapperLibrary.specVersion is {w.get('specVersion')!r}")
         if not is_client and w.get("name") not in SDK_NAMES:
             problems.append(f"{where}: context.wrapperLibrary.name is {w.get('name')!r}, not one of {sorted(SDK_NAMES)}")
-    # trackAction takes no feature, so server ai_user_action has none; MCP events have none either
-    if args.feature and not is_mcp and (is_client or name != "ai_user_action") and props.get("feature") not in args.feature:
+    # trackAction takes no feature, so server ai_user_action has none; MCP events have none either;
+    # a standalone score carries one only when given, so check it only when present
+    optional_feature = name == "ai_interaction_scored" and "feature" not in props
+    if args.feature and not is_mcp and not optional_feature and (is_client or name != "ai_user_action") \
+            and props.get("feature") not in args.feature:
         problems.append(f"{where}: feature {props.get('feature')!r} not in {args.feature}")
     system = props.get("trigger") == "system"
     optional_surface = name == "ai_user_action" and not is_client and "surface" not in props  # trackAction: optional
@@ -125,7 +128,9 @@ for i, m in enumerate(tracks):
     if system and user:
         problems.append(f"{where}: system-triggered event carries userId {user!r}")
     if not system and not is_client and name in {"ai_user_prompt_created", "ai_response_received"}:
-        if args.user_id and user and user != args.user_id:
+        if args.user_id and not user:  # an anonymousId fallback hides broken user wiring
+            problems.append(f"{where}: no userId, expected {args.user_id!r}")
+        elif args.user_id and user != args.user_id:
             problems.append(f"{where}: userId {user!r}, expected {args.user_id!r}")
         if args.expect_session and not context.get("sessionId"):
             problems.append(f"{where}: no context.sessionId (cookies not read?)")
@@ -212,7 +217,7 @@ for key, count in clients_seen.items():
     if count > 1:
         notes.append(f"mcp_client_seen {key}: {count} times in one window (several processes, or a restart?)")
 for t in tool_calls:
-    joined = t.get("interaction_id") in by_interaction
+    joined = t.get("interaction_id") in answers  # the calling answer, not any event sharing the ID
     print("mcp call:", {k: t.get(k) for k in ("server_name", "client_name", "protocol_version", "tool_name", "tool_status",
                                                "error_type", "intent", "user_sentiment")}, "joined" if joined else "")
 if tool_calls:
@@ -233,6 +238,8 @@ if args.no_ai_events and sdk_events:
     problems.append(f"{sdk_events} AI SDK events sent with the AI events switch off")
 if args.no_ai_events and browser_events:
     problems.append(f"{browser_events} browser AI events sent with the AI events switch off (trackAi not gated on it)")
+if not args.no_ai_events and not sdk_events and not browser_events:  # a silent recorder must not pass
+    problems.append("no AI events captured (recorder not wired, or the AI events switch is off)")
 
 print("events:", dict(names))
 print("legacy or other events (no wrapperLibrary):", dict(legacy))
