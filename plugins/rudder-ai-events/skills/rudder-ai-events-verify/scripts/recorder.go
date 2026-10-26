@@ -31,6 +31,16 @@ func NewRecorder(path string) (*Recorder, error) {
 }
 
 func (r *Recorder) Enqueue(m analytics.Message) error {
+	switch p := m.(type) { // Enqueue accepts pointers too
+	case *analytics.Track:
+		if p != nil {
+			m = *p
+		}
+	case *analytics.Identify:
+		if p != nil {
+			m = *p
+		}
+	}
 	var line any
 	switch msg := m.(type) {
 	case analytics.Track:

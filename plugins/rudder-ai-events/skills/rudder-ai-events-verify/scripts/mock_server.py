@@ -5,6 +5,7 @@ import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 OUT = sys.argv[2] if len(sys.argv) > 2 else "events.jsonl"
+open(OUT, "a").close()  # a run that sends nothing (AI switch off, new install) still leaves a capture
 
 
 class Handler(BaseHTTPRequestHandler):

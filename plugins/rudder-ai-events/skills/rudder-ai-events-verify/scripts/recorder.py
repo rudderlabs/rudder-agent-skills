@@ -13,10 +13,16 @@ class Recorder:
         self._lock = threading.Lock()
         open(path, "a").close()  # a run that sends nothing (AI switch off, new install) still leaves a capture
 
-    def track(self, **message) -> None:  # rudder-sdk-python keyword arguments: user_id, anonymous_id, event, ...
-        line = json.dumps({"type": "track", **message}, default=str)
+    # rudder-sdk-python Client.track: same parameters and order, returns (success, message)
+    def track(self, user_id=None, event=None, properties=None, context=None, timestamp=None,
+              anonymous_id=None, integrations=None, message_id=None):
+        given = dict(user_id=user_id, event=event, properties=properties, context=context, timestamp=timestamp,
+                     anonymous_id=anonymous_id, integrations=integrations, message_id=message_id)
+        message = {"type": "track", **{k: v for k, v in given.items() if v is not None}}
+        line = json.dumps(message, default=str)
         with self._lock, open(self.path, "a") as f:
             f.write(line + "\n")
+        return True, message
 
     def flush(self) -> None:
         pass
