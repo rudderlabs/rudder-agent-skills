@@ -11,6 +11,7 @@ import sys
 
 from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
+from referencing.jsonschema import DRAFT202012
 
 SPEC_VERSION = "0.3.0"
 SDK_NAMES = {"@rudderstack/ai", "rudderstack-ai", "ai-sdk-go"}  # context.wrapperLibrary.name: Node.js, Python, Go
@@ -55,13 +56,31 @@ p.add_argument("--mcp-server", action="append", default=[], help="allowed server
 p.add_argument("--mcp-intent", action="append", default=[], help="allowed request_context intents (other is implied)")
 args = p.parse_args()
 
-spec = json.load(open(args.spec))
-registry = Registry().with_resource(spec["$id"], Resource.from_contents(spec))
-client = json.load(open(args.client_schema)) if args.client_schema else None
+
+
+def load_schema(path):
+    """A schema file with an $id and an object $defs; exits 2 otherwise."""
+    try:
+        schema = json.load(open(path))
+    except (OSError, ValueError):
+        schema = None
+    if not isinstance(schema, dict) or not isinstance(schema.get("$id"), str) or not isinstance(schema.get("$defs"), dict):
+        print(f"{path}: cannot read schema (needs a string $id and an object $defs)", file=sys.stderr)
+        sys.exit(2)
+    return schema
+
+
+def resource(schema):
+    return Resource.from_contents(schema, default_specification=DRAFT202012)
+
+
+spec = load_schema(args.spec)
+registry = Registry().with_resource(spec["$id"], resource(spec))
+client = load_schema(args.client_schema) if args.client_schema else None
 # browser AI event names: only these count as AI traffic when they carry source: client
 client_names = {n for n in client["$defs"] if n.startswith("ai_")} if client else CLIENT_COPIES | CLIENT_ONLY
 if client:
-    registry = registry.with_resource(client["$id"], Resource.from_contents(client))
+    registry = registry.with_resource(client["$id"], resource(client))
 
 
 def validator(schema, name):
@@ -123,8 +142,9 @@ for i, m in enumerate(tracks):
         if not is_client and w.get("name") not in SDK_NAMES:
             problems.append(f"{where}: context.wrapperLibrary.name is {w.get('name')!r}, not one of {sorted(SDK_NAMES)}")
     # trackAction takes no feature, so server ai_user_action has none; MCP events have none either;
-    # a standalone score carries one only when given, so check it only when present
-    optional_feature = name == "ai_interaction_scored" and "feature" not in props
+    # a standalone score carries one only when given, and ai_otel_span (tracing) none by default:
+    # check it only when present
+    optional_feature = name in {"ai_interaction_scored", "ai_otel_span"} and "feature" not in props
     if args.feature and not is_mcp and not optional_feature and (is_client or name != "ai_user_action") \
             and props.get("feature") not in args.feature:
         problems.append(f"{where}: feature {props.get('feature')!r} not in {args.feature}")
@@ -157,7 +177,11 @@ for i, m in enumerate(tracks):
         if args.mcp_server and props.get("server_name") not in args.mcp_server:
             problems.append(f"{where}: server_name {props.get('server_name')!r} not in {args.mcp_server}")
         if "request_context" in (props.get("argument_keys") or []):
-            problems.append(f"{where}: request_context reached the tool (argument_keys)")
+            # a tool declaring its own request_context gets it untouched, and the SDK records none of its fields
+            if {"intent", "user_sentiment", "call_reason"} & props.keys():
+                problems.append(f"{where}: request_context reached the tool (argument_keys)")
+            else:
+                notes.append(f"{where}: request_context in argument_keys (fine if the tool declares its own)")
         if args.mcp_intent and "intent" in props and props["intent"] not in args.mcp_intent + ["other"]:
             problems.append(f"{where}: intent {props['intent']!r} not in the server's list")
         if name == "mcp_client_seen":
