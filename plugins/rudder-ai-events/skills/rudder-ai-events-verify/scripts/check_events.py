@@ -41,6 +41,8 @@ p.add_argument("--user-id", help="userId expected on user-triggered server event
 p.add_argument("--expect-session", action="store_true", help="user-triggered server events carry context.sessionId")
 p.add_argument("--expect-joins", action="store_true",
                help="the client side was driven with the server's interaction IDs: every gap between sides fails")
+p.add_argument("--client-opt-out", action="append", default=[], choices=["client_prompt", "client_response"],
+               help="a browser copy the plan's client_events.opt_out drops: not expected, and fails if sent")
 p.add_argument("--failed-interaction", action="append", default=[],
                help="interaction_id of a turn the app failed and caught itself: its answer must not be success")
 p.add_argument("--mcp-server", action="append", default=[], help="allowed server_name values (the plan's MCP servers)")
@@ -165,12 +167,19 @@ for iid, c in by_interaction.items():
     if (has_client_copies or args.expect_joins) and iid not in {r.get("interaction_id") for r in runs}:
         if c[("ai_user_prompt_created", "client")] and not c[("ai_user_prompt_created", "server")]:
             gap(f"interaction {iid}: client prompt with no server prompt (request never reached the SDK, or a different ID)")
-        if c[("ai_user_prompt_created", "server")] and not c[("ai_user_prompt_created", "client")]:
+        if c[("ai_user_prompt_created", "server")] and not c[("ai_user_prompt_created", "client")] \
+                and "client_prompt" not in args.client_opt_out:
             gap(f"interaction {iid}: server prompt with no client copy (browser copy not sent, or a different ID)")
-        if c[("ai_response_received", "server")] and not c[("ai_response_received", "client")]:
+        if c[("ai_response_received", "server")] and not c[("ai_response_received", "client")] \
+                and "client_response" not in args.client_opt_out:
             gap(f"interaction {iid}: server answer with no client copy (not shown, client left, or client event lost)")
         if c[("ai_response_received", "client")] and not c[("ai_response_received", "server")]:
             gap(f"interaction {iid}: client answer with no server answer (request never reached the SDK, or a different ID)")
+    # An opted-out copy was dropped from the plan, so sending it is a regression, not a gap.
+    if "client_prompt" in args.client_opt_out and c[("ai_user_prompt_created", "client")]:
+        problems.append(f"interaction {iid}: client prompt copy sent, but the plan opts it out")
+    if "client_response" in args.client_opt_out and c[("ai_response_received", "client")]:
+        problems.append(f"interaction {iid}: client answer copy sent, but the plan opts it out")
     responses = c[("ai_response_received", "server")] + c[("ai_response_received", "client")]
     for event in ("ai_user_action", "ai_interaction_scored"):
         if (c[(event, "server")] or c[(event, "client")]) and not responses:

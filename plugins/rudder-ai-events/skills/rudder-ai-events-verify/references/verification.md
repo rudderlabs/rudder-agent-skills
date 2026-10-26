@@ -138,6 +138,7 @@ Pass only the flags that apply:
 | `--feature`, `--surface` | once per planned feature and channel |
 | `--user-id`, `--expect-session` | the requests carried a user and cookies |
 | `--expect-joins` | the browser was driven with the server's IDs: every client/server gap, either way (a prompt or answer on one side only), fails instead of being a note; background runs are exempt |
+| `--client-opt-out <copy>` | `client_prompt` or `client_response` listed in the plan's `client_events.opt_out`: that browser copy is not expected, and fails if sent. Pass one per opted-out copy so only approved omissions are exempt |
 | `--failed-interaction <id>` | per app-detected failure driven: its server answer must not be `success` |
 | `--expect-legacy <event>` | per planned legacy event; also names a legacy event that uses an `ai_*` name |
 | `--mcp-server`, `--mcp-intent` | per planned server name, and per entry of its `request_context.intents` (without `other`) |
