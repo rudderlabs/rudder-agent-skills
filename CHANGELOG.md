@@ -55,8 +55,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instead continue without one, in a new subfolder unless the folder is empty, and send the first
   planned event with curl. It stops on uncommitted changes, and commits an app that was not in git
   as it is before changing it, so a `git revert` never deletes the app's files. Every commit names
-  its paths. Step 3 writes the event names and property types to `rudder/plan.events.json`, and
-  steps 6 to 8 read them from there. Step 7 captures events with `rudder-cli sources listen` and
+  its paths, in `git add` and after `git commit --`, so changes the user staged stay out of it.
+  Step 3 writes the event names and property types to `rudder/plan.events.json`, and steps 6 to 8
+  read them from there. Step 7 captures events with `rudder-cli sources listen` and
   checks them against that file with a jq program shipped beside the references, in two shell
   calls, or in one for agents that stop background processes when a call returns. The destination
   reference leaves unfilled secrets as `NAME:` with no value, names every secret key of Amplitude
@@ -89,7 +90,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   emulator (`10.0.2.2`) or the iOS Simulator, or is skipped without one, and step 8 runs the app
   against the real data plane. A Capacitor or Cordova app gets the JavaScript SDK, and a Unity game
   the Unity SDK. An app that already uses a RudderStack SDK keeps its current source unless the user
-  agrees to move it, and a legacy SDK is replaced only on a yes. The iOS reference never edits
+  agrees to move it, and a legacy SDK is replaced only on a yes. When the app keeps its source,
+  step 6 writes the new write key to `rudder/first-event.vars.yaml`, not to the app's `.env.local`,
+  and step 8's probe and curl send read it from there. The iOS reference never edits
   `project.pbxproj` and gives the user its Xcode changes in one list. Neither mobile reference turns
   off plain HTTP an app already allows: iOS gets `NSAllowsLocalNetworking` only without
   `NSAllowsArbitraryLoads`, and Android's debug network config is skipped when
@@ -101,9 +104,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   iOS app's `RudderStack.local.xcconfig`, on any path, it saves the file in the git directory under
   the app folder's own path, and afterwards records what it wrote. The undo reads that folder, in
   the same session or a later one: it puts back each file that still holds what step 6 wrote,
-  deletes the ones step 6 created, and asks before replacing a file the user changed since. The undo
-  also stops when its dry run would remove a resource that its reverts did not take out of
-  `rudder/`. Every validate, dry run and apply runs through a filter that keeps only the lines
+  deletes the ones step 6 created, and asks before replacing a file the user changed since. It then
+  drops its copies of each file it dealt with, so a later onboarding saves the file as it is then.
+  The undo starts with a dry run and stops if it would remove anything, because the workspace then
+  holds resources that `rudder/` does not, such as another project's. After its reverts it stops
+  again if the dry run would remove a resource that the reverts did not take out of `rudder/`.
+  Every validate, dry run and apply runs through a filter that keeps only the lines
   rudder-cli is known to print, because validate shows the spec line a message is about with secrets
   filled in, and a multi-line secret runs over several lines. Step 8's probe reads only its two
   values from `.env.local`, as dotenv reads them, and never runs the file as shell. It gives each
@@ -113,10 +119,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   accepts the key. When the workspace holds resources another project manages, step 2 stops and
   offers an empty workspace: `rudder-cli import workspace` cannot take them over, and specs copied
   from that project would be deleted by the undo. On resume, step 1 makes git ignore the var file
-  before it writes it. Step 9 copies `rudder/` to the app without the var file. A site without a
+  before it writes it. After any uncommitted changes are dealt with, it commits specs it finds in
+  `rudder/` that no commit holds yet, on their own, and the undo never reverts that commit.
+  Step 9 copies `rudder/` to the app without the var file. A site without a
   build keeps its write key in the page. A mobile app skips step 7 in an agent that stops background
-  processes, and reruns after a listener or app failure are bounded. When `/mcp` lists the
-  rudder-core plugin's server, step 1 has the user authenticate it instead of adding a second one.
+  processes, and reruns after a listener or app failure are bounded. When `claude mcp list` shows a
+  server at `https://mcp.rudderstack.com/mcp`, under any name, the rudder-core plugin's included,
+  step 1 has the user authenticate it instead of adding a second one.
   The measured facts, step 2's probe and the Flutter, React Native and Unity notes are references
   beside SKILL.md.
 
