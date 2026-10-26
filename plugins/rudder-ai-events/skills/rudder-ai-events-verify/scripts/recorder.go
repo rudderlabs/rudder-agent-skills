@@ -50,6 +50,22 @@ func (r *Recorder) Enqueue(m analytics.Message) error {
 		if p != nil {
 			m = *p
 		}
+	case *analytics.Page:
+		if p != nil {
+			m = *p
+		}
+	case *analytics.Screen:
+		if p != nil {
+			m = *p
+		}
+	case *analytics.Group:
+		if p != nil {
+			m = *p
+		}
+	case *analytics.Alias:
+		if p != nil {
+			m = *p
+		}
 	}
 	var line any
 	switch msg := m.(type) {
@@ -58,6 +74,18 @@ func (r *Recorder) Enqueue(m analytics.Message) error {
 		line = msg
 	case analytics.Identify:
 		msg.Type = "identify"
+		line = msg
+	case analytics.Page:
+		msg.Type = "page"
+		line = msg
+	case analytics.Screen:
+		msg.Type = "screen"
+		line = msg
+	case analytics.Group:
+		msg.Type = "group"
+		line = msg
+	case analytics.Alias:
+		msg.Type = "alias"
 		line = msg
 	default:
 		line = map[string]string{"type": fmt.Sprintf("%T", m)}
