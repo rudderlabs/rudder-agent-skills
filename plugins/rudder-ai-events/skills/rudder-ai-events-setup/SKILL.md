@@ -6,7 +6,7 @@ allowed-tools: "Bash(rg *), Bash(grep *), Bash(node --version), Bash(python3 --v
 
 # RudderStack AI Events Setup
 
-Takes an existing app with LLM features to the standard RudderStack AI events (spec v0.3): one `ai_user_prompt_created` and one `ai_response_received` per answer, `ai_user_action` for feedback, and `mcp_*` events for MCP servers, through the app's existing RudderStack client. SDKs, each for chat, background agents and MCP servers: `@rudderstack/ai` (Node.js 24+), `rudderstack-ai` (Python 3.12+) and `github.com/rudderlabs/ai-sdk-go` (public Go modules, one per provider integration; the Go floor is the `go` line of the chosen version's `go.mod`). Use 0.6.0 / v0.2.0 or later; resolve the latest in step 2.3 and never invent one.
+Takes an existing app with LLM features to the standard RudderStack AI events (spec v0.3): one `ai_user_prompt_created` and one `ai_response_received` per answer, `ai_user_action` for feedback, and `mcp_*` events for MCP servers, through the app's existing RudderStack client. SDKs, each for chat, background agents and MCP servers: `@rudderstack/ai` (Node.js 24+), `rudderstack-ai` (Python 3.12+) and `github.com/rudderlabs/ai-sdk-go` (public Go modules, one per provider integration; the Go floor is the `go` line of the chosen version's `go.mod`). Use 0.6.0 / v0.2.0 or later; resolve the latest in step 2.3 and never invent one. Other product events (non-AI features): `rudder-code-first-instrumentation` or `rudder-design-first-instrumentation`.
 
 ## Workflow
 
