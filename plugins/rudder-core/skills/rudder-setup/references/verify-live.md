@@ -45,9 +45,11 @@ case $code in 400|2??) exit 0 ;; 401) exit 1 ;; *) echo "data plane URL: ${dp%/}
 - Exit 3, any other status. The probe prints the status and the first line of the answer. Do not ask the user to
   send events.
   - `404 source is disabled`: the URL is right and the source is turned off. Ask the user to turn it on in the
-    RudderStack dashboard, then run the probe again.
+    RudderStack dashboard, then run the probe again, at most twice. If it still answers `404 source is disabled`,
+    report that and stop.
   - `429`, or a `5xx` such as `502` or `503`: the data plane answered but did not take the request. Run the probe
-    once more after a minute. If it exits 3 again, treat it as the next case.
+    once more after a minute. If it answers `429` or a `5xx` again, show the status and the answer, say that the
+    data plane is not taking requests for now, and stop.
   - Anything else: the data plane URL is wrong, or the network does not reach it. `000` means no answer within 10
     seconds, as with a mistyped host, a proxy or no network; another `404` means something else answered. Show the
     URL and the status, ask the user to compare the URL with the one in the RudderStack dashboard, and stop.
@@ -72,9 +74,9 @@ action before saying done.
 
 ### No app here: send the first planned event with curl
 
-When `sender` is `curl`, send the first event in `rudder/plan.events.json` yourself, once the probe above stops
-answering `401`. Run this command as written. It builds the body from the plan, so the event name and property
-names match it exactly, and gives each property a sample value of its agreed type: `"sample"` for `string`,
+When `sender` is `curl`, send the first event in `rudder/plan.events.json` yourself, once the probe above
+exits 0. Run this command as written. It builds the body from the plan, so the event name and property names
+match it exactly, and gives each property a sample value of its agreed type: `"sample"` for `string`,
 `42.5` for `number`, `42` for `integer` and `true` for `boolean`. The key and the URL come from `.env.local`, read
 as in section 2, so neither appears on the command line:
 
