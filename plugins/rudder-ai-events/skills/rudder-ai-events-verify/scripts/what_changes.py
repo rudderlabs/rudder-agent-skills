@@ -19,7 +19,8 @@ BROWSER = {"ai_user_prompt_created", "ai_response_received", "ai_user_action", "
            "ai_conversation_deleted"}  # check_events.py CLIENT_COPIES | CLIENT_ONLY
 DROP = {"messageId", "timestamp", "originalTimestamp", "sentAt", "receivedAt", "_metadata"}
 # \Z, not $: $ also matches before a final newline
-ID_KEY = re.compile(r"(^|_)id\Z|Id\Z|^on_behalf_of\Z|[eE]mail")
+# user_id, userId, userID, ID; not isValid or VALID
+ID_KEY = re.compile(r"(^|_)(id|ID)\Z|Id\Z|[a-z0-9]ID\Z|^on_behalf_of\Z|[eE]mail")
 PERSONAL = {"traits"}  # identify() traits (email, name, ...) ride along in context
 EMAIL = re.compile(r'[^ \t\n\r\f\v@"]+@[^ \t\n\r\f\v@"]+\.[A-Za-z0-9_]+')  # ASCII classes, as in the SDKs
 VARY = re.compile(r"^(interaction_id|conversation_id|parent_interaction_id|trace_id|anonymousId|anonymous_id|sessionId)\Z"
