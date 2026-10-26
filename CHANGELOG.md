@@ -32,9 +32,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Installing the plugin connects MCP; the client asks the user to sign in to RudderStack in the
   browser (OAuth) the first time a tool runs. Claude Code lists it as
   `plugin:rudder-core:rudderstack`, and cursor.directory picks up the same file.
-  `rudder-destination-debugging` and `rudder-environment-check` now have the user authenticate
-  that entry in `/mcp` and send them to `rudder-mcp-setup` only when `/mcp` lists no RudderStack
-  server, and the environment check now also looks for the MCP tools. Claude Code skips the
+  When the MCP tools are missing, `rudder-destination-debugging` and `rudder-environment-check`
+  connect the server that is there before adding one. They find it by its URL under any name with
+  `claude mcp list`, keep an access-token entry at `/bearer-auth-mcp` with the plugin's entry
+  disabled, have the user authenticate an entry at `/mcp`, and give the `claude mcp add` command,
+  and a line for other agents, only when there is none. The environment check also looks for
+  `list_sources` and `get_source`, which both routes have. Claude Code skips the
   plugin's entry when a hand-added HTTP server has the same URL, but keeps both beside a hand-added
   `npx -y mcp-remote` entry, so remove that one with `claude mcp remove rudderstack`. It also
   keeps both beside an access-token entry at `https://mcp.rudderstack.com/bearer-auth-mcp`, a

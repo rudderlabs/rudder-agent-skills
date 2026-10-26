@@ -8,7 +8,7 @@ allowed-tools: "Read, Write, Edit"
 
 This skill teaches how to diagnose and fix **event delivery failures** between RudderStack and a destination — covering dropped events, auth errors, rate limiting, transformation filters, and warehouse sync failures.
 
-Requires the RudderStack MCP server, connected and signed in. In Claude Code, type `/mcp`. If it lists `plugin:rudder-core:rudderstack` (the server the rudder-core plugin adds) or `rudderstack`, choose it, enable it if it is disabled, and choose `Authenticate`. Use `rudder-mcp-setup` only when `/mcp` lists neither, so the server is not added twice.
+Requires the RudderStack MCP server, connected and signed in. If its tools, such as `list_sources`, are missing, connect the server that is there before adding one. In Claude Code, `claude mcp list` prints each server's name and URL, and a RudderStack server can have any name; the rudder-core plugin's is `plugin:rudder-core:rudderstack`. If one points at `https://mcp.rudderstack.com/bearer-auth-mcp`, the access-token route, keep it: leave the plugin's entry disabled, and check that `RUDDERSTACK_ACCESS_TOKEN` is exported in the shell Claude Code was started from, because that entry signs in with the token, not with `Authenticate`. Otherwise, if one points at `https://mcp.rudderstack.com/mcp`, type `/mcp`, choose it, enable it if it is disabled, and choose `Authenticate`. If none does, run `claude mcp add --scope user --transport http rudderstack https://mcp.rudderstack.com/mcp`, start Claude Code again and authenticate it the same way. In other agents, add an HTTP MCP server with that URL in the agent's MCP settings and sign in. `rudder-mcp-setup` covers both routes in full.
 
 ## Event Delivery Pipeline
 
