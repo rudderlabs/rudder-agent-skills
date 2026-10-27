@@ -9,10 +9,12 @@
 # Capacitor or Cordova app, unity, android_kotlin (a Gradle file that applies the Android application plugin, puts
 # the Android Gradle plugin on its classpath, or holds an android block), ios_swift (an Xcode project or workspace,
 # or a Podfile; a Package.swift alone is a library) and javascript (a package.json with a browser framework, or an
-# index.html at the top, in public/ or in src/). Frameworks come first and claim the android/ and ios/ folders
-# under them, because their apps hold both. Only when it finds none of these does it look for a server: node
-# (express, fastify, koa, nest, hapi, hono or restify), python, go, java, dotnet, php, ruby or rust. A package.json
-# with none of these frameworks prints none.
+# index.html at the top, in public/ or in src/). Frameworks come first, because their apps hold native and web
+# builds of their own. A framework app claims only those: the android/, ios/ and macos/ folders beside its manifest,
+# platforms/ for Cordova, the manifest itself and the index.html checks in its folder. Another app in the
+# repository, even one inside the framework app's folder, is still found. Only when it finds none of these does it
+# look for a server: node (express, fastify, koa, nest, hapi, hono or restify), python, go, java, dotnet, php, ruby
+# or rust. A package.json with none of these frameworks prints none.
 #
 # An app's folder is the one that holds the file it was found by, except that an Android app's is its Gradle root
 # (the nearest folder up with a settings.gradle or settings.gradle.kts), an iOS app's is the one that holds the
@@ -28,7 +30,7 @@ flutter=$(m -name pubspec.yaml -exec grep -lE '^[[:space:]]*sdk:[[:space:]]*flut
 rn=$(m -name package.json -exec jq -r 'select(.dependencies["react-native"]) | input_filename' {} \;)
 hybrid=$(m -name package.json -exec grep -l '"@capacitor/core"[[:space:]]*:' {} +; m -name config.xml -exec grep -l 'w3\.org/ns/widgets' {} +)
 roots=$(printf '%s\n' "$flutter" "$rn" "$hybrid" | sed -n 's#/[^/]*$#/#p')
-own() { if [ -n "$roots" ]; then grep -vF -e "$roots"; else cat; fi; }
+own() { R=$roots awk 'BEGIN { n = split(ENVIRON["R"], r, "\n") } { k = 1; for (i = 1; i <= n; i++) if (r[i] != "" && index($0, r[i]) == 1 && substr($0, length(r[i]) + 1) ~ /^((android|ios|macos|platforms)\/|package\.json$|(public\/|src\/)?index\.html$)/) k = 0; if (k) print }'; }
 clients() {
   "$1" flutter "$(printf '%s\n' "$flutter" | dirs)"
   "$1" react_native "$(printf '%s\n' "$rn" | dirs)"

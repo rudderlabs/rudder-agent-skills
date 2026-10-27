@@ -14,25 +14,27 @@ without it an old count looks like a new delivery.
 
 A new write key is refused for about two minutes after apply. Probe it without sending an event: an empty
 batch is authenticated first and then rejected for being empty, so nothing is ingested. This call reads the key
-and the URL from `.env.local`, the `VITE_RUDDERSTACK_` names in a Vite app or the `RUDDERSTACK_` names on the curl
-path and in a mobile app, so neither appears on the command line or in the output. It reads only those lines and
+and the URL from `.env.local`, so neither appears on the command line or in the output. Set `p` to the prefix of
+the names step 6 wrote there: `VITE_` in a Vite app, `NEXT_PUBLIC_` in Next.js, `REACT_APP_` in Create React App,
+and nothing (`p=`) on the curl path, in a site without a build, in a mobile app and in a server app. It reads both
+values under that one prefix, so a pair the file held before step 6, such as a server's `RUDDERSTACK_` values
+beside a Vite app's, is never probed in place of the app's, and never mixed with it. It reads only those lines and
 never runs the file, which is the app's dotenv file, not a shell script. Like dotenv, it uses the last line that sets
-a name, drops a comment after an unquoted value, and keeps a `#` inside quotes. It probes every 20 seconds for up to
-5 minutes; give the call a timeout of 6 minutes.
+a name, drops a comment after an unquoted value, and keeps a `#` inside quotes. It probes every 20 seconds and stops
+5 minutes after it starts, however long each answer takes, so a timeout of 6 minutes covers the call.
 
 ```bash
-f=.env.local
+f=.env.local; p=VITE_
 val() { sed -n "s/^[[:space:]]*\(export[[:space:]]\{1,\}\)\{0,1\}$1[[:space:]]*[=:][[:space:]]*//p" "$f" | tail -n 1 |
   sed -e "/^[^'\"]/s/[[:space:]]*#.*//" -e 's/[[:space:]]*$//' -e "s/^'\([^']*\)'.*/\1/" -e 's/^"\([^"]*\)".*/\1/'; }
-key=$(val RUDDERSTACK_WRITE_KEY); [ -n "$key" ] || key=$(val VITE_RUDDERSTACK_WRITE_KEY)
-dp=$(val RUDDERSTACK_DATA_PLANE_URL); [ -n "$dp" ] || dp=$(val VITE_RUDDERSTACK_DATA_PLANE_URL)
-[ -n "$key" ] || { echo "no write key in $f"; exit 2; }
-[ -n "$dp" ] || { echo "no data plane URL in $f"; exit 2; }
-tmp=$(mktemp)
-for i in $(seq 15); do
+key=$(val "${p}RUDDERSTACK_WRITE_KEY"); dp=$(val "${p}RUDDERSTACK_DATA_PLANE_URL")
+[ -n "$key" ] || { echo "no ${p}RUDDERSTACK_WRITE_KEY in $f"; exit 2; }
+[ -n "$dp" ] || { echo "no ${p}RUDDERSTACK_DATA_PLANE_URL in $f"; exit 2; }
+tmp=$(mktemp); end=$(( $(date +%s) + 300 ))
+while :; do
   code=$(curl -s -o "$tmp" --max-time 10 -w '%{http_code}' -H "Authorization: Basic $(printf '%s:' "$key" | base64)" \
     -H 'Content-Type: application/json' -d '{"batch":[]}' "${dp%/}/v1/batch")
-  [ "$code" = 401 ] || break
+  [ "$code" = 401 ] && [ "$(date +%s)" -lt "$end" ] || break
   sleep 20
 done
 echo "write key probe: $code $(head -n 1 "$tmp" | cut -c 1-200)"
@@ -53,12 +55,11 @@ case $code in 400|2??) exit 0 ;; 401) exit 1 ;; *) echo "data plane URL: ${dp%/}
   - Anything else: the data plane URL is wrong, or the network does not reach it. `000` means no answer within 10
     seconds, as with a mistyped host, a proxy or no network; another `404` means something else answered. Show the
     URL and the status, ask the user to compare the URL with the one in the RudderStack dashboard, and stop.
-- Exit 2: `.env.local` has no write key or no data plane URL under these names.
+- Exit 2: `.env.local` has no write key or no data plane URL under the names with that prefix. Check `p`.
 
-When the app is in a subfolder, set `f` to its `.env.local`. In a framework with other names for the two values,
-such as `NEXT_PUBLIC_` in Next.js, put those names in the `key=` and `dp=` lines. When step 6 wrote the two values
-to `rudder/first-event.vars.yaml`, because the user kept an app's RudderStack SDK on its old source, set `f` to that
-file, here and in the send below. `val` reads its `NAME: value` lines the same way.
+When the app is in a subfolder, set `f` to its `.env.local`. When step 6 wrote the two values to
+`rudder/first-event.vars.yaml`, because the user kept an app's RudderStack SDK on its old source, set `f` to that
+file and `p=`, here, and `f` in the send below. `val` reads its `NAME: value` lines the same way.
 
 ## 3. Send real events
 

@@ -170,8 +170,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lines, which print secret values. The skill needs rudder-cli 0.26.0 or later, the first release
   that accepts its destination specs without experimental flags, and step 1 installs the latest
   release when the copy it finds is older. Step 7 needs 0.29.0 or later and is skipped on an older
-  one; its one-call recipe exits 5 when the app cannot start, and both recipes exit 3 when the
-  listener stops during a check. Step 8 builds the curl event
+  one; its one-call recipe exits 5 when the app cannot start or anything accepts a connection on its
+  port, and both recipes exit 3 when the listener stops during a check. Step 7 counts only events
+  that arrive after its mark, so it takes the mark before the app can send one, and launches a
+  mobile app after it. Step 8 builds the curl event
   from the plan. Step 1 downloads the installer into a new temporary folder. While the installer
   is unpublished, it runs a script shipped with the skill instead, which installs the latest
   release's archive (the arm64 build under Rosetta) after checking it against the release's
@@ -181,14 +183,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rudder-cli command they run. Step 9's summary shows the `export PATH` line for the user's shell
   profile, and so does any stop before step 9.
   Step 2 runs a probe that names the app's source type: Flutter and React Native first, because
-  their apps also hold `android/` and `ios/` folders, then Android (`android_kotlin`), iOS
+  their apps also hold `android/` and `ios/` folders, which they claim without hiding the other apps
+  in the repository, then Android (`android_kotlin`), iOS
   (`ios_swift`, from an Xcode project or a Podfile), web, and only then server languages; a
   `Package.swift` or a `package.json` alone makes it ask. When it finds several apps, of one type or
   several, it lists each with its folder and asks which one sends events, and an app in a subfolder
   gets its `.env.local` and its build commands in that folder; when it finds none it asks "What
   will send events to RudderStack?", the question step 1 asks outside an app, now defined once. It
-  also lists the RudderStack and Segment SDKs the dependencies name, the legacy Android (Java) and
-  iOS (Objective-C) SDKs included. New Android (Kotlin SDK) and iOS (Swift SDK) references add the
+  also lists the RudderStack and Segment SDKs the dependencies name, in the manifests of the client
+  apps and of every server language, the legacy Android (Java) and iOS (Objective-C) SDKs included. New Android (Kotlin SDK) and iOS (Swift SDK) references add the
   dependency, keep the write key out of git, load the SDK once and give each agreed event a typed
   function, in Kotlin or Java and in Swift or Objective-C. Step 7 checks a mobile app on an Android
   emulator (`10.0.2.2`) or the iOS Simulator, or is skipped without one, and step 8 runs the app
@@ -212,14 +215,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the same session or a later one: it puts back each file that still holds what step 6 wrote,
   deletes the ones step 6 created, and asks before replacing a file the user changed since. It then
   drops its copies of each file it dealt with, so a later onboarding saves the file as it is then.
-  The undo starts with a dry run and stops if it would remove anything, because the workspace then
+  The undo runs only when the user asks for it, never as part of step 9's summary.
+  It starts with a dry run and stops if it would remove anything, because the workspace then
   holds resources that `rudder/` does not, such as another project's. After its reverts it stops
   again if the dry run would remove a resource that the reverts did not take out of `rudder/`,
   comparing kind and id, since ids are unique only per kind.
   Every validate, dry run and apply runs through a filter that keeps only the lines
   rudder-cli is known to print, because validate shows the spec line a message is about with secrets
   filled in, and a multi-line secret runs over several lines. Step 8's probe reads only its two
-  values from `.env.local`, as dotenv reads them, and never runs the file as shell. It gives each
+  values from `.env.local`, both under the prefix of the names step 6 wrote, as dotenv reads them,
+  and never runs the file as shell. It stops 5 minutes after it starts, however slow each answer is. It gives each
   request 10 seconds, stops on any status but 400, 2xx and 401, and prints the data plane's answer,
   so a disabled source (404), a rate limit (429) or a server error is not taken for a wrong data
   plane URL; it reruns for those a bounded number of times. The curl send waits until the probe
@@ -233,8 +238,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Step 9 copies `rudder/` to the app without the var file. A site without a
   build keeps its write key in the page. A mobile app skips step 7 in an agent that stops background
   processes, and reruns after a listener or app failure are bounded. When `claude mcp list` shows a
-  server at `https://mcp.rudderstack.com/mcp`, under any name, the rudder-core plugin's included,
-  step 1 has the user authenticate it instead of adding a second one.
+  server at `https://mcp.rudderstack.com/mcp` or `https://mcp.rudderstack.com/bearer-auth-mcp`,
+  under any name, the rudder-core plugin's included, step 1 uses it instead of adding a second one.
+  The user authenticates an `/mcp` server. A `/bearer-auth-mcp` server needs
+  `RUDDERSTACK_ACCESS_TOKEN` in the agent's shell, and step 1 checks with `get_workspace_settings`
+  that its `X-Workspace-ID` header names the CLI's workspace.
   The measured facts, step 2's probe and the Flutter, React Native and Unity notes are references
   beside SKILL.md. `rudder-core` 0.0.7 to 0.0.8.
 
