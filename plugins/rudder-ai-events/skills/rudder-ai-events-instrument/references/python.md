@@ -158,7 +158,7 @@ def chat(body: ChatRequest, request: Request, user: User = Depends(current_user)
   ```
 
   A thread pool: submit `propagate(_agent_turn_sync)` (section 6) with the same structure. Calls made after the interaction ends are reported as separate answers; a loop still open at `shutdown()`, or past `limits.interaction_ttl_ms` (1 hour by default), ends as `incomplete`.
-- Exceptions propagate unchanged and fail the answer; keep the route's error handling.
+- Exceptions propagate unchanged and fail the answer; keep the route's error handling, and have its error response carry `interaction.id` and the conversation ID once the interaction opened, so the browser can send its failure copy.
 - `surface` (`web`, `mobile`, `slack`, `teams`, `email`, `chatgpt_app`, `claude_app`, `ide`, `api`, `other`) comes from the plan; `ai_context(surface=...)` sets it for a whole request.
 - Attachments: `attachment_count=` and `attachment_types=[...]` (`image`, `audio`, `video`, `pdf`, `file`); never names or content.
 - `trace_id` is sent only when set. Another tracing tool (`tracing.trace_id_source`): pass `trace_id=` or `interaction.set_trace_id(...)`. The SDK's OpenTelemetry span processor (`tracing` extra) takes it from the first span started inside the interaction only with `register_tracing(link_trace_id=True)` / `create_span_processor(link_trace_id=True)` from `rudderstack.ai.tracing`; it is off by default. A value the app sets always wins. Extras via `interaction.end(extra_properties={...})`.

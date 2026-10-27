@@ -65,14 +65,14 @@ try {
     headers: { 'content-type': 'application/json', 'x-interaction-id': interactionId },
     body: JSON.stringify({ message, conversationId }), // same-origin requests send cookies by default
   });
+  const data = await response.json().catch(() => ({})); // error bodies carry the IDs too
+  conversationId = data.conversationId ?? conversationId;
+  interactionId = data.interactionId ?? interactionId;
   if (!response.ok) {
     status = 'error';
     errorKind = response.status >= 500 ? 'http_5xx' : 'http_4xx';
   } else {
-    const data = await response.json();
     render(data); // the app's existing rendering
-    conversationId = data.conversationId ?? conversationId;
-    interactionId = data.interactionId ?? interactionId;
   }
 } catch (err) {
   status = err?.name === 'AbortError' ? 'cancelled' : 'error'; // the user pressed stop
@@ -87,7 +87,7 @@ trackAi('ai_response_received', {
 });
 ```
 
-Fit this into the app's existing submit handler; do not restructure it. With `interaction_id_source: sdk` or `app` the browser learns the ID only from the response: send the prompt copy then, just before the answer copy. An error reported inside a successful HTTP response or stream is `client_error_kind: 'agent_error'`. When the first message of a new thread fails before the server returns a `conversation_id`, skip the answer copy: both schemas require `conversation_id` on `ai_response_received`.
+Fit this into the app's existing submit handler; do not restructure it. With `interaction_id_source: sdk` or `app` the browser learns the ID only from the response: send the prompt copy then, just before the answer copy. An error reported inside a successful HTTP response or stream is `client_error_kind: 'agent_error'`. The server returns `conversationId` and `interactionId` on its error responses too, once the interaction has opened (a failed answer has a server row to join): extend the route's error path if it returns neither. When the first message of a new thread fails before the server returns a `conversation_id` (the request never reached it, or failed before the interaction opened), skip the answer copy: both schemas require `conversation_id` on `ai_response_received`, and there is no server answer to join.
 
 A chat API on another origin needs `credentials: 'include'` (and CORS that allows credentials) for the cookies to arrive.
 

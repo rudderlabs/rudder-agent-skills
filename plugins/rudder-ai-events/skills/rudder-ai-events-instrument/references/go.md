@@ -153,7 +153,7 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 		answer, interactionID = completion.Choices[0].Message.Content, in.ID()
 		return nil
 	})
-	// ...existing error handling and response; always return interactionID to the client
+	// ...existing error handling and response; always return interactionID to the client, on errors too
 }
 ```
 
