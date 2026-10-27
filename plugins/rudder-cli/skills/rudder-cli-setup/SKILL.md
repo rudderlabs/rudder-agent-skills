@@ -43,52 +43,25 @@ command -v rudder-cli || ls "$HOME/.local/bin/rudder-cli"
 
 ## Step 2: Install rudder-cli
 
-Both commands below install the latest release from [GitHub Releases](https://github.com/rudderlabs/rudder-iac/releases) on macOS or Linux, on x86_64 or arm64 (Linux also on i386). They check the archive against the release's checksums file, put `rudder-cli` in `~/.local/bin` without `sudo`, and replace no copy elsewhere. On Windows, download the `.zip` for your CPU from the [latest release](https://github.com/rudderlabs/rudder-iac/releases/latest) instead.
+The command below installs the latest release from [GitHub Releases](https://github.com/rudderlabs/rudder-iac/releases) on macOS or Linux, on x86_64 or arm64 (Linux also on i386). It checks the archive against the release's checksums file, puts `rudder-cli` in `~/.local/bin` without `sudo`, and replaces no copy elsewhere. On Windows, download the `.zip` for your CPU from the [latest release](https://github.com/rudderlabs/rudder-iac/releases/latest) instead.
 
 Never install rudder-cli with npm, npx or Homebrew. No npm package or Homebrew tap ships it, and the npm package named `rudder-cli` belongs to someone else.
 
 ### Run the install script
 
-Download the script into a new temporary folder, then run it. Do not pipe it into a shell.
+The script is the `install.sh` attached to the latest release. Download it into a new temporary folder, then run it. Do not pipe it into a shell.
 
 ```bash
-d=$(mktemp -d) && curl -fsSL https://raw.githubusercontent.com/rudderlabs/rudder-iac/main/install.sh -o "$d/install.sh" && sh "$d/install.sh"
+d=$(mktemp -d) && curl -fsSL https://github.com/rudderlabs/rudder-iac/releases/latest/download/install.sh -o "$d/install.sh" && sh "$d/install.sh"
 ```
 
 ### If the script download fails with 404
 
-The script is not published yet. Install the release archive directly instead. This block does what the script does, including the arm64 build under Rosetta. It runs in a subshell, so an error ends the block and leaves the shell running:
-
-```bash
-(
-  set -e
-  releases=https://github.com/rudderlabs/rudder-iac/releases
-  tag=$(curl -fsSLI -o /dev/null -w '%{url_effective}' "$releases/latest"); tag=${tag##*/}
-  case "$(uname -m)" in
-    x86_64 | amd64) arch=x86_64 ;;
-    arm64 | aarch64) arch=arm64 ;;
-    i386 | i486 | i586 | i686) arch=i386 ;;
-    *) echo "no rudder-cli build for $(uname -m)" >&2; exit 1 ;;
-  esac
-  if [ "$(uname -s)" = Darwin ] && [ "$arch" = x86_64 ] && [ "$(sysctl -in hw.optional.arm64 2>/dev/null)" = 1 ]; then arch=arm64; fi
-  archive="rudder-cli_$(uname -s)_$arch.tar.gz"
-  d=$(mktemp -d); trap 'rm -rf "$d"' EXIT
-  curl -fsSL -o "$d/$archive" "$releases/download/$tag/$archive"
-  curl -fsSL -o "$d/checksums.txt" "$releases/download/$tag/rudder-cli_${tag#v}_checksums.txt"
-  want=$(awk -v f="$archive" '$2 == f { print $1 }' "$d/checksums.txt")
-  got=$(sha256sum <"$d/$archive" 2>/dev/null || shasum -a 256 <"$d/$archive"); got=${got%% *}
-  [ -n "$want" ] && [ "$got" = "$want" ] || { echo "checksum mismatch for $archive; not installing" >&2; exit 1; }
-  tar -xzf "$d/$archive" -C "$d" rudder-cli
-  mkdir -p "$HOME/.local/bin" && mv "$d/rudder-cli" "$HOME/.local/bin/rudder-cli"
-  "$HOME/.local/bin/rudder-cli" --version
-)
-```
-
-In the first minutes after a new release, its files may still be uploading, and a download fails. Wait a few minutes and run the block again.
+If curl prints `The requested URL returned error: 404`, a release came out in the last few minutes and its files are still uploading. Wait one minute and run the same command again, up to 5 times. Go by that message, not by curl's exit code, which is 22 or 56 for the same 404. If the last try also gets a 404, tell the user that a new rudder-cli release is being published and that they can try again in a few minutes.
 
 ### If `~/.local/bin` is not on PATH
 
-After either install, check which rudder-cli a plain `rudder-cli` runs:
+After the install, check which rudder-cli a plain `rudder-cli` runs:
 
 ```bash
 command -v rudder-cli
@@ -181,8 +154,8 @@ Expected output:
 | `command not found` after install | `~/.local/bin` is not on PATH. Run `"$HOME/.local/bin/rudder-cli"` for the rest of the session, and show the `export PATH` line from Step 2 in the closing summary |
 | `unauthorized` error | Check that `RUDDERSTACK_ACCESS_TOKEN` holds a valid token in the shell that started the agent, or have the user re-run `rudder-cli auth login` with a new token |
 | Wrong workspace | Token is tied to workspace; generate new token in correct workspace. If `RUDDERSTACK_ACCESS_TOKEN` is set, it overrides the token that `auth login` saved |
-| Download fails | A 404 for `install.sh` means the script is not published yet; use the release archive block in Step 2. Otherwise check the network, or wait a few minutes if a release came out just now |
-| `checksum mismatch` | Install nothing. Run the block again once; if it fails the same way, stop and tell the user |
+| Download fails | A 404 for `install.sh` right after a release means its files are still uploading; wait a minute and run the command again, up to 5 times (Step 2). Otherwise check the network |
+| `checksum mismatch` | The script installs nothing. Run the command again once; if it fails the same way, stop and tell the user |
 
 ## Next Steps
 
