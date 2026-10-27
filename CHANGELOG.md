@@ -56,18 +56,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`rudder-cli` / `rudder-cli-setup`, `rudder-typer-workflow`; `docs/installation.md`;
   `examples/typer-workflow`.** The rudder-cli install instructions now point at
   files that exist. rudder-cli-setup named raw binaries such as
-  `rudder-cli_darwin_arm64` that no release has. It now downloads rudder-iac's
-  `install.sh` from `main` into a new temporary folder and runs it, and while
-  that answers 404, it installs the latest release's archive (the arm64 build
-  under Rosetta) after checking it against the release's checksums file.
-  Both put `rudder-cli` in `~/.local/bin`. When that folder is not on PATH, the
+  `rudder-cli_darwin_arm64` that no release has. It now downloads the
+  `install.sh` attached to the latest rudder-iac release into a new temporary
+  folder and runs it. The script installs that release's archive (the arm64
+  build under Rosetta) after checking it against the release's checksums file,
+  and puts `rudder-cli` in `~/.local/bin`. When the download gets a 404 because
+  a release that just came out is still uploading its files, the agent waits a
+  minute and tries again, up to 5 times. When `~/.local/bin` is not on PATH, the
   agent runs `"$HOME/.local/bin/rudder-cli"` for the rest of the session, gives
   the user that path for any rudder-cli command they run, and shows the
   `export PATH` line in its closing summary, or when it stops earlier. The
   installation guide named a Homebrew tap that does not exist, the typer example installed
   `@rudderlabs/rudder-cli` from npm, which does not exist, and
   rudder-typer-workflow's CI reference used a `rudderstack/setup-rudder-cli`
-  action that does not exist. The guide now gives the same two installs, and
+  action that does not exist. The guide now gives the same install, and
   both CI examples download the release archive and check its checksum.
 - **`rudder-cli` / `rudder-cli-setup`, `rudder-cli-workflow`, `rudder-transformations`.**
   Replaced `RUDDER_ACCESS_TOKEN` with `RUDDERSTACK_ACCESS_TOKEN`, the variable
@@ -177,10 +179,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   port, and both recipes exit 3 when the listener stops during a check. Step 7 counts only events
   that arrive after its mark, so it takes the mark before the app can send one, and launches a
   mobile app after it. Step 8 builds the curl event
-  from the plan. Step 1 downloads the installer into a new temporary folder. While the installer
-  is unpublished, it runs a script shipped with the skill instead, which installs the latest
-  release's archive (the arm64 build under Rosetta) after checking it against the release's
-  checksums file. After an install, or when only a copy an earlier install left in `~/.local/bin`
+  from the plan. Step 1 downloads the installer attached to the latest rudder-iac release into a new
+  temporary folder and runs it. When the download gets a 404 because a release that just came out is
+  still uploading its files, the agent waits a minute and tries again, up to 5 times, then tells the
+  user to try again in a few minutes. After an install, or when only a copy an earlier install left in `~/.local/bin`
   works, and a plain `rudder-cli` runs another copy or none, the agent runs
   `"$HOME/.local/bin/rudder-cli"` for the rest of the session and gives the user that path for any
   rudder-cli command they run. Step 9's summary shows the `export PATH` line for the user's shell
