@@ -57,7 +57,13 @@ d=$(mktemp -d) && curl -fsSL https://github.com/rudderlabs/rudder-iac/releases/l
 
 ### If the script download fails with 404
 
-If curl prints `The requested URL returned error: 404`, a release came out in the last few minutes and its files are still uploading. Wait one minute and run the same command again, up to 5 times. Go by that message, not by curl's exit code, which is 22 or 56 for the same 404. If the last try also gets a 404, tell the user that a new rudder-cli release is being published and that they can try again in a few minutes.
+If curl prints `The requested URL returned error: 404` while it downloads `install.sh`, a release came out in the last few minutes and its files are still uploading. Wait one minute and run the same command again, up to 10 times. Go by that message, not by curl's exit code, which is 22 or 56 for the same 404. If the last try also gets a 404, tell the user that a new rudder-cli release is being published and that they can try again in a few minutes.
+
+A line that starts with `rudder-cli install:` comes from the script, which ran and failed. That is not this 404, even when a curl message comes before it, so do not retry it here; see Troubleshooting.
+
+### If the install cannot write to `~/.local/bin` or reach github.com
+
+Inside an agent's sandbox, the script cannot write to `~/.local/bin`, and curl may not reach github.com. Ask the user to let the command run outside the sandbox or to run it in their own terminal. Never set `RUDDER_CLI_INSTALL_DIR` to a folder inside the project. The binary would land in the user's repository, and `"$HOME/.local/bin/rudder-cli"` would not exist.
 
 ### If `~/.local/bin` is not on PATH
 
@@ -154,7 +160,8 @@ Expected output:
 | `command not found` after install | `~/.local/bin` is not on PATH. Run `"$HOME/.local/bin/rudder-cli"` for the rest of the session, and show the `export PATH` line from Step 2 in the closing summary |
 | `unauthorized` error | Check that `RUDDERSTACK_ACCESS_TOKEN` holds a valid token in the shell that started the agent, or have the user re-run `rudder-cli auth login` with a new token |
 | Wrong workspace | Token is tied to workspace; generate new token in correct workspace. If `RUDDERSTACK_ACCESS_TOKEN` is set, it overrides the token that `auth login` saved |
-| Download fails | A 404 for `install.sh` right after a release means its files are still uploading; wait a minute and run the command again, up to 5 times (Step 2). Otherwise check the network |
+| Download fails | A 404 for `install.sh` right after a release means its files are still uploading; wait a minute and run the command again, up to 10 times (Step 2). Otherwise check the network |
+| `rudder-cli install: cannot write to ...` | Inside an agent's sandbox, ask the user to run the command outside it (Step 2). Never set `RUDDER_CLI_INSTALL_DIR` to a folder inside the project |
 | `checksum mismatch` | The script installs nothing. Run the command again once; if it fails the same way, stop and tell the user |
 
 ## Next Steps
