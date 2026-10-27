@@ -188,7 +188,18 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Install Rudder CLI
-        run: npm install -g @rudderlabs/rudder-cli
+        # Installs the latest release after checking it against the release's
+        # checksums file. To pin a release, replace the two tag= lines with tag=v0.28.0.
+        run: |
+          cd "$RUNNER_TEMP"
+          tag=$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/rudderlabs/rudder-iac/releases/latest)
+          tag=${tag##*/}
+          url=https://github.com/rudderlabs/rudder-iac/releases/download/$tag
+          curl -fsSLO "$url/rudder-cli_Linux_x86_64.tar.gz"
+          curl -fsSL "$url/rudder-cli_${tag#v}_checksums.txt" | grep ' rudder-cli_Linux_x86_64.tar.gz$' | sha256sum -c -
+          tar -xzf rudder-cli_Linux_x86_64.tar.gz rudder-cli
+          mkdir -p "$HOME/.local/bin" && mv rudder-cli "$HOME/.local/bin/"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Validate
         run: rudder-cli validate -l ./
