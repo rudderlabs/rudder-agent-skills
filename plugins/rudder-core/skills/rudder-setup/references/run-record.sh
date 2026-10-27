@@ -5,34 +5,53 @@
 # how far an undo of it got. A run lasts from step 1 to step 9's summary; a later session continues a run that has not
 # reached step 9, and starts a new one otherwise.
 #
-#   begin               step 1: continue the open run or start one; prints `continued <id>` or `started <id>`
+#   begin               step 1: continue the open run or start one; prints `continued <id>`, with the workspace and
+#                       the commits that run recorded, or `started <id>`
 #   workspace <id>      step 5, before the apply: the workspace this run changes; fails if it recorded another
 #   commit revert|keep  after each commit: HEAD, for the undo to revert, or to leave alone
 #   save <file>         step 6, before the first write to a git-ignored key file
 #   record <file>       step 6, after the last write to it
 #   forget <file>       drop the copies of a file the user keeps as it is now
 #   close               step 9, after the summary
-#   show [<id>]         the run an undo takes (the newest with something to undo), and whether <id> is its workspace
+#   show [<id>]         the run an undo takes (the newest with something to undo), and whether <id> is its workspace;
+#                       with no such run, the other folders of the repository whose runs it keeps
 #   unexpected          read a filtered dry run on stdin and print it, then an `unexpected: <kind>:<id>` line for
 #                       each removal that no recorded revert of the run took out of rudder/, and one when the dry
 #                       run did not end with `exit 0`; exits 1 when it printed one
-#   revert              revert the run's commits that are not reverted yet, newest first
+#   revert              revert the run's commits that are not reverted yet, newest first; a commit that a later
+#                       commit reverts already (git's `This reverts commit <sha>.` line), as one the user reverted by
+#                       hand, counts as reverted
 #   restore [<file>]    put back the key files the run saved that still hold what it wrote; with a file, put back
 #                       that one as it was before step 6 whatever it holds now. It writes the saved bytes into the
 #                       file, so a key file that is a symbolic link stays one and its target gets them back. A file
 #                       it cannot write or delete keeps its copies, and it exits 1
-#   undone              after the undo's apply: mark the run undone and drop its copies
+#   undone              after the undo's apply, or when the user ends an undo where it stopped: mark the run undone
+#                       and drop its copies
 set -u
-B=$(git rev-parse --git-path "rudderstack-backup/$(git rev-parse --show-prefix)") || exit 2
+N=rudderstack-backup; B=$(git rev-parse --git-path "$N/$(git rev-parse --show-prefix)") || exit 2
 die() { echo "$*" >&2; exit 1; }
 runs() { [ ! -d "$B/runs" ] || ls "$B/runs" | sort; }
 newest() { runs | tail -n 1; }
 # an undo that started (it reverted or put back something) and has not finished
-halfway() { for r in $(runs); do [ ! -d "$B/runs/$r/undo" ] || [ -e "$B/runs/$r/undone" ] || { echo "$r"; return; }; done; }
+halfway() { for r in $(runs); do { [ -s "$B/runs/$r/undo/reverted" ] || [ -e "$B/runs/$r/undo/restored" ]; } && [ ! -e "$B/runs/$r/undone" ] && { echo "$r"; return; }; done; }
 has() { grep -qs ' revert$' "$B/runs/$1/commits" || [ -d "$B/runs/$1/undo" ] || [ -n "$(find "$B/runs/$1/files" "$B/runs/$1/created" -type f 2>/dev/null)" ]; }
 # the run an undo takes: one whose undo is halfway, or else the newest one not undone that has a commit to revert or
 # a file to put back
 target() { r=$(halfway); [ -z "$r" ] || { echo "$r"; return; }; for r in $(runs | sort -r); do [ ! -e "$B/runs/$r/undone" ] || continue; has "$r" && { echo "$r"; return; }; done; }
+list() { [ ! -s "$1/commits" ] || while read -r c how; do
+  echo "$how $(git log -1 --format='%h %s' "$c" 2>/dev/null || echo "$c, not in this repository")"; done < "$1/commits"; }
+# the folders, by full path, whose runs another record of this repository keeps: another folder of this worktree, or
+# a folder of another worktree
+elsewhere() {
+  c=$(cd "$(git rev-parse --git-common-dir)" && pwd -P) || return; me=$(cd "$B/runs" 2>/dev/null && pwd -P)
+  find "$c/$N" "$c"/worktrees/*/"$N" -type d -name runs 2>/dev/null | while IFS= read -r p; do
+    p=$(cd "$p" && pwd -P); [ "$p" != "$me" ] && ls "$p" | grep -q '^[0-9][0-9][0-9]-' || continue
+    case $p in
+    "$c"/worktrees/*) n=${p#"$c"/worktrees/}; n=${n%%/*}; top=$(dirname "$(cat "$c/worktrees/$n/gitdir")"); rest=${p#"$c"/worktrees/"$n"/"$N"} ;;
+    *) top=$(dirname "$c"); rest=${p#"$c"/"$N"} ;;
+    esac
+    rest=${rest%/runs}; echo "$top$rest"
+  done; }
 cmd=${1-}; [ $# -eq 0 ] || shift
 case $cmd in
 begin)
@@ -43,7 +62,7 @@ begin)
     mkdir -p "$B/runs/$r" && date +%s > "$B/runs/$r/began" || exit 2
     echo "started $r"
   else
-    echo "continued $r"
+    echo "continued $r"; [ ! -s "$B/runs/$r/workspace_id" ] || echo "workspace $(cat "$B/runs/$r/workspace_id")"; list "$B/runs/$r"
   fi ;;
 workspace|commit|save|record|forget|close)
   r=$(newest); [ -n "$r" ] || die "no run: run begin first"; R=$B/runs/$r
@@ -63,7 +82,8 @@ workspace|commit|save|record|forget|close)
   save)
     f=${1-}; [ -n "$f" ] || die "save takes a file"; d=$(dirname "$f"); mkdir -p "$R/files/$d" "$R/after/$d" "$R/created/$d"
     if [ -e "$R/files/$f" ] || [ -e "$R/created/$f" ]; then
-      if ! cmp -s "$f" "$R/after/$f" && { [ -e "$f" ] || [ -e "$R/files/$f" ]; }; then echo "changed since step 6: $f"; fi
+      # no copy in after/ when a session stopped between save and record: the file is still the run's
+    if [ -e "$R/after/$f" ] && ! cmp -s "$f" "$R/after/$f" && { [ -e "$f" ] || [ -e "$R/files/$f" ]; }; then echo "changed since step 6: $f"; fi
     elif [ -e "$f" ]; then cp "$f" "$R/files/$f"
     else touch "$R/created/$f"; fi ;;
   record) [ -n "${1-}" ] || die "record takes a file"; cp "$1" "$R/after/$1" ;;
@@ -72,22 +92,27 @@ workspace|commit|save|record|forget|close)
   esac ;;
 show|revert|restore|unexpected|undone)
   r=$(target)
-  if [ -z "$r" ]; then [ "$cmd" = unexpected ] || { echo "nothing to undo"; exit 3; }; fi
+  if [ -z "$r" ] && [ "$cmd" != unexpected ]; then
+    echo "nothing to undo"; o=; [ "$cmd" != show ] || o=$(elsewhere)
+    [ -z "$o" ] || printf 'runs started from other folders of this repository:\n%s\n' "$o"
+    exit 3
+  fi
   R=$B/runs/$r
   case $cmd in
   show)
     echo "run $r$([ -e "$R/closed" ] || echo ', stopped before step 9')"
     w=$(cat "$R/workspace_id" 2>/dev/null)
-    [ ! -s "$R/commits" ] || while read -r c how; do
-      echo "$how $(git log -1 --format='%h %s' "$c" 2>/dev/null || echo "$c, not in this repository")"
-    done < "$R/commits"
+    list "$R"
     for s in files created; do [ ! -d "$R/$s" ] || (cd "$R/$s" && find . -type f | sed "s|^\./|$s: |"); done
     [ ! -e "$R/undo/from" ] || echo "undo started: $(cat "$R/undo/reverted" 2>/dev/null | grep -c .) reverted$([ ! -e "$R/undo/restored" ] || echo ', key files put back')"
+    # an unchanged resume applies what no commit of its own holds, so its undo takes nothing out of that workspace
+    [ -z "$w" ] || grep -qs ' revert$' "$R/commits" || echo "no commit of this run holds what it applied to $w, so the undo removes nothing there"
     if [ -n "$w" ] && [ "$w" = "${1-}" ]; then echo same; else echo "recorded ${w:-none}, now ${1:-none}"; exit 1; fi ;;
   revert)
     mkdir -p "$R/undo"; [ -e "$R/undo/from" ] || git rev-parse HEAD > "$R/undo/from"; touch "$R/undo/reverted"
     for c in $(sed -n 's/ revert$//p' "$R/commits" 2>/dev/null | sed '1!G;h;$!d'); do
       ! grep -qx "$c" "$R/undo/reverted" || continue
+      if git log --format=%B "$c..HEAD" 2>/dev/null | grep -qx "This reverts commit $c\."; then echo "$c" >> "$R/undo/reverted"; continue; fi
       git merge-base --is-ancestor "$c" HEAD 2>/dev/null || die "$c is not on this branch any more (rebased or reset?); not reverting"
       if ! git revert --no-edit "$c"; then
         ! git rev-parse -q --verify REVERT_HEAD >/dev/null || git revert --abort
@@ -106,9 +131,11 @@ show|revert|restore|unexpected|undone)
     fi
     # a file it cannot write or delete keeps its copies, and the restore then fails, so asking again retries it
     for s in files created; do [ ! -d "$R/$s" ] || (cd "$R/$s" && find . -type f | sed 's|^\./||'); done | { bad=0; while IFS= read -r f; do
-      if cmp -s "$f" "$R/after/$f"; then
+      if [ ! -e "$R/after/$f" ] || cmp -s "$f" "$R/after/$f"; then
+        # still what step 6 wrote, or a file a session saved and stopped before recording, which is the run's too
         if [ -e "$R/files/$f" ]; then cat "$R/files/$f" > "$f" || { echo "could not write $f; its copy is kept" >&2; bad=1; continue; }
-        else rm "$f" || { echo "could not delete $f; its copy is kept" >&2; bad=1; continue; }; fi
+        elif [ -e "$f" ]; then rm "$f" || { echo "could not delete $f; its copy is kept" >&2; bad=1; continue; }; fi
+        [ -e "$R/after/$f" ] || echo "step 6 stopped before recording $f; put back as it was before the run"
       elif [ -e "$f" ] || [ -e "$R/files/$f" ]; then echo "changed since step 6: $f"; continue; fi
       rm -f "$R/files/$f" "$R/after/$f" "$R/created/$f"
     done; exit $bad; } || exit 1

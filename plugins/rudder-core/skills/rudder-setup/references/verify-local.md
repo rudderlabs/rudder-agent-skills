@@ -95,7 +95,9 @@ echo "FROM=$(( $(wc -l <"$d/events") )) LOGFROM=$(( $(wc -l <"$d/log") )) CUR=$(
 
 FROM and LOGFROM are line counts, so the check reads only what arrives after them. CUR is the listener's own
 cursor, for the diagnosis. Then ask the user to go through the flows and say done. On a later pass, ask them to
-reload the page, or to close the app and open it again, so the events it sends on start come after the new mark.
+reload the page, or to close the app and open it again (on an Android emulator, from the app drawer), so the events
+it sends on start come after the new mark. On the iOS Simulator, launch the app again yourself after the mark instead,
+and ask them to use it where it is (Mobile apps, below).
 
 ### 4. Check
 
