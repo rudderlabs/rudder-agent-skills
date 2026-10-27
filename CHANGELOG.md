@@ -97,6 +97,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rudder-typer-workflow's CI reference used a `rudderstack/setup-rudder-cli`
   action that does not exist. The guide now gives the same install, and
   both CI examples download the release archive and check its checksum.
+  `rudder-cli` 0.0.4 to 0.0.5 for the move to the release asset.
 - **`rudder-cli` / `rudder-cli-setup`, `rudder-cli-workflow`, `rudder-transformations`.**
   Replaced `RUDDER_ACCESS_TOKEN` with `RUDDERSTACK_ACCESS_TOKEN`, the variable
   rudder-cli reads (rudder-iac `cli/internal/config/config.go:86`).
