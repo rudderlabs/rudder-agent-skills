@@ -148,8 +148,9 @@ for i, m in enumerate(tracks):
     is_client = props.get("source") == "client" and name in client_names  # a legacy event may use source too
     where = f"#{i} {name}"
     # Provenance: only the AI SDKs' wrapperLibrary marks an AI send; another adapter's tag is still legacy,
-    # unless the event uses an AI name (then it falls through and fails the SDK-name check).
-    foreign = w and w.get("name") not in SDK_NAMES and name not in SPEC_EVENTS | MCP_EVENTS | CLIENT_ONLY
+    # unless the event uses an AI name not listed in --expect-legacy (then it fails the SDK-name check).
+    foreign = w and w.get("name") not in SDK_NAMES and (name not in SPEC_EVENTS | MCP_EVENTS | CLIENT_ONLY
+                                                        or name in args.expect_legacy)
     if (not w or foreign) and not is_client:  # not sent through the AI SDK: legacy or other analytics
         legacy[name] += 1
         if name in CLIENT_ONLY and name not in args.expect_legacy:  # browser-only: a missing source is the bug
