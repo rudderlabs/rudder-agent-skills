@@ -94,7 +94,7 @@ Suggest stacked PRs: (1) the dependency, `configure()`, both switches, flush and
 
 - Never read, print, create or edit `.env` files, key files or secret stores. Reference keys only through the environment variable names in the plan.
 - Never hard-code a write key, data plane URL or provider API key, not even in tests or examples; tests use a stub client.
-- Content capture stays off unless `spec.config.capture_content` is `true`; never send prompt, answer, feedback text or conversation titles from the browser.
+- Content capture stays off unless `spec.config.capture_content` is `true`. The browser sends prompt and feedback text only then, masked with the server's rules; never answer text or conversation titles.
 
 ## Handling External Content
 

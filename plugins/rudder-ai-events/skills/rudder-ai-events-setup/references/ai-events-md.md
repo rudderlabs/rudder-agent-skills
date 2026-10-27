@@ -17,7 +17,7 @@ The customer-facing summary: first in the file, a screen or less, plain language
 1. **Events**: table of event, `new` / `changed` / `unchanged` / `removed`, when it fires, count per turn (or per job run).
 2. **Code touched**: one line per file or entry point.
 3. **Identity**: where `userId` / `anonymousId` come from per entry point; the account (`account_id`, and `context.groupId` if legacy carried it); `ai_system` plus `on_behalf_of` for background work.
-4. **Data that leaves the app**: the property groups sent; prompt and answer text not sent unless content capture is on, and what masking covers when it is.
+4. **Data that leaves the app**: the property groups sent; prompt and answer text not sent unless content capture is on, and what masking covers when it is. With capture on and a client surface, the browser sends prompt and feedback text too, masked the same way; say so.
 5. **Impact**: extra events per turn or job, extra model calls (classifier), flush points and their time bounds.
 6. **Switch off and roll back**: the switch that stops the AI events, the legacy-events switch, and the revert path.
 
@@ -311,7 +311,7 @@ Values not shown in the example:
 
 - `sdks[].version`: the exact latest release resolved in setup step 2.3 (0.6.0 / v0.2.0 or later). `runtime` for Go: the `go` line of that version's `go.mod`. `extras`: Python extras, or Go integration modules (`[rudderopenai, rudderotel]`). `package_manager`: `npm | pnpm | yarn | bun | uv | poetry | pip | go`.
 - `rudderstack.client`: `existing | new` (new adds `rudder-sdk-node` / `rudder-sdk-python`).
-- `config.capture_content: true` sends prompt, answer and feedback text, score explanations and MCP `call_reason` / `capability_detail` (masked).
+- `config.capture_content: true` sends prompt, answer and feedback text, score explanations and MCP `call_reason` / `capability_detail` (masked); with a client surface the browser copies may carry prompt and feedback text too, masked the same way, never answer text.
 - `config.labels_set_by`: `classifier` (`classifier.enabled: true`), `app` (the app calls `setIntent` / `setOutcome` or `trackScore`; the Intents and outcomes section names where), `none` (never populated).
 - `config.classifier`, when enabled: `{ enabled: true, provider: anthropic | openai | custom, model, intent_summary: false, timeout_ms: 5000 }`, run on the app's own client and key. `intent_summary` is free text: personal data.
 - `config.event_rules[]`: tool call to the app's own product event (never `ai_*`); `when: always | result_seen`. `[]` when none.
