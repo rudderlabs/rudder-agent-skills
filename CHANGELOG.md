@@ -30,7 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`rudder-ai-events`** — new plugin that onboards an existing app to RudderStack AI events
   (spec v0.3) with the `@rudderstack/ai` (Node.js), `rudderstack-ai` (Python) and `ai-sdk-go` (Go)
   SDKs. Versions are resolved at run time (0.7.0 / v0.3.0 or later); all three install from public
-  registries.
+  registries. Node.js apps on Deno, browser-only repos whose chat backend lives elsewhere, and
+  repos that generate typed tracking calls are covered.
   - `rudder-ai-events-setup` — discovers chat, background-agent, browser-client and MCP server
     surfaces (read-only) and drafts the committed `ai-events.md` plan. The plan opens with a
     customer-facing `## What changes` summary (events new / changed / removed, code touched, identity,
