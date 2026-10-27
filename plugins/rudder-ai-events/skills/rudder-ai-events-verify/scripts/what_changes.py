@@ -79,7 +79,9 @@ def norm(value, key=""):
     if isinstance(value, dict):
         return {k: norm(v, k) for k, v in value.items()}
     if isinstance(value, list):
-        return [norm(v, key) for v in value]
+        items = [norm(v, key) for v in value]
+        # argument_keys is unordered (known limit argument_keys_unordered): compare it as a set
+        return sorted(items, key=lambda v: json.dumps(v, sort_keys=True)) if key == "argument_keys" else items
     return redact(value, key)
 
 
