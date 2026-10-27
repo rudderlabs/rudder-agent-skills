@@ -170,8 +170,13 @@ WEBHOOK_AUTH:
   `RUDDER_<KEY>` overrides the file.
 - Substitution pastes the value into the raw text before YAML is parsed, so write every reference in
   single quotes, `'{{ .VAR }}'`, as these samples do. In a double-quoted slot a value containing `"` or `\`
-  breaks the YAML or silently changes the secret. A `'` inside the value must be doubled (`''`); the CLI
-  reports an unescaped one as an error.
+  breaks the YAML or silently changes the secret. Each `'` in the value must reach the spec doubled (`''`); the
+  CLI reports a single one as an error.
+- The var file is YAML too. When you ask the user to fill it, tell them to write a one-line value in single
+  quotes, `NAME: 'value'`, with each `'` of the value written four times, as in `'it''''s'` for `it's`. YAML
+  turns the four into two, and the spec's single quotes turn the two into one. Unquoted, YAML cuts the value at
+  ` #`, reads a leading `!` or `&` as a tag or an anchor, and drops trailing spaces, and validate still passes.
+  A `RUDDER_<KEY>` environment variable is not YAML, so there each `'` is written twice.
 - Every referenced variable must be defined, even for `validate`. A missing one fails with
   `error[project/var-substitution]` and the file, line and column.
 - A value that spans lines, such as a PEM private key or certificate, keeps its line breaks only from rudder-cli
@@ -180,7 +185,8 @@ WEBHOOK_AUTH:
   `private_key` is such a value. With 0.28.0 or earlier, offer the type's other way to sign in, such as a password
   for Snowflake, or say that this rudder-cli cannot connect that destination. From 0.29.0, ask the user to write
   the value in the var file as a YAML literal block, `NAME: |` with the value's lines below it, each indented by
-  two spaces. The reference in the spec keeps its single quotes.
+  two spaces. The reference in the spec keeps its single quotes. A block keeps every character as written, so
+  each `'` in it is written twice.
 
 ## Errors you will meet
 
