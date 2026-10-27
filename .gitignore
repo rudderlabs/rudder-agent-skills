@@ -51,3 +51,7 @@ docs/superpowers/
 
 # Internal examples (RudderStack-specific, not for public distribution)
 **/references/internal-*
+
+# Python bytecode
+__pycache__/
+*.pyc
