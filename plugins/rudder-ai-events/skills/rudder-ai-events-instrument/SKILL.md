@@ -1,7 +1,7 @@
 ---
 name: rudder-ai-events-instrument
 description: "Adds RudderStack AI events code from an approved ai-events.md plan: installs @rudderstack/ai, rudderstack-ai or ai-sdk-go, wraps model clients and MCP servers, opens interactions and tasks, wires feedback and browser events. Use when implementing an approved AI events plan."
-allowed-tools: "Bash(npm *), Bash(npx *), Bash(pnpm *), Bash(yarn *), Bash(bun *), Bash(node *), Bash(uv *), Bash(poetry *), Bash(pip *), Bash(python *), Bash(python3 *), Bash(pytest *), Bash(go get *), Bash(go mod tidy), Bash(go list *), Bash(go build *), Bash(go vet *), Bash(go test *), Bash(git status), Bash(git diff), Bash(git diff *), Bash(git show *), Bash(git switch -c *), Read, Write, Edit, Glob, Grep"
+allowed-tools: "Bash(npm *), Bash(npx *), Bash(pnpm *), Bash(yarn *), Bash(bun *), Bash(node *), Bash(uv *), Bash(poetry *), Bash(pip *), Bash(python *), Bash(python3 *), Bash(pytest *), Bash(go get *), Bash(go mod tidy), Bash(go list *), Bash(go build *), Bash(go vet *), Bash(go test *), Bash(git status), Bash(git diff), Bash(git diff *), Bash(cp *), Bash(git switch -c *), Read, Write, Edit, Glob, Grep"
 ---
 
 # RudderStack AI Events Instrumentation
@@ -39,10 +39,11 @@ Do one surface at a time; after each, run the app's type check (and its tests wh
    go get github.com/rudderlabs/ai-sdk-go@<VERSION>           # plus one module per provider at its own version
    ```
 
-   Other managers: section 1 of the recipe files. Never add a version range, and never bump the app's own LLM libraries. Add the RudderStack server client (`@rudderstack/rudder-sdk-node`, `rudder-sdk-python`, `analytics-go/v4`, at its latest release) only when the plan says `client: new`. Then `git diff` the lockfile: only the SDK and what it pulls may change. pnpm drops the `tarball:` URL from unrelated `resolution` entries (packages from a registry with a non-default tarball path, such as a private one) on every install, whatever its version: restore them rather than stopping, keyed by `integrity`:
+   Other managers: section 1 of the recipe files. Never add a version range, and never bump the app's own LLM libraries. Add the RudderStack server client (`@rudderstack/rudder-sdk-node`, `rudder-sdk-python`, `analytics-go/v4`, at its latest release) only when the plan says `client: new`. Then `git diff` the lockfile: only the SDK and what it pulls may change. pnpm drops the `tarball:` URL from unrelated `resolution` entries (packages from a registry with a non-default tarball path, such as a private one) on every install, whatever its version: restore them rather than stopping, keyed by `integrity`, from a copy of the lockfile taken just before the install (not `HEAD`, which misses the user's uncommitted edits):
 
    ```bash
-   git show HEAD:pnpm-lock.yaml > "${TMPDIR:-/tmp}/pnpm-lock.before.yaml"
+   cp pnpm-lock.yaml "${TMPDIR:-/tmp}/pnpm-lock.before.yaml"   # before pnpm add
+   # ...pnpm add --save-exact @rudderstack/ai@<VERSION>...
    python3 - "${TMPDIR:-/tmp}/pnpm-lock.before.yaml" pnpm-lock.yaml <<'PY'
    import re, sys
    tarballs = dict(re.findall(r"integrity: (\S+?), tarball: (\S+?)\}", open(sys.argv[1]).read()))
