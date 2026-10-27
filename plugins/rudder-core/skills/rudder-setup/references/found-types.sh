@@ -72,7 +72,9 @@ if [ "${1-}" = --sdks ]; then
   # --sdks '<a line --apps printed>': the analytics SDKs that app's manifests name, one `file:SDK` line each. It reads
   # only the manifests of the app's type, in the app's folder, and leaves out every other app's folder, a server's
   # included, and in a Gradle build with several apps, the other apps' modules.
-  set -f; set -- $2; ty=$1; dir=$2; mod=${3-}
+  # the line is `<type> <folder>`, with ` :<module>` at its end for a module of a shared Gradle build; the folder can
+  # hold spaces
+  set -f; ty=${2%% *}; dir=${2#* }; mod=; case $dir in *" :"*) mod=:${dir##* :}; dir=${dir% :*} ;; esac
   case $ty in
     javascript|node) inc='package.json' ;;
     react_native) inc='package.json Podfile *.gradle *.gradle.kts' ;;
@@ -89,7 +91,7 @@ if [ "${1-}" = --sdks ]; then
   # the other apps' modules. Only folders inside the app's own folder matter.
   own=$dir; [ -z "$mod" ] || own=$(gdir "$dir" "$mod")
   # globbing back on here: the app list reads gradle/*.versions.toml; it stays off for the include patterns below
-  others=$(set +f; { clients line; servers line; } | while read -r t f g; do case $t in (python|go|java|dotnet|php|ruby|rust) continue ;; esac; [ -z "$g" ] || f=$(gdir "$f" "$g"); printf '%s\n' "$f"; done |
+  others=$(set +f; { clients line; servers line; } | while IFS= read -r l; do t=${l%% *}; f=${l#* }; g=; case $f in (*" :"*) g=:${f##* :}; f=${f% :*} ;; esac; case $t in (python|go|java|dotnet|php|ruby|rust) continue ;; esac; [ -z "$g" ] || f=$(gdir "$f" "$g"); printf '%s\n' "$f"; done |
     awk -v d="$dir" -v o="$own" '$0 != o && $0 != d && $0 != "." && (d == "." || index($0, d "/") == 1)')
   grep -rIoE --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=Pods --exclude-dir=build --exclude-dir=vendor --exclude-dir=target --exclude-dir=.venv --exclude-dir=venv $o '@rudderstack/[a-z-]+|rudder-sdk-[a-z-]+|com\.rudderstack\.[a-z.]+|rudder_sdk_flutter|pod .Rudder.|rudderlabs/analytics-go|rudder-php-sdk|rudder_analytics_sync|[Rr]udder[Aa]nalytics|@segment/[a-z-]+|com\.segment\.analytics[a-z.]*|analytics-swift|segment_analytics|pod .Analytics[^A-Za-z]|segment-analytics-python|analytics-python|segmentio/analytics-[a-z]+|analytics-ruby|Segment\.Analytics' "$dir" 2>/dev/null |
     sed 's#^\./##' | O=$others awk 'BEGIN { n = split(ENVIRON["O"], x, "\n") } { k = 1; for (i = 1; i <= n; i++) if (x[i] != "" && index($0, x[i] "/") == 1) k = 0; if (k) print }'

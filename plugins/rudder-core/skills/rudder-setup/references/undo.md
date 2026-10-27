@@ -35,7 +35,8 @@ recorded as `keep`: step 1's commits of `.gitignore` lines and of the specs it f
 4. Put back the key files: `<record> restore`. It puts back each file that still holds what step 6 wrote, deletes
    the ones step 6 created, and names each file that changed since. For a named file, ask whether to put back the
    copy from before step 6, which drops those edits (`<record> restore '<file>'`), or to keep it and change its
-   RudderStack values by hand.
+   RudderStack values by hand. If it cannot write or delete a file, it keeps that file's copy, says so and exits 1:
+   tell the user why, and run it again once that is fixed.
 5. Git removes `rudder/` when no untracked file such as the var file is left in it, so run `mkdir -p rudder`. Run
    `<dry run> | <record> unexpected` again. If it prints an `unexpected:` line, stop and show those lines: something
    was applied to the workspace since the first dry run, and apply would delete it (fact apply-scope).
