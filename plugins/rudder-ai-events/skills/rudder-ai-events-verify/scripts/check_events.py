@@ -236,11 +236,13 @@ for i, m in enumerate(tracks):
                 problems.append(f"{where}: request_context reached the tool (argument_keys)")
             else:
                 notes.append(f"{where}: request_context in argument_keys (fine if the tool declares its own)")
-        allowed = mcp_intents[None] | mcp_intents[props.get("server_name")] | {"other"}
-        if args.mcp_intent and "intent" in props and props["intent"] not in allowed:
+        server = props.get("server_name") if isinstance(props.get("server_name"), str) else ""  # schema reports others
+        allowed = mcp_intents[None] | mcp_intents.get(server, set()) | {"other"}
+        intent = props.get("intent")
+        if args.mcp_intent and "intent" in props and (not isinstance(intent, str) or intent not in allowed):
             problems.append(f"{where}: intent {props['intent']!r} not in {props.get('server_name')!r}'s list")
         if name == "mcp_client_seen":
-            clients_seen[(props.get("server_name"), props.get("client_name"), props.get("oauth_client_id"), user)] += 1
+            clients_seen[repr((props.get("server_name"), props.get("client_name"), props.get("oauth_client_id"), user))] += 1  # repr: values may be unhashable
         if name == "mcp_tool_called":
             tool_calls.append(props)
         continue  # MCP interaction_id joins the calling answer; it is not an answer of its own
