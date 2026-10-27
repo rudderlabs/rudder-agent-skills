@@ -2,13 +2,16 @@
 import gzip
 import itertools
 import json
+import os
 import re
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 OUT = sys.argv[2] if len(sys.argv) > 2 else "events.jsonl"
 # a run that sends nothing (AI switch off, new install) still leaves a capture; an existing one that does not
-# end in a newline gets one, so the next record starts its own line
+# end in a newline gets one, so the next record starts its own line. Owner-only: captures hold identities.
+os.close(os.open(OUT, os.O_CREAT | os.O_APPEND | os.O_WRONLY, 0o600))
+os.chmod(OUT, 0o600)
 with open(OUT, "ab+") as f:
     f.seek(0, 2)
     if f.tell():
