@@ -212,6 +212,7 @@ A row is `n/a` only when the app has no surface it applies to. Page-load is `n/a
 |---|---|
 | Several `ai_response_received` for one turn | model calls outside `aiInteraction` / `ai_interaction` / `RunInteraction` (Go: a call made with a context that is not the interaction's), a stream not returned or bound, a Python thread pool without `propagate`, a LangChain handler on the model constructor |
 | `ai_user_action` without a matching answer | the client sent a different ID than the server used; check the `x-interaction-id` hand-off |
+| `error_type: app_error` on a failed turn | the turn failed in the app's own code (a review, parsing or tool step that threw) with no model call failing; expected for such failures, so fix the app error itself if it is unintended. SDKs before 0.7.0 / v0.3.0 reported it as `api_error` |
 | App-detected failure reported as `success` | the entry point catches the failure and returns normally without `end({ status, errorType })` (Python `end(status=..., error_type=...)`, Go `End(EndOptions{...})`) inside the callback |
 | AI events with the AI switch off | the switch is read after `configure()`, or one entry point builds its own client; browser AI events: `trackAi` does not read the switch the server exposes to the page |
 | `prompt_text` / `response_text` present | `captureContent` on, globally or per interaction |
