@@ -321,7 +321,7 @@ if os.environ.get("AI_EVENTS_LEGACY_EVENT", "true").lower() != "false":
     rudder_client.track(user_id=user.id, event="chatTurnCompleted", properties={...})
 ```
 
-`configure()` changes only the arguments passed, so a reloadable config calls it again on change (`classifier=None`, `evaluator=None` when turning off). Wrapped clients and `ai_interaction` stay in place either way.
+`configure()` changes only the arguments passed, so a reloadable config calls it again on change (`classifier=None`, `evaluator=None` when turning off). Wrapped clients and `ai_interaction` stay in place either way. MCP wrappers and the SDK's tracing follow the switch only on restart: a wrapper keeps the client it was given, so after an on-to-off reload `mcp_*` events stop only once the process restarts; say so in the plan's switch-off and rollback text.
 
 `configure()` does not reach the browser: expose `ai_events_on` to the page the way the app exposes its other config, and gate `trackAi` on it (`client-events.md`, "Code").
 
