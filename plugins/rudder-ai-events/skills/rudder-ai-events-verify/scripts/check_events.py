@@ -159,7 +159,7 @@ for i, m in enumerate(tracks):
     # customer name was sent by an AI SDK as a declared tool event
     is_span = name == "ai_otel_span" or (w.get("integration") in TRACING and name not in KNOWN_EVENTS)
     is_declared = not name.startswith(("ai_", "mcp_")) and not is_span
-    if not user and not anon and not is_client:
+    if not user and not anon:  # the browser SDK sends anonymousId on every event
         problems.append(f"{where}: no userId or anonymousId")
     if not is_declared and not is_span and not is_client and name not in KNOWN_EVENTS:
         problems.append(f"{where}: not an AI events spec name (misspelled?)")
