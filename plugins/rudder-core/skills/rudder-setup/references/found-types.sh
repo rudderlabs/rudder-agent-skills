@@ -37,8 +37,9 @@ xc() { sed -nE 's#/[^/]+\.(xcodeproj|xcworkspace)(/.*)?$##p; s#/Podfile$##p' | r
 # settings gives.
 appalias() { cat "$1"/gradle/*.versions.toml 2>/dev/null | awk '/^[[:space:]]*\[/ { p = $0 ~ /^[[:space:]]*\[plugins\]/ } p && /"com\.android\.application[":]/ { k = $1; sub(/=.*/, "", k); gsub(/"/, "", k); gsub(/[-_.]/, "[.]", k); printf "|plugins[.]%s([^.A-Za-z0-9_]|$)", k }'; }
 gmap() { sed -nE "s#.*project\\(['\"](:[^'\"]+)['\"]\\)\\.projectDir *= *(file\\(|File\\(rootDir, *|new File\\(rootDir, *)['\"]([^'\"]+)['\"].*#\\1 \\3#p" "$1"/settings.gradle "$1"/settings.gradle.kts 2>/dev/null | sed -E 's# \./# #; s#/$##'; }
-gpath() { gmap "$1" | awk -v w="$2" '$2 == w { print $1; exit }'; }
-gdir() { x=$(gmap "$1" | awk -v g="$2" '$1 == g { print $2; exit }'); [ -n "$x" ] || x=$(printf '%s' "${2#:}" | tr : /); if [ "$1" = . ]; then printf '%s\n' "$x"; else printf '%s/%s\n' "$1" "$x"; fi; }
+# gmap prints `<gradle path> <folder>`; a Gradle path holds no space, and the folder can
+gpath() { gmap "$1" | awk -v w="$2" 'substr($0, length($1) + 2) == w { print $1; exit }'; }
+gdir() { x=$(gmap "$1" | awk -v g="$2" '$1 == g { print substr($0, length($1) + 2); exit }'); [ -n "$x" ] || x=$(printf '%s' "${2#:}" | tr : /); if [ "$1" = . ]; then printf '%s\n' "$x"; else printf '%s/%s\n' "$1" "$x"; fi; }
 groot() { while IFS= read -r f; do [ -n "$f" ] || continue; d=${f%/*}; until [ -f "$d/settings.gradle" ] || [ -f "$d/settings.gradle.kts" ] || [ "$d" = . ]; do d=${d%/*}; done; [ -f "$d/settings.gradle" ] || [ -f "$d/settings.gradle.kts" ] || d=${f%/*}; a=; g=; ! grep -qE "android\.?[Aa]pplication$(appalias "$d")" "$f" || { a=${f%/*}; g=$(gpath "$d" "${a#"$d"/}"); }; printf '%s\t%s\t%s\n' "$d" "$a" "$g"; done | awk -F '\t' '{ r[NR] = $1; m[NR] = $2; g[NR] = $3; if ($2 != "" && $2 != $1) n[$1]++ } END { for (i = 1; i <= NR; i++) if (n[r[i]] < 2) print r[i]; else if (m[i] != "" && m[i] != r[i]) { p = r[i] == "." ? substr(m[i], 3) : substr(m[i], length(r[i]) + 2); gsub("/", ":", p); print r[i] " " (g[i] != "" ? g[i] : ":" p) } }' | rel; }
 outer() { dirs | awk '{ a[NR] = $0 } END { for (i = 1; i <= NR; i++) { k = 1; for (j = 1; j <= NR; j++) if (a[j] != a[i] && (a[j] == "." || index(a[i], a[j] "/") == 1)) k = 0; if (k) print a[i] } }'; }
 flutter=$(m -name pubspec.yaml -exec grep -lE '^[[:space:]]*sdk:[[:space:]]*flutter' {} +)
