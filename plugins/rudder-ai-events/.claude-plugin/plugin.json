@@ -1,7 +1,7 @@
 {
   "name": "rudder-ai-events",
   "description": "Onboard an existing app to RudderStack AI events (spec v0.3) with the @rudderstack/ai (Node.js), rudderstack-ai (Python) and ai-sdk-go (Go) SDKs: discover AI surfaces, plan ai-events.md, instrument chat, background agents, MCP servers and browser clients, and verify the events.",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "author": {
     "name": "RudderStack"
   },

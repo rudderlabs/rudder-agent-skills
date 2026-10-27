@@ -29,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`rudder-ai-events`** — new plugin that onboards an existing app to RudderStack AI events
   (spec v0.3) with the `@rudderstack/ai` (Node.js), `rudderstack-ai` (Python) and `ai-sdk-go` (Go)
-  SDKs. Versions are resolved at run time (0.6.0 / v0.2.0 or later); all three install from public
+  SDKs. Versions are resolved at run time (0.7.0 / v0.3.0 or later); all three install from public
   registries.
   - `rudder-ai-events-setup` — discovers chat, background-agent, browser-client and MCP server
     surfaces (read-only) and drafts the committed `ai-events.md` plan. The plan opens with a
@@ -45,12 +45,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     events on the existing JavaScript SDK. Covers agent loops the app starts without awaiting, cache-write
     prices, and restoring the `tarball:` URLs pnpm drops from unrelated lockfile entries. A verify PASS
     comes before any commit or PR.
-  - `rudder-ai-events-verify` — offline capture with shipped recorders (Node.js, Python, Go), a mock data
-    plane and model server, or an MCP client in the server's production session mode; `check_events.py`
-    validates against the AI events v0.3 schema and the client-event schema, joins, counts, identity,
-    content, switches and app-detected failures; `what_changes.py` regenerates `## What changes` from
-    captured payloads for the PR body. The AI events switch is required; a no-op client stands in only
-    when checking an older instrumentation without one.
+  - `rudder-ai-events-verify` — offline capture with the SDKs' recorders, a mock data plane and model
+    server, or an MCP client in the server's production session mode; the SDKs' migration check
+    (`npx @rudderstack/ai check`, `python -m rudderstack.ai.check`, `aicheck`) validates the AI events
+    v0.3 and browser-event schemas, joins, counts, identity, content, switches and app-detected failures,
+    and its `what-changes` regenerates `## What changes` from captured payloads for the PR body. The AI
+    events switch is required; a no-op client stands in only when checking an older instrumentation.
 - **CI / dev tooling** — both directory crawlers now run as gates against the
   working tree: cursor.directory's real `parse.ts` (vendored, pinned) via
   `scripts/cursor-preview/preview.mts`, and skills.sh's real `skills` CLI (pinned)
