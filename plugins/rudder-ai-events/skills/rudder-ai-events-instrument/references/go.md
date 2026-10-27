@@ -146,11 +146,12 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 		InputMethod:    "text",
 		PromptText:     body.Message, // sent only with content capture on
 	}, func(ctx context.Context, in *rudderstackai.Interaction) error {
+		interactionID = in.ID() // first, so the error response can carry it too
 		completion, err := llm.Chat.Completions.New(ctx, params)
 		if err != nil {
 			return err // fails the answer; returned unchanged
 		}
-		answer, interactionID = completion.Choices[0].Message.Content, in.ID()
+		answer = completion.Choices[0].Message.Content
 		return nil
 	})
 	// ...existing error handling and response; always return interactionID to the client, on errors too
