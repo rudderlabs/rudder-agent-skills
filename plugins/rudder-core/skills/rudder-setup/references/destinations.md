@@ -100,10 +100,13 @@ NAME:
   t=$(mktemp) && jq -e . key.json >/dev/null && { grep -v '^NAME:' rudder/secrets.vars.yaml; printf "NAME: '%s'\n" "$(jq -c . key.json | sed "s/'/''''/g")"; } > "$t" && mv "$t" rudder/secrets.vars.yaml
   ```
 
-- A value that spans lines, such as a PEM private key, cannot go through the var file yet. The CLI pastes it
-  into the spec's text, where YAML turns each line break into a space, and validate still passes. When a secret
-  key's pattern accepts line breaks (its `regex` starts with `(?s)`), offer the type's other way to sign in, such
-  as a password, or say this workflow cannot connect that destination yet.
+- A value that spans lines, such as a PEM private key, keeps its line breaks from rudder-cli 0.29.0, the first
+  release with rudder-iac#998. #998 merged before #990, so every release that step 1's `cli_features` probe
+  accepts has it. Ask the user to write the value in the var file as a YAML literal block, `NAME: |` with the
+  value's lines below it, each indented by two spaces. The slot in the spec keeps its single quotes. A block
+  keeps every character as written, so each `'` in it is written twice. Up to 0.28.0, and in a build from
+  source without #998, the CLI pastes the value into the spec's text, where YAML turns each line break into a
+  space, and validate still passes.
 
 ## Errors you will meet
 

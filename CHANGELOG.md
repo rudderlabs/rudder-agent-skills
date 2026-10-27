@@ -32,8 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   only the layout, the source and connection specs, how to get a webhook endpoint, and how to
   write values in the var file, JSON keys and `'` included. It gives a command that writes a key
   file into the var file without printing it, and says that a multi-line secret, such as a PEM
-  private key, cannot go through the var file yet. It names no destination keys, samples or secret
-  names. `rudder-core` 0.0.10.
+  private key, goes in the var file as a `|` block, which keeps its line breaks from rudder-cli
+  0.29.0 (rudderlabs/rudder-iac#998) and so in every release step 1 accepts. It names no
+  destination keys, samples or secret names. `rudder-core` 0.0.10.
 - **`rudder-cli` / `rudder-cli-setup`, `rudder-cli-workflow`, `rudder-transformations`,
   `rudder-import-and-evolve`; `rudder-core` / `rudder-instrumentation-debugging`.**
   Agents now check auth with `rudder-cli workspace info --json` and read the token
