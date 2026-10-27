@@ -138,7 +138,7 @@ $TMPDIR/ai-events-verify/.venv/bin/python scripts/check_events.py events.jsonl \
   --feature support_bot --surface web --user-id demo_user_1 --expect-session --expect-joins \
   --feedback-endpoint web:feedback_given --expect-legacy chatTurnCompleted \
   --failed-interaction <id of the app-detected failure> \
-  --mcp-server docs-server --mcp-intent search_docs --mcp-intent read_page
+  --mcp-server docs-server --mcp-intent docs-server:search_docs --mcp-intent docs-server:read_page
 ```
 
 Pass only the flags that apply:
@@ -156,7 +156,7 @@ Pass only the flags that apply:
 | `--feedback-endpoint [[<feature>:]<surface>:]<action_type>` | per `action_type` in the plan's `surfaces[].feedback`, prefixed with that surface's `feature` and `surface` values when the capture has several: each browser copy of it on those turns needs a server copy. An action type the server sends on one feature's turns on one surface is checked the same way there; others (`clicked_through`, browser-only `copied_response`) need no server copy. With both copies expected, each turn needs as many client as server copies of each action |
 | `--failed-interaction <id>` | per app-detected failure driven: its server answer must not be `success` |
 | `--expect-legacy <event>` | per planned legacy event; also names a legacy event that uses an `ai_*` name |
-| `--mcp-server`, `--mcp-intent` | per planned server name, and per entry of its `request_context.intents` (without `other`) |
+| `--mcp-server`, `--mcp-intent <server>:<intent>` | per planned server name, and per entry of that server's `request_context.intents` (without `other`), prefixed with its server name so one server's intents never pass on another; a bare `<intent>` is allowed on every server |
 | `--no-ai-events` | the capture with `ai_events_env` off: no AI SDK event and no browser AI event (`source: client`, names from the client schema) may appear (pair it with `--expect-legacy`) |
 | `--absent <event>` | the capture with `legacy_events_env` off: per legacy event; counts only legacy sends (no `context.wrapperLibrary`, not a browser AI copy), so an AI event with the same name does not fail it |
 

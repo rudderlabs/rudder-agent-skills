@@ -66,7 +66,9 @@ p.add_argument("--feedback-endpoint", action="append", default=[],
 p.add_argument("--failed-interaction", action="append", default=[],
                help="interaction_id of a turn the app failed and caught itself: its answer must not be success")
 p.add_argument("--mcp-server", action="append", default=[], help="allowed server_name values (the plan's MCP servers)")
-p.add_argument("--mcp-intent", action="append", default=[], help="allowed request_context intents (other is implied)")
+p.add_argument("--mcp-intent", action="append", default=[],
+               help="[server_name:]intent from a server's request_context intents (other is implied); "
+                    "without a server name it is allowed on every server")
 args = p.parse_args()
 
 
@@ -119,6 +121,10 @@ def schema_errors(schema, path, name, instance):
 
 
 problems, notes = [], []
+mcp_intents = collections.defaultdict(set)  # server_name (None: every server) -> allowed intents
+for value in args.mcp_intent:
+    server, _, intent = value.rpartition(":")
+    mcp_intents[server or None].add(intent)
 messages = [json.loads(line) for line in open(args.events) if line.strip()]
 tracks = [m for m in messages if m.get("type", "track") == "track" and m.get("event")]
 by_interaction = collections.defaultdict(collections.Counter)
@@ -230,8 +236,9 @@ for i, m in enumerate(tracks):
                 problems.append(f"{where}: request_context reached the tool (argument_keys)")
             else:
                 notes.append(f"{where}: request_context in argument_keys (fine if the tool declares its own)")
-        if args.mcp_intent and "intent" in props and props["intent"] not in args.mcp_intent + ["other"]:
-            problems.append(f"{where}: intent {props['intent']!r} not in the server's list")
+        allowed = mcp_intents[None] | mcp_intents[props.get("server_name")] | {"other"}
+        if args.mcp_intent and "intent" in props and props["intent"] not in allowed:
+            problems.append(f"{where}: intent {props['intent']!r} not in {props.get('server_name')!r}'s list")
         if name == "mcp_client_seen":
             clients_seen[(props.get("server_name"), props.get("client_name"), props.get("oauth_client_id"), user)] += 1
         if name == "mcp_tool_called":
