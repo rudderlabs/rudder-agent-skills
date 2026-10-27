@@ -109,6 +109,8 @@ with values the code already has. Do not add state just to track it.
 A static site, HTML files with no package manager or bundler, has nothing that reads `.env.local`. Add the script
 snippet from RudderStack's JavaScript SDK documentation to the `<head>` of each page, with the write key and the
 data plane URL in its `load` call, and put the typed functions in one script file that the pages load after it.
+When a page already loads RudderStack's snippet, step 2 asked the user about it: on "send to the new source",
+change the write key and data plane URL in its `load` call instead of adding a second snippet.
 
 A web source's write key is public by design: the SDK needs it in every visitor's browser, whether a bundle or the
 page delivers it. So the page is the one committed file that holds the write key; check every other staged file

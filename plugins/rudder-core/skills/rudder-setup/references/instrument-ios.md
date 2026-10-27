@@ -59,9 +59,12 @@ RUDDERSTACK_DATA_PLANE_URL = https:/$()/<data plane host>
 
 Then:
 
-- If the app target already has a configuration file (`baseConfigurationReference` in `project.pbxproj`), add
-  `#include "RudderStack.xcconfig"` to that file. When CocoaPods generated it, ask the user where their own build
-  settings live instead. Otherwise attaching `RudderStack.xcconfig` is an Xcode change.
+- If the app target already has a configuration file (`baseConfigurationReference` in `project.pbxproj`), add an
+  `#include` of `RudderStack.xcconfig` to that file, with the path from that file's folder, because Xcode resolves
+  an include from the file that holds it: `#include "RudderStack.xcconfig"` when the file sits beside the
+  `.xcodeproj`, `#include "../RudderStack.xcconfig"` for `Config/Debug.xcconfig`. When CocoaPods generated it, ask
+  the user where their own build settings live instead. Otherwise attaching `RudderStack.xcconfig` is an Xcode
+  change.
 - Pass three String keys through `Info.plist`: `RudderStackWriteKey` set to `$(RUDDERSTACK_WRITE_KEY)`,
   `RudderStackDataPlaneURL` set to `$(RUDDERSTACK_DATA_PLANE_URL)` and `RudderStackControlPlaneURL` set to
   `$(RUDDERSTACK_CONTROL_PLANE_URL)`. When the target has an `Info.plist` file (`INFOPLIST_FILE` in

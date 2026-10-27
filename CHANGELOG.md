@@ -234,8 +234,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   gets its `.env.local` and its build commands in that folder; when it finds none it asks "What
   will send events to RudderStack?", the question step 1 asks outside an app, now defined once. It
   also lists the RudderStack and Segment SDKs the dependencies name, in the manifests of the client
-  apps and of every server language, the legacy Android (Java) and iOS (Objective-C) SDKs included. New Android (Kotlin SDK) and iOS (Swift SDK) references add the
-  dependency, keep the write key out of git, load the SDK once and give each agreed event a typed
+  apps and of every server language, the legacy Android (Java) and iOS (Objective-C) SDKs included,
+  and a RudderStack snippet in the app's pages counts too. New Android (Kotlin SDK) and iOS (Swift
+  SDK) references add the dependency, keep the write key out of git, load the SDK once and give each
+  agreed event a typed
   function, in Kotlin or Java and in Swift or Objective-C. Step 7 checks a mobile app on an Android
   emulator (`10.0.2.2`) or the iOS Simulator, or is skipped without one, and step 8 runs the app
   against the real data plane. A Capacitor or Cordova app gets the JavaScript SDK, and a Unity game
@@ -243,7 +245,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   user agrees to move it, and a legacy SDK is replaced only on a yes. When the app keeps its
   source, step 6 writes the new write key to `rudder/first-event.vars.yaml`, not to the app's
   `.env.local`, and step 8's probe and curl send read it from there. The iOS reference never edits
-  `project.pbxproj` and gives the user its Xcode changes in one list. Neither mobile reference
+  `project.pbxproj` and gives the user its Xcode changes in one list, and includes
+  `RudderStack.xcconfig` from an app's configuration file by the path from that file's folder.
+  Neither mobile reference
   turns off plain HTTP an app already allows: iOS gets `NSAllowsLocalNetworking` only without
   `NSAllowsArbitraryLoads`, and Android's debug network config is skipped when
   `usesCleartextTraffic` is on and no network security config is set. With one, which Android 7.0
@@ -263,11 +267,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   holds resources that `rudder/` does not, such as another project's. After its reverts it stops
   again if the dry run would remove a resource that the reverts did not take out of `rudder/`,
   comparing kind and id, since ids are unique only per kind.
-  Every validate, dry run and apply runs through a filter that keeps only the lines
-  rudder-cli is known to print, because validate shows the spec line a message is about with secrets
-  filled in, and a multi-line secret runs over several lines. Step 8's probe reads only its two
+  Every validate, dry run and apply runs through a filter that first drops each message's source
+  block, from the gutter line to the `^^^` line under it, then keeps only the lines rudder-cli is
+  known to print, because validate shows the spec line a message is about with secrets filled in,
+  and a multi-line secret's later lines may look like any line. Step 8's probe reads only its two
   values from `.env.local`, both under the prefix of the names step 6 wrote, as dotenv reads them,
-  and never runs the file as shell. It stops 5 minutes after it starts, however slow each answer is. It gives each
+  and never runs the file as shell. It stops 5 minutes after it starts, however slow each answer
+  is. It gives each
   request 10 seconds, stops on any status but 400, 2xx and 401, and prints the data plane's answer,
   so a disabled source (404), a rate limit (429) or a server error is not taken for a wrong data
   plane URL; it reruns for those a bounded number of times. The curl send waits until the probe
