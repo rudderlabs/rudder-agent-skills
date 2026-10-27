@@ -8,6 +8,8 @@ allowed-tools: "Bash(rudder-cli *), Read, Write, Edit"
 
 This skill teaches how to diagnose and fix common **validation errors**, **schema issues**, and **instrumentation problems** when working with RudderStack data catalog and tracking plans.
 
+For events sent by the AI SDKs (`ai_*`, `mcp_*`), use `rudder-ai-events-verify`, which checks them against the AI events spec.
+
 ## Debugging Workflow
 
 ```

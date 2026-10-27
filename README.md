@@ -59,6 +59,8 @@ npx skills update
 
 Non-interactive equivalent: `claude plugin marketplace add rudderlabs/rudder-agent-skills` then `claude plugin install <plugin>@rudder-agent-skills`. Update with `/plugin marketplace update rudder-agent-skills`.
 
+To try a plugin from an unmerged branch, clone that branch and either start `claude --plugin-dir ./rudder-agent-skills/plugins/<plugin>` (this session only) or run `claude plugin marketplace add ./rudder-agent-skills`, then install as above.
+
 ### Cursor
 
 Add it straight from the [cursor.directory listing](https://cursor.directory/plugins/rudder-agent-skills) with **Add to Cursor**, or use the Skills CLI:
@@ -120,8 +122,8 @@ npx skills add rudderlabs/rudder-agent-skills -a cursor
 
 | Skill | When to use |
 |---|---|
-| `rudder-ai-events-setup` | Onboarding an app to AI events: discovering chat, background-agent, browser and MCP server surfaces and planning `ai-events.yaml` |
-| `rudder-ai-events-instrument` | Adding the AI events code from an approved `ai-events.yaml`, including MCP server wrappers |
+| `rudder-ai-events-setup` | Onboarding an app to AI events: discovering chat, background-agent, browser and MCP server surfaces and planning `ai-events.md` |
+| `rudder-ai-events-instrument` | Adding the AI events code from an approved `ai-events.md`, including MCP server wrappers |
 | `rudder-ai-events-verify` | Validating captured AI events against the spec before real traffic |
 
 ## How skills work together
@@ -172,7 +174,7 @@ Each plugin includes a setup skill that guides you through installing and config
 | `rudder-mcp` | `/rudder-mcp-setup` | Configures Claude Code to connect to RudderStack's MCP server at `mcp.rudderstack.com` |
 | `rudder-terraform` | `/rudder-terraform-setup` | Installs Terraform, configures the RudderStack provider |
 | `rudder-profiles` | `/rudder-profiles-setup` | Installs `pb`, configures `profiles-mcp`, and wires editor MCP settings |
-| `rudder-ai-events` | `/rudder-ai-events-setup` | Plans AI events for your app in `ai-events.yaml`; `/rudder-ai-events-instrument` then adds the pinned SDK |
+| `rudder-ai-events` | `/rudder-ai-events-setup` | Plans AI events for your app in `ai-events.md`; `/rudder-ai-events-instrument` then adds the pinned SDK |
 
 After installing a plugin, run its setup skill to get started. Use `/rudder-environment-check` to verify your full setup.
 

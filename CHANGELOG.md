@@ -144,22 +144,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lookup.
 - **`rudder-ai-events`** — new plugin that onboards an existing app to RudderStack AI events
   (spec v0.3) with the `@rudderstack/ai` (Node.js), `rudderstack-ai` (Python) and `ai-sdk-go` (Go)
-  SDKs, pinned to the release that ships spec v0.3.
+  SDKs. Versions are resolved at run time (0.7.0 / v0.3.0 or later); all three install from public
+  registries. Node.js apps on Deno, browser-only repos whose chat backend lives elsewhere, and
+  repos that generate typed tracking calls are covered.
   - `rudder-ai-events-setup` — discovers chat, background-agent, browser-client and MCP server
-    surfaces (read-only), drafts the committed `ai-events.yaml` plan (surfaces with channel,
-    identity, intents with `other`, MCP `identify` / `request_context` / declared tool events,
-    scores, event rules, classifier, content capture, optional trace ID link, legacy-event
-    migration, time to integrate), lists the known limits that apply, and stops for explicit approval.
-  - `rudder-ai-events-instrument` — exact-pinned install, `configure()` with the existing RudderStack
-    client, client wrappers or framework integrations, one interaction per user turn, one task per
-    background run, MCP server wrappers for every supported MCP library (Node.js SDK 1.x and 2.x,
-    Python `mcp` 1.x and 2.x, Go go-sdk and mcp-go), feedback (`serverFeedback`
-    opt-out), scores, flush, browser events on the existing JavaScript SDK (client copies of the
-    prompt, answer and feedback sent alongside the server's by default), legacy events behind a flag.
-  - `rudder-ai-events-verify` — offline capture (stub client, a mock data plane and model server, or
-    an MCP client driver), validation against the AI events v0.3 JSON Schema and a client-event
-    schema (events from any of the three SDKs), join, count, identity, content and MCP checks, and a
-    short report.
+    surfaces (read-only) and drafts the committed `ai-events.md` plan. The plan opens with a
+    customer-facing `## What changes` summary (events new / changed / removed, code touched, identity,
+    data that leaves the app, impact, switch-off and rollback), then the breaking-change checks against
+    legacy events, intents and outcomes, known limits and one `## Config` YAML block. Decisions the code
+    answers are taken with evidence; only identity per entry point, intent lists, true blockers and
+    approval are asked, in one round.
+  - `rudder-ai-events-instrument` — exact-pinned install with lockfile hygiene, `configure()` with the
+    existing RudderStack client, wrappers or integrations, one interaction per user turn and one task
+    per background run, app-detected failures ended with a status, MCP server wrappers (one per
+    endpoint), independent switches for AI and legacy events, bounded flush and shutdown, and browser
+    events on the existing JavaScript SDK. Covers agent loops the app starts without awaiting, cache-write
+    prices, and restoring the `tarball:` URLs pnpm drops from unrelated lockfile entries. A verify PASS
+    comes before any commit or PR.
+  - `rudder-ai-events-verify` — offline capture with the SDKs' recorders, a mock data plane and model
+    server, or an MCP client in the server's production session mode; the SDKs' migration check
+    (`npx @rudderstack/ai check`, `python -m rudderstack.ai.check`, `aicheck`) validates the AI events
+    v0.3 and browser-event schemas, joins, counts, identity, content, switches and app-detected failures,
+    and its `what-changes` regenerates `## What changes` from captured payloads for the PR body. The AI
+    events switch is required; a no-op client stands in only when checking an older instrumentation.
 - **CI / dev tooling** — both directory crawlers now run as gates against the
   working tree: cursor.directory's real `parse.ts` (vendored, pinned) via
   `scripts/cursor-preview/preview.mts`, and skills.sh's real `skills` CLI (pinned)
