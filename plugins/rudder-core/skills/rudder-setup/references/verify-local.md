@@ -39,10 +39,12 @@ Only missing events and wrong types fail a check. Events outside the plan, refus
 JSON show in the table as "reported, not a failure", because an app may already send other events, and an SDK
 retry can leave a refused request behind.
 
-`sources listen` first ships in rudder-cli 0.29.0. On exit 4, tell the user: "Your rudder-cli has no `sources
-listen`, which checks events on this machine before anything reaches RudderStack. It needs rudder-cli 0.29.0 or
-later. I will skip this check; step 8 still checks delivery at the destination." Then skip to step 8. Do not
-install or upgrade rudder-cli during the workflow.
+`sources listen` first ships in rudder-cli 0.29.0, and exit 4 is a guard for a rudder-cli without it. The start
+command prints the version that ran. If that is not the version step 1 checked, the command ran another copy: run it
+again as SKILL.md's full-path rule says. Otherwise tell the user: "Your rudder-cli has no `sources listen`, which
+checks events on this machine before anything reaches RudderStack. It needs rudder-cli 0.29.0 or later. I will skip
+this check; step 8 still checks delivery at the destination." Then skip to step 8. Do not install or upgrade
+rudder-cli during the workflow.
 
 ## Two calls
 
@@ -212,7 +214,9 @@ machine's loopback, so step 7 is skipped for it.
      install booted '<D>/xcode/Build/Products/Debug-iphonesimulator/<app>.app'`. Run in Xcode installs it too, but
      launches it with the real values first, so those first events go to the live data plane. Then launch it with
      the listener's values in its environment, which a debug build reads first (iOS instrumentation reference), and
-     ask the user to use it without pressing Run again. `<bundle id>` is the target's `PRODUCT_BUNDLE_IDENTIFIER`.
+     ask the user to use it where it is. Pressing Run again, closing it or opening it from its icon starts it without
+     that environment, so it reads the real values and sends to the live data plane. `<bundle id>` is the target's
+     `PRODUCT_BUNDLE_IDENTIFIER`.
      Read it with `xcodebuild -scheme '<scheme>' -showBuildSettings | grep -m1 ' PRODUCT_BUNDLE_IDENTIFIER ='`, and
      never show `-showBuildSettings` output unfiltered, because it prints the write key from
      `RudderStack.local.xcconfig`. Run the mark (section 3) first, then the launch command, and launch again after
