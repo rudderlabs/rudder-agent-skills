@@ -130,13 +130,13 @@ Populated: by the app. It already computes `ticket.category` per turn and maps i
 | gpt-4.1-mini | 0.4 / 1.6 / 0.1 | `src/billing/rates.ts` |
 | claude-haiku-4-5 | TODO | none in the repo |
 
-Every model ID constant in the repo, Bedrock geo-prefixed IDs included. claude-haiku-4-5 has no rate: its calls record tokens without `total_cost_usd` until the customer fills the `TODO` instrument leaves at the price config (known limit `prices_missing`); verify checks the cost path with dummy prices.
+Every model ID constant in the repo, Bedrock geo-prefixed IDs included. claude-haiku-4-5 has no rate: its calls record tokens without `total_cost_usd` until the customer fills the `TODO` instrument leaves at the price config (known limit `prices_missing`); verify checks the cost path with dummy prices. Cache reads and writes are priced at `input_per_mtok` unless the entry sets `cached_input_per_mtok` / `cache_write_per_mtok`: for a model whose provider charges more for cache writes (Anthropic), a missing `cache_write_per_mtok` understates the cost.
 
 ## Dependencies and blockers
 
 - `@rudderstack/ai` 0.6.0 (npm, exact pin); `rudderstack-ai` 0.6.0 (uv, exact pin): the latest when this plan was written.
 - Registry and auth: public npm and PyPI; no private registry.
-- Release-age gates: pnpm `minimumReleaseAge: 10080`; `@rudderstack/ai` 0.6.0 is newer, so it needs a `minimumReleaseAgeExclude` entry until it ages past the gate.
+- Release-age gates: pnpm `minimumReleaseAge: 10080` (minutes, so 7 days); `@rudderstack/ai` 0.6.0 was published less than 7 days ago, so it needs a `minimumReleaseAgeExclude` entry until it ages past the gate.
 - Peer ranges: `openai` 7.34.0 is inside `>=7.0.0 <8.0.0`; `@rudderstack/rudder-sdk-node` 3.0.14 is below `>=3.0.16`: upgrade it to 3.0.16 in the same change.
 - Blockers: none.
 
@@ -317,7 +317,7 @@ Values not shown in the example:
 - `config.event_rules[]`: tool call to the app's own product event (never `ai_*`); `when: always | result_seen`. `[]` when none.
 - `config.scores.evaluator`: `none | hook` (configure `evaluator`, the app's own judge) `| manual` (`trackScore` calls).
 - `config.server_feedback: false` only with `client_events.opt_out: [server_feedback]`.
-- `config.prices[]`: USD per 1M tokens, one entry per model ID the app sends. `config.unpriced_models[]`: model IDs with no rate yet. Optional keys: `cache_write_1h_per_mtok`, `tier_multipliers: { batch: 0.5, fast: 2 }`, `long_context: { threshold_tokens, input_per_mtok, output_per_mtok }`, `server_tool_per_call: { web_search: 0.01 }`, `provider` (only to price one provider; `gcp.gemini` and `gcp.vertex_ai` are priced separately, `google` / `google.vertex` are aliases).
+- `config.prices[]`: USD per 1M tokens, one entry per model ID the app sends. `config.unpriced_models[]`: model IDs with no rate yet. Optional keys: `cache_write_per_mtok` (cache writes; without it the SDKs price them at `input_per_mtok`, so set it for Anthropic or Bedrock models with prompt caching), `cache_write_1h_per_mtok` (defaults to `cache_write_per_mtok`), `tier_multipliers: { batch: 0.5, fast: 2 }`, `long_context: { threshold_tokens, input_per_mtok, output_per_mtok }`, `server_tool_per_call: { web_search: 0.01 }`, `provider` (only to price one provider; `gcp.gemini` and `gcp.vertex_ai` are priced separately, `google` / `google.vertex` are aliases).
 - `surfaces[].type`: `chat | background | client | mcp`, also used for Kind in the Surfaces section. `status`: `instrument | skipped | blocked | unsupported`; `reason` required unless `instrument`.
 - `surfaces[].surface`: `web | mobile | slack | teams | email | chatgpt_app | claude_app | ide | api | other`, or `per request: <expression>`.
 - `surfaces[].integration`: `wrapOpenAI | wrapAnthropic | wrapGoogleGenAI | wrapBedrock | rudderstackMiddleware | RudderStackCallbackHandler | trackMessages | trackedQuery | trackedRun | recordCall | instrument_litellm` (Python: snake_case names); Go: `rudderopenai | rudderanthropic | ruddergenai | rudderbedrock | RecordCall`.

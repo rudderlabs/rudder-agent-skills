@@ -50,7 +50,7 @@ Find what would stop the install before any code is written; record each under D
 
 | Check | Where |
 |---|---|
-| Release-age gates | pnpm `minimumReleaseAge` / `minimumReleaseAgeExclude` (`pnpm-workspace.yaml`, `.npmrc`); npm `min-release-age` / `before` (`.npmrc`); uv `exclude-newer` (`pyproject.toml` `[tool.uv]`, `uv.toml`). An SDK release newer than the gate needs an exemption with a removal date. |
+| Release-age gates | pnpm `minimumReleaseAge` (in minutes: `10080` is 7 days) / `minimumReleaseAgeExclude` (`pnpm-workspace.yaml`, `.npmrc`); npm `min-release-age` / `before` (`.npmrc`); uv `exclude-newer` (`pyproject.toml` `[tool.uv]`, `uv.toml`). An SDK release newer than the gate needs an exemption with a removal date. |
 | Private registries and auth | `registry=` / `@scope:registry=` in `.npmrc`, `.yarnrc.yml` `npmRegistryServer`, `[[tool.uv.index]]`, `pip.conf` `index-url`, CodeArtifact login scripts (`aws codeartifact login`, `codeartifact` in `package.json` scripts or CI); Go `GOPROXY` in CI and `go env` files. The SDKs are public (npm, PyPI, proxy.golang.org); a mirror or proxy the app forces must serve them. Record the registry and how auth is obtained, never a token. |
 | Peer ranges | the SDK's `peerDependencies` (`npm view @rudderstack/ai peerDependencies`, from a scratch directory) against the app's resolved versions; a conflict is a blocker. Node.js 0.6.0 declares `@rudderstack/rudder-sdk-node >=3.0.16`: an older core SDK fails `npm install` with `ERESOLVE`, so plan its upgrade. |
 
