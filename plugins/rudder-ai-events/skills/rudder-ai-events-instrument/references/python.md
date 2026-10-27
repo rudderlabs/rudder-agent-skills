@@ -2,7 +2,7 @@
 
 Python 3.12+. The package has no dependencies of its own; the extra for each library the app uses (`openai`, `anthropic`, `google-genai`, `bedrock`, `langchain`, `openai-agents`, `claude-agent-sdk`, `litellm`, `mcp`, `tracing`) only declares the supported version of that library, which the app already has. `tracing` is only for exporting OpenTelemetry spans; AI events do not need it.
 
-`<VERSION>` below is the plan's `sdks[].version`: 0.6.0 or later.
+`<VERSION>` below is the plan's `sdks[].version`: 0.7.0 or later.
 
 Full API reference: the package README on the `rudderstack-ai` PyPI page.
 
@@ -260,7 +260,7 @@ def main() -> None:
 
 `shutdown()` ends open interactions as `incomplete`, then flushes. Both share one deadline for classifications and every client (10 s, or `timeout=`), never raise, never close the client, and return `False` when time ran out (`flush_timeout`). `configure(flush_on_exit=...)` (on by default) also flushes for up to 2 s at interpreter exit; it installs no signal handler. Apps that register the tracing span processor also call `force_flush()` on it (or on the `register_tracing()` handle) at shutdown.
 
-From the release after 0.6.0, `flush()` and `shutdown()` drain the app's own client too, so its `flush()` afterwards has nothing left to fail on: when the client's `flush()` raises, they return `False` and pass that first error, unchanged, to `on_error` with `info["kind"] == "flush_failed"`. A timeout does not hide it (both `flush_timeout` and `flush_failed` are reported), and an error the client raises after the deadline is still reported once. If the app logs or alerts on its client's flush errors, move that into `configure(on_error=...)` for `flush_failed` (called at most once per kind per minute) instead of around its own `client.flush()`. On 0.6.0, keep it where it is.
+From 0.7.0, `flush()` and `shutdown()` drain the app's own client too, so its `flush()` afterwards has nothing left to fail on: when the client's `flush()` raises, they return `False` and pass that first error, unchanged, to `on_error` with `info["kind"] == "flush_failed"`. A timeout does not hide it (both `flush_timeout` and `flush_failed` are reported), and an error the client raises after the deadline is still reported once. If the app logs or alerts on its client's flush errors, move that into `configure(on_error=...)` for `flush_failed` (called at most once per kind per minute) instead of around its own `client.flush()`.
 
 ## 8. Declared tool events, classifier, scores, prices
 

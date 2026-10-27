@@ -52,9 +52,9 @@ Find what would stop the install before any code is written; record each under D
 |---|---|
 | Release-age gates | pnpm `minimumReleaseAge` (in minutes: `10080` is 7 days) / `minimumReleaseAgeExclude` (`pnpm-workspace.yaml`, `.npmrc`); npm `min-release-age` / `before` (`.npmrc`); uv `exclude-newer` (`pyproject.toml` `[tool.uv]`, `uv.toml`). An SDK release newer than the gate needs an exemption with a removal date. |
 | Private registries and auth | `registry=` / `@scope:registry=` in `.npmrc`, `.yarnrc.yml` `npmRegistryServer`, `[[tool.uv.index]]`, `pip.conf` `index-url`, CodeArtifact login scripts (`aws codeartifact login`, `codeartifact` in `package.json` scripts or CI); Go `GOPROXY` in CI and `go env` files. The SDKs are public (npm, PyPI, proxy.golang.org); a mirror or proxy the app forces must serve them. Record the registry and how auth is obtained, never a token. |
-| Peer ranges | the SDK's `peerDependencies` (`npm view @rudderstack/ai peerDependencies`, from a scratch directory) against the app's resolved versions; a conflict is a blocker. Node.js 0.6.0 declares `@rudderstack/rudder-sdk-node >=3.0.16`: an older core SDK fails `npm install` with `ERESOLVE`, so plan its upgrade. |
+| Peer ranges | the SDK's `peerDependencies` (`npm view @rudderstack/ai peerDependencies`, from a scratch directory) against the app's resolved versions; a conflict is a blocker. Node.js 0.7.0 declares `@rudderstack/rudder-sdk-node >=3.0.16`: an older core SDK fails `npm install` with `ERESOLVE`, so plan its upgrade. |
 
-A library outside its supported range is a blocker for that integration: record it and, in the one batched round, ask whether to upgrade the library or use `recordCall` / `record_call` instead. These ranges are from `@rudderstack/ai` 0.6.0, `rudderstack-ai` 0.6.0 and `ai-sdk-go` v0.2.0; for a later release, re-read its README compatibility table and trust it over this one.
+A library outside its supported range is a blocker for that integration: record it and, in the one batched round, ask whether to upgrade the library or use `recordCall` / `record_call` instead. These ranges are from `@rudderstack/ai` 0.7.0, `rudderstack-ai` 0.7.0 and `ai-sdk-go` v0.3.0; for a later release, re-read its README compatibility table and trust it over this one.
 
 ## 2. Call sites to entry points
 
@@ -84,6 +84,8 @@ Then walk callers up to the entry point and classify the surface:
 
 One code path can serve both (a function called from a route and from a cron): record both entry points; the interaction or task is opened at the entry point, not in the shared function.
 
+A new chat's first message often takes another path than follow-ups: a welcome or empty-state component, a "new chat" or starter-suggestion handler, or a route that creates the conversation and answers in one call. Trace where the first message of a new chat is sent, as well as where follow-ups go, and list both entry points (and both browser handlers) under Files to change; the first turn is also where `conversation_id` may not exist yet.
+
 Streaming: note whether the route returns a stream (`stream: true`, `.stream(`, `streamText`, `StreamingResponse`, `res.write`, SSE). Streams need `bind()` or returning the stream from the interaction callback; in Go the stream must be read inside `RunInteraction`.
 
 Thread pools (Python): `ThreadPoolExecutor`, `run_in_executor` inside a background job need `propagate()`.
@@ -92,7 +94,7 @@ Tool loops: when requests pass `tools`, check whether the app executes the retur
 
 Background granularity: note what one run is (the whole cron invocation, one queue message) and whether it fans out per item (per workspace, per document). Per-item steps that report their own usage (separate tenant or `on_behalf_of`) become `child_tasks`; propose the level from the code.
 
-Failures the app handles itself: for each entry point, note where it catches a failure and returns normally (empty stream, deadline, lost lease, a job runner that swallows errors) and where it already records it (log, metric, legacy `status`, app error codes). Those turns must end as failed, not `success`. Note turns that can fail before the interaction would open (validation, auth, rate limit): they send no AI event.
+Failures the app handles itself: for each entry point, note where it catches a failure and returns normally (empty stream, deadline, lost lease, a job runner that swallows errors) and where it already records it (log, metric, legacy `status`, app error codes). Those turns must end as failed, not `success`. Note turns that can fail before the interaction would open (validation, auth, rate limit): they send no AI event. Flag best-effort generators (titles, summaries, suggestions, structured extraction) that catch an unparseable or empty model reply and return an empty result: the model call succeeded, so without an explicit failure status the answer reports `success`; they must end with `status: error` (and an `error_type` such as `empty_response`) where they give up.
 
 ## 3. Browser client
 

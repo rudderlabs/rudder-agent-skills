@@ -4,12 +4,12 @@ Events carry `context.wrapperLibrary.name: ai-sdk-go`. The root module (package 
 
 | Needs | |
 |---|---|
-| Go | the `go` line of the pinned version's `go.mod` (v0.2.0: `go 1.26.10`), for the root module and every integration module |
+| Go | the `go` line of the pinned version's `go.mod` (v0.3.0: `go 1.26.10`), for the root module and every integration module |
 | RudderStack client | `github.com/rudderlabs/analytics-go/v4` v4.3.1+, the app's existing one or a new one |
 | Model clients | `github.com/openai/openai-go/v3` v3.70.0+, `github.com/anthropics/anthropic-sdk-go` v1.78.0+, `google.golang.org/genai` v1.72.0+, `github.com/aws/aws-sdk-go-v2/service/bedrockruntime` v1.63.1+; anything else through `RecordCall` |
 | MCP servers | `github.com/modelcontextprotocol/go-sdk` v1.8.0 (`rudderstackai.WrapMCPServer`) or `github.com/mark3labs/mcp-go` v0.55.1+, tested through v1.2.1 (`ruddermcpgo.WrapServer`) |
 
-`<VERSION>` is the plan's `sdks[].version`: v0.2.0 or later for the root module. Each integration module is tagged on its own (`rudderopenai/v0.2.0`, `rudderotel/v0.1.1`, ...): pin each at its latest tag (`go list -m -versions github.com/rudderlabs/ai-sdk-go/rudderopenai`). The modules are public on proxy.golang.org. Never pin a branch or pseudo-version.
+`<VERSION>` is the plan's `sdks[].version`: v0.3.0 or later for the root module. Each integration module is tagged on its own (`rudderopenai/v0.2.0`, `rudderotel/v0.1.1`, ...): pin each at its latest tag (`go list -m -versions github.com/rudderlabs/ai-sdk-go/rudderopenai`). The modules are public on proxy.golang.org. Never pin a branch or pseudo-version.
 
 Runnable references in the SDK repository's `examples/`: `openai`, `anthropic`, `google-genai`, `bedrock-converse`, `background-agent`, `manual`, `mcp-server`, `mcp-server-mcpgo`, `mcp-stateless-http`, `mcp-auth`.
 
@@ -232,7 +232,7 @@ client.Close()              // the SDK never closes it; sends analytics-go's que
 
 `Flush(ctx)` (no deadline on `ctx`: 10 s) waits for pending classifications, scores and held provider retries, then flushes every client the SDK used, MCP wrappers' included. A client with `Flush(ctx)` or `Flush()` sends its queue then; analytics-go without one (v4.3.1) is reported once as `client_outdated` and sends on `Close()`. Use `Flush(ctx)` where the process keeps running (per Lambda invocation), `Shutdown(ctx)` when it stops.
 
-From the release after v0.2.0, `Flush(ctx)` and `Shutdown(ctx)` drain the app's client too: when the client's `Flush` returns an error, they return `false` and pass that first error, unchanged, to the `WithOnError` hook with `info.Kind == "flush_failed"`. A timeout does not hide it (both `flush_timeout` and `flush_failed` are reported), and an error the client raises after the deadline is still reported once. If the app logs or alerts on its client's flush errors, move that into `WithOnError` for `flush_failed` (called at most once per kind per minute) instead of around its own flush call; `client.Close()` stays. On v0.2.0, keep it where it is.
+From v0.3.0, `Flush(ctx)` and `Shutdown(ctx)` drain the app's client too: when the client's `Flush` returns an error, they return `false` and pass that first error, unchanged, to the `WithOnError` hook with `info.Kind == "flush_failed"`. A timeout does not hide it (both `flush_timeout` and `flush_failed` are reported), and an error the client raises after the deadline is still reported once. If the app logs or alerts on its client's flush errors, move that into `WithOnError` for `flush_failed` (called at most once per kind per minute) instead of around its own flush call; `client.Close()` stays.
 
 ## 8. Optional config (only what the plan lists)
 

@@ -2,7 +2,7 @@
 
 Node.js 24+. ESM shown; CommonJS works the same with `require('@rudderstack/ai')` and `require('@rudderstack/ai/openai')`. Every entry point: `@rudderstack/ai`, `/openai`, `/anthropic`, `/google-genai`, `/bedrock`, `/vercel-ai-sdk`, `/langchain`, `/claude-agent-sdk`, `/openai-agents`, `/middleware`, `/mcp`, `/tracing` and `/tracing/vercel-ai-sdk` (advanced OpenTelemetry export, not needed for AI events).
 
-`<VERSION>` below is the plan's `sdks[].version`: 0.6.0 or later.
+`<VERSION>` below is the plan's `sdks[].version`: 0.7.0 or later.
 
 Full API reference: the package README, shipped at `node_modules/@rudderstack/ai/README.md` and shown on npmjs.com.
 
@@ -291,7 +291,7 @@ process.on('SIGTERM', async () => {
 
 `flush()` and `shutdown()` share one deadline for classifications and every client (10 s, or `{ timeoutMs }`), never throw, never close the client, and resolve `false` when time ran out (`flush_timeout`). `configure({ flushOnExit })` (on by default) also flushes for up to 2 s when the event loop empties; it installs no signal handler.
 
-From the release after 0.6.0, `flush()` and `shutdown()` drain the app's own client too, so its `flush()` afterwards has nothing left to fail on: when the client's flush throws or rejects, they resolve `false` and pass that first error, unchanged, to `onError` with `kind: 'flush_failed'`. A timeout does not hide it (both `flush_timeout` and `flush_failed` are reported), and an error the client raises after the deadline is still reported once. If the app logs or alerts on its client's flush errors, move that into `configure({ onError: (err, info) => { if (info.kind === 'flush_failed') ... } })` (called at most once per kind per minute) instead of around its own `client.flush()`. On 0.6.0, keep it where it is.
+From 0.7.0, `flush()` and `shutdown()` drain the app's own client too, so its `flush()` afterwards has nothing left to fail on: when the client's flush throws or rejects, they resolve `false` and pass that first error, unchanged, to `onError` with `kind: 'flush_failed'`. A timeout does not hide it (both `flush_timeout` and `flush_failed` are reported), and an error the client raises after the deadline is still reported once. If the app logs or alerts on its client's flush errors, move that into `configure({ onError: (err, info) => { if (info.kind === 'flush_failed') ... } })` (called at most once per kind per minute) instead of around its own `client.flush()`.
 
 ## 8. Declared tool events (`spec.config.event_rules`)
 

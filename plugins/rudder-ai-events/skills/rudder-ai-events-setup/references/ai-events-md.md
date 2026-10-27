@@ -134,9 +134,9 @@ Every model ID constant in the repo, Bedrock geo-prefixed IDs included. claude-h
 
 ## Dependencies and blockers
 
-- `@rudderstack/ai` 0.6.0 (npm, exact pin); `rudderstack-ai` 0.6.0 (uv, exact pin): the latest when this plan was written.
+- `@rudderstack/ai` 0.7.0 (npm, exact pin); `rudderstack-ai` 0.7.0 (uv, exact pin): the latest when this plan was written.
 - Registry and auth: public npm and PyPI; no private registry.
-- Release-age gates: pnpm `minimumReleaseAge: 10080` (minutes, so 7 days); `@rudderstack/ai` 0.6.0 was published less than 7 days ago, so it needs a `minimumReleaseAgeExclude` entry until it ages past the gate.
+- Release-age gates: pnpm `minimumReleaseAge: 10080` (minutes, so 7 days); `@rudderstack/ai` 0.7.0 was published less than 7 days ago, so it needs a `minimumReleaseAgeExclude` entry until it ages past the gate.
 - Peer ranges: `openai` 7.34.0 is inside `>=7.0.0 <8.0.0`; `@rudderstack/rudder-sdk-node` 3.0.14 is below `>=3.0.16`: upgrade it to 3.0.16 in the same change.
 - Blockers: none.
 
@@ -167,9 +167,9 @@ metadata:
   name: support-app
 spec:
   sdks:
-    - { language: node, path: ., package: "@rudderstack/ai", version: "0.6.0", extras: [], package_manager: pnpm,
+    - { language: node, path: ., package: "@rudderstack/ai", version: "0.7.0", extras: [], package_manager: pnpm,
         runtime: ">=24 (package.json engines)" }
-    - { language: python, path: ., package: rudderstack-ai, version: "0.6.0", extras: [anthropic], package_manager: uv,
+    - { language: python, path: ., package: rudderstack-ai, version: "0.7.0", extras: [anthropic], package_manager: uv,
         runtime: "3.12 (.python-version)" }
   rudderstack:
     client: existing
@@ -309,7 +309,7 @@ spec:
 
 Values not shown in the example:
 
-- `sdks[].version`: the exact latest release resolved in setup step 2.3 (0.6.0 / v0.2.0 or later). `runtime` for Go: the `go` line of that version's `go.mod`. `extras`: Python extras, or Go integration modules (`[rudderopenai, rudderotel]`). `package_manager`: `npm | pnpm | yarn | bun | uv | poetry | pip | go`.
+- `sdks[].version`: the exact latest release resolved in setup step 2.3 (0.7.0 / v0.3.0 or later). `runtime` for Go: the `go` line of that version's `go.mod`. `extras`: Python extras, or Go integration modules (`[rudderopenai, rudderotel]`). `package_manager`: `npm | pnpm | yarn | bun | uv | poetry | pip | go`.
 - `rudderstack.client`: `existing | new` (new adds `rudder-sdk-node` / `rudder-sdk-python`).
 - `config.capture_content: true` sends prompt, answer and feedback text, score explanations and MCP `call_reason` / `capability_detail` (masked); with a client surface the browser copies may carry prompt and feedback text too, masked the same way, never answer text.
 - `config.labels_set_by`: `classifier` (`classifier.enabled: true`), `app` (the app calls `setIntent` / `setOutcome` or `trackScore`; the Intents and outcomes section names where), `none` (never populated).
