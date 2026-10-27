@@ -42,12 +42,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     existing RudderStack client, wrappers or integrations, one interaction per user turn and one task
     per background run, app-detected failures ended with a status, MCP server wrappers (one per
     endpoint), independent switches for AI and legacy events, bounded flush and shutdown, and browser
-    events on the existing JavaScript SDK. A verify PASS comes before any commit or PR.
+    events on the existing JavaScript SDK. Covers agent loops the app starts without awaiting, cache-write
+    prices, and restoring the `tarball:` URLs pnpm drops from unrelated lockfile entries. A verify PASS
+    comes before any commit or PR.
   - `rudder-ai-events-verify` — offline capture with shipped recorders (Node.js, Python, Go), a mock data
     plane and model server, or an MCP client in the server's production session mode; `check_events.py`
     validates against the AI events v0.3 schema and the client-event schema, joins, counts, identity,
     content, switches and app-detected failures; `what_changes.py` regenerates `## What changes` from
-    captured payloads for the PR body.
+    captured payloads for the PR body. The AI events switch is required; a no-op client stands in only
+    when checking an older instrumentation without one.
 - **CI / dev tooling** — both directory crawlers now run as gates against the
   working tree: cursor.directory's real `parse.ts` (vendored, pinned) via
   `scripts/cursor-preview/preview.mts`, and skills.sh's real `skills` CLI (pinned)
