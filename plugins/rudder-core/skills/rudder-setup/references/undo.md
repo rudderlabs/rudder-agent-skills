@@ -22,11 +22,12 @@ recorded as `keep`: step 1's commits of `.gitignore` lines and of the specs it f
    with its access token before asking again. `nothing to undo` means no run in this clone left a commit to revert
    or a key file to put back.
 2. Run `<dry run> | <record> unexpected`. It prints the dry run, then an `unexpected:` line for each resource the
-   apply would remove that this undo's reverts did not take out of `rudder/`. Before any revert, that is every
-   removal. If it prints an `unexpected:` line, stop and show those lines: the workspace holds CLI-managed resources
-   that `rudder/` does not, such as another project's, and an apply from here would delete them (fact apply-scope).
-   After an earlier attempt's reverts, it expects what they took out, so asking again continues where that attempt
-   stopped.
+   apply would remove that no revert of this undo took out of `rudder/`, and one when the dry run did not end with
+   `exit 0`. Before any revert, every removal is unexpected. If it prints an `unexpected:` line, stop and show those
+   lines: the dry run failed, or the workspace holds CLI-managed resources that `rudder/` does not, such as another
+   project's, and an apply from here would delete them (fact apply-scope). After an earlier attempt's reverts, it
+   expects what those reverts took out, and nothing a later commit removed, so asking again continues where that
+   attempt stopped.
 3. Revert the run's commits: `<record> revert`. It reverts each commit recorded for the undo, newest first, and
    skips the ones an earlier attempt reverted. If `git revert` stops on uncommitted changes, staged ones included,
    ask the user to commit or stash them and say continue, then run it again. If a commit is no longer on the branch,

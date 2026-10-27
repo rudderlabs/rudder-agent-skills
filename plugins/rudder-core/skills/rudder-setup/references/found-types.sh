@@ -88,7 +88,8 @@ if [ "${1-}" = --sdks ]; then
   # the folders to leave out: every other client app's, a node server's, and in a Gradle build with several apps,
   # the other apps' modules. Only folders inside the app's own folder matter.
   own=$dir; [ -z "$mod" ] || own=$(gdir "$dir" "$mod")
-  others=$({ clients line; servers line; } | while read -r t f g; do case $t in (python|go|java|dotnet|php|ruby|rust) continue ;; esac; [ -z "$g" ] || f=$(gdir "$f" "$g"); printf '%s\n' "$f"; done |
+  # globbing back on here: the app list reads gradle/*.versions.toml; it stays off for the include patterns below
+  others=$(set +f; { clients line; servers line; } | while read -r t f g; do case $t in (python|go|java|dotnet|php|ruby|rust) continue ;; esac; [ -z "$g" ] || f=$(gdir "$f" "$g"); printf '%s\n' "$f"; done |
     awk -v d="$dir" -v o="$own" '$0 != o && $0 != d && $0 != "." && (d == "." || index($0, d "/") == 1)')
   grep -rIoE --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=Pods --exclude-dir=build --exclude-dir=vendor --exclude-dir=target --exclude-dir=.venv --exclude-dir=venv $o '@rudderstack/[a-z-]+|rudder-sdk-[a-z-]+|com\.rudderstack\.[a-z.]+|rudder_sdk_flutter|pod .Rudder.|rudderlabs/analytics-go|rudder-php-sdk|rudder_analytics_sync|[Rr]udder[Aa]nalytics|@segment/[a-z-]+|com\.segment\.analytics[a-z.]*|analytics-swift|segment_analytics|pod .Analytics[^A-Za-z]|segment-analytics-python|analytics-python|segmentio/analytics-[a-z]+|analytics-ruby|Segment\.Analytics' "$dir" 2>/dev/null |
     sed 's#^\./##' | O=$others awk 'BEGIN { n = split(ENVIRON["O"], x, "\n") } { k = 1; for (i = 1; i <= n; i++) if (x[i] != "" && index($0, x[i] "/") == 1) k = 0; if (k) print }'
