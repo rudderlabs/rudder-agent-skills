@@ -34,6 +34,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   file into the var file without printing it, and says that a multi-line secret, such as a PEM
   private key, cannot go through the var file yet. It names no destination keys, samples or secret
   names. `rudder-core` 0.0.10.
+- **`rudder-cli` / `rudder-cli-setup`, `rudder-cli-workflow`, `rudder-transformations`,
+  `rudder-import-and-evolve`; `rudder-core` / `rudder-instrumentation-debugging`.**
+  Agents now check auth with `rudder-cli workspace info --json` and read the token
+  from `RUDDERSTACK_ACCESS_TOKEN`. Every place that tells an agent to run
+  `rudder-cli auth login` now says that the command prompts on a terminal, that
+  the agent should ask the user to export the variable instead, and that it must
+  never ask the user to paste a token into the chat. rudder-cli-setup documents
+  that the variable wins over the token saved by `auth login`.
+- **`rudder-cli` / `rudder-cli-workflow`, `rudder-transformations`,
+  `rudder-import-and-evolve`; `rudder-mcp` / `rudder-mcp-workflow`.** Apply
+  commands an agent runs now carry `--confirm=false`. That flag applies with
+  no prompt, and the rudder-cli skills' `allowed-tools` pre-approve
+  `rudder-cli`, so each of these applies says the agent first shows the user
+  the dry run and waits for an explicit yes. The interactive iteration loop in
+  rudder-cli-workflow is labelled as being for a person at a terminal.
+  rudder-import-and-evolve says its reference examples need the same flag and
+  the same yes when an agent runs them. In the multi-workspace flows, an agent
+  checks that `rudder-cli workspace info --json` shows the target workspace ID
+  before each dry run, because `apply` writes to the workspace of the CLI's
+  token. Those flows are rudder-mcp-workflow's Dev and Prod pattern and its
+  Instrumentation Verification Workflow, and the Promote Changes example in
+  rudder-import-and-evolve. The expected ID comes from the user or from the
+  import, never from a spec's `metadata.import`, which a copied spec brings
+  from another workspace. Changing that workspace means the user restarts the
+  agent with that workspace's token. The Promote Changes example now switches
+  workspaces between steps.
+- **`rudder-core` / `rudder-code-first-instrumentation`.** The dev and prod
+  applies in Phase 6 first check that `rudder-cli workspace info --json` shows
+  the target workspace, and the prod step switches the CLI to the prod
+  workspace before it applies.
+- **Versions.** `rudder-cli` 0.0.3 to 0.0.4, `rudder-mcp` 0.0.2 to 0.0.3,
+  `rudder-core` 0.0.6 to 0.0.7.
+
 - **Breaking (repo layout):** renamed the top-level `skills/` directory back to
   `plugins/` (reverting the earlier `plugins/` → `skills/` rename). Each plugin
   lives at `plugins/<plugin>/skills/<skill>/SKILL.md`; marketplace `source` fields
@@ -45,6 +78,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`rudder-cli` / `rudder-cli-setup`, `rudder-typer-workflow`; `docs/installation.md`;
+  `examples/typer-workflow`.** The rudder-cli install instructions now point at
+  files that exist. rudder-cli-setup named raw binaries such as
+  `rudder-cli_darwin_arm64` that no release has. It now downloads rudder-iac's
+  `install.sh` from `main` into a new temporary folder and runs it, and while
+  that answers 404, it installs the latest release's archive (the arm64 build
+  under Rosetta) after checking it against the release's checksums file.
+  Both put `rudder-cli` in `~/.local/bin`. When that folder is not on PATH, the
+  agent runs `"$HOME/.local/bin/rudder-cli"` for the rest of the session, gives
+  the user that path for any rudder-cli command they run, and shows the
+  `export PATH` line in its closing summary, or when it stops earlier. The
+  installation guide named a Homebrew tap that does not exist, the typer example installed
+  `@rudderlabs/rudder-cli` from npm, which does not exist, and
+  rudder-typer-workflow's CI reference used a `rudderstack/setup-rudder-cli`
+  action that does not exist. The guide now gives the same two installs, and
+  both CI examples download the release archive and check its checksum.
+- **`rudder-cli` / `rudder-cli-setup`, `rudder-cli-workflow`, `rudder-transformations`.**
+  Replaced `RUDDER_ACCESS_TOKEN` with `RUDDERSTACK_ACCESS_TOKEN`, the variable
+  rudder-cli reads (rudder-iac `cli/internal/config/config.go:86`).
+- **`rudder-cli` / `rudder-cli-workflow`, `rudder-transformations`.** Removed
+  `rudder-cli plan`, which does not exist; `rudder-cli apply --dry-run` is the
+  plan. Removed `rudder-cli export` from the transformations command table for
+  the same reason.
+- **`rudder-cli` / `rudder-cli-workflow`.** Corrected what `apply` deletes. It
+  plans a delete for every CLI-managed resource (one with an external id) in the
+  workspace that the local project does not declare, across all providers.
+  Resources created in the dashboard have no external id and are never touched.
+  The old text said every remote resource of any kind was deleted.
+
 - **`rudder-profiles` / `rudder-profiles-setup`, `rudder-profiles-update`** —
   quoted the `description` frontmatter. An unquoted `: ` (colon-space) made the
   skills.sh CLI's YAML parser read it as a nested mapping and reject the
@@ -52,6 +114,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`rudder-cli` / `rudder-cli-workflow`, `rudder-transformations`.** A
+  "Variables and secrets" section on `--var-file` for `validate` and `apply`:
+  `{{ .NAME }}` references in single quotes, doubling a `'` inside a value, the
+  `.vars.yaml` / `.vars.yml` name rule, later files winning, `RUDDER_<NAME>`
+  environment variables winning over files, the
+  `error[project/var-substitution]` failure, git-ignoring the var file, and that
+  substitution is on by default only from rudder-cli 0.25.0. The var file's
+  one-line values are single-quoted too, since YAML reads `\` as an escape
+  inside double quotes, and a `'` in a value is written as four inside those
+  quotes. A multi-line value, such as a PEM key, goes in a `|` block with each
+  `'` written as `''`, since single quotes would turn its line breaks into
+  spaces; up to rudder-cli 0.28.0 the spec's quotes still do. The recipe
+  filters the output of `validate`, the dry run, apply and
+  `transformations test`, since each shows a diagnostic's source line after
+  substitution, secrets included, whether the value comes from a var file or a
+  `RUDDER_<NAME>` variable. Each filter drops every diagnostic's whole source
+  block, so every line of a multi-line value is dropped too, and keeps the
+  error lines, the plan and the test results. The filtered apply is in Step 3,
+  apart from the others, so it runs only after a dry run that exits 0 and the
+  user's yes.
+  rudder-transformations says `transformations test` needs the same
+  `--var-file` flags and the same filter.
+- **`rudder-mcp` / `rudder-mcp-setup`, `rudder-mcp-workflow`.** OAuth setup
+  uses Claude Code's native HTTP transport:
+  `claude mcp add --transport http rudderstack https://mcp.rudderstack.com/mcp`,
+  then `/mcp` and Authenticate, with no `npx` or `mcp-remote`. OAuth is the
+  route for people and coding agents alike. The access-token route,
+  `https://mcp.rudderstack.com/bearer-auth-mcp` with `Authorization: Bearer
+  <token>` and `X-Workspace-ID` headers referenced as
+  `${RUDDERSTACK_ACCESS_TOKEN}` in `.mcp.json`, is documented for sessions that
+  cannot open a browser. The skills say that route has no `user_details` or
+  `user_switch_workspace` tool. A "Choose the workspace" section in
+  rudder-mcp-workflow tells an agent on the OAuth route to pass the workspace
+  ID as `workspace_id` when the workspace tools take that argument, and to call
+  `user_switch_workspace` when they do not. The MCP server is replacing
+  `user_switch_workspace` with a `workspace_id` argument on every workspace
+  tool, so the guidance works with both versions. When `claude mcp list`
+  already shows a server at `https://mcp.rudderstack.com/mcp`, as
+  `plugin:rudder-core:rudderstack` or under any other name, both skills
+  authenticate that entry instead of adding a second server, and they give the
+  plugin entry's name for `claude mcp login` and `claude mcp logout`.
+  rudder-mcp-workflow also uses an entry at
+  `https://mcp.rudderstack.com/bearer-auth-mcp` as it is, since adding a server
+  under the name a project's `.mcp.json` already uses hides that entry. With the
+  access-token route, rudder-mcp-setup says to disable that entry for the
+  folder in `/mcp`, since its different URL would leave both servers listed.
+  rudder-mcp-setup's `allowed-tools` pre-approves only the OAuth
+  `claude mcp add` command, so the access-token command waits for the user's
+  approval. Its troubleshooting table maps `403` `insufficient_scope` to a
+  wrong `X-Workspace-ID`, `401` `bearer token authentication failed` to a
+  token that expired or was revoked, and `401`
+  `bearer token authorization failed` to a token refused during the workspace
+  lookup.
 - **`rudder-core` carries the RudderStack MCP server** — `plugins/rudder-core/.mcp.json`
   declares `rudderstack`, an HTTP server at `https://mcp.rudderstack.com/mcp` with no headers.
   Installing the plugin connects MCP; the client asks the user to sign in to RudderStack in the
@@ -98,8 +213,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lines, which print secret values. The skill needs rudder-cli 0.26.0 or later, the first release
   that accepts its destination specs without experimental flags, and step 1 installs the latest
   release when the copy it finds is older. Step 7 needs 0.29.0 or later and is skipped on an older
-  one; its one-call recipe exits 5 when the app cannot start, and both recipes exit 3 when the
-  listener stops during a check. Step 8 builds the curl event
+  one; its one-call recipe exits 5 when the app cannot start or anything accepts a connection on its
+  port, and both recipes exit 3 when the listener stops during a check. Step 7 counts only events
+  that arrive after its mark, so it takes the mark before the app can send one, and launches a
+  mobile app after it. Step 8 builds the curl event
   from the plan. Step 1 downloads the installer into a new temporary folder. While the installer
   is unpublished, it runs a script shipped with the skill instead, which installs the latest
   release's archive (the arm64 build under Rosetta) after checking it against the release's
@@ -109,14 +226,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rudder-cli command they run. Step 9's summary shows the `export PATH` line for the user's shell
   profile, and so does any stop before step 9.
   Step 2 runs a probe that names the app's source type: Flutter and React Native first, because
-  their apps also hold `android/` and `ios/` folders, then Android (`android_kotlin`), iOS
+  their apps also hold `android/` and `ios/` folders, which they claim without hiding the other apps
+  in the repository, then Android (`android_kotlin`), iOS
   (`ios_swift`, from an Xcode project or a Podfile), web, and only then server languages; a
   `Package.swift` or a `package.json` alone makes it ask. When it finds several apps, of one type or
   several, it lists each with its folder and asks which one sends events, and an app in a subfolder
   gets its `.env.local` and its build commands in that folder; when it finds none it asks "What
   will send events to RudderStack?", the question step 1 asks outside an app, now defined once. It
-  also lists the RudderStack and Segment SDKs the dependencies name, the legacy Android (Java) and
-  iOS (Objective-C) SDKs included. New Android (Kotlin SDK) and iOS (Swift SDK) references add the
+  also lists the RudderStack and Segment SDKs the dependencies name, in the manifests of the client
+  apps and of every server language, the legacy Android (Java) and iOS (Objective-C) SDKs included. New Android (Kotlin SDK) and iOS (Swift SDK) references add the
   dependency, keep the write key out of git, load the SDK once and give each agreed event a typed
   function, in Kotlin or Java and in Swift or Objective-C. Step 7 checks a mobile app on an Android
   emulator (`10.0.2.2`) or the iOS Simulator, or is skipped without one, and step 8 runs the app
@@ -140,14 +258,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the same session or a later one: it puts back each file that still holds what step 6 wrote,
   deletes the ones step 6 created, and asks before replacing a file the user changed since. It then
   drops its copies of each file it dealt with, so a later onboarding saves the file as it is then.
-  The undo starts with a dry run and stops if it would remove anything, because the workspace then
+  The undo runs only when the user asks for it, never as part of step 9's summary.
+  It starts with a dry run and stops if it would remove anything, because the workspace then
   holds resources that `rudder/` does not, such as another project's. After its reverts it stops
   again if the dry run would remove a resource that the reverts did not take out of `rudder/`,
   comparing kind and id, since ids are unique only per kind.
   Every validate, dry run and apply runs through a filter that keeps only the lines
   rudder-cli is known to print, because validate shows the spec line a message is about with secrets
   filled in, and a multi-line secret runs over several lines. Step 8's probe reads only its two
-  values from `.env.local`, as dotenv reads them, and never runs the file as shell. It gives each
+  values from `.env.local`, both under the prefix of the names step 6 wrote, as dotenv reads them,
+  and never runs the file as shell. It stops 5 minutes after it starts, however slow each answer is. It gives each
   request 10 seconds, stops on any status but 400, 2xx and 401, and prints the data plane's answer,
   so a disabled source (404), a rate limit (429) or a server error is not taken for a wrong data
   plane URL; it reruns for those a bounded number of times. The curl send waits until the probe
@@ -161,10 +281,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Step 9 copies `rudder/` to the app without the var file. A site without a
   build keeps its write key in the page. A mobile app skips step 7 in an agent that stops background
   processes, and reruns after a listener or app failure are bounded. When `claude mcp list` shows a
-  server at `https://mcp.rudderstack.com/mcp`, under any name, the rudder-core plugin's included,
-  step 1 has the user authenticate it instead of adding a second one.
+  server at `https://mcp.rudderstack.com/mcp` or `https://mcp.rudderstack.com/bearer-auth-mcp`,
+  under any name, the rudder-core plugin's included, step 1 uses it instead of adding a second one.
+  The user authenticates an `/mcp` server. A `/bearer-auth-mcp` server needs
+  `RUDDERSTACK_ACCESS_TOKEN` in the agent's shell, and step 1 checks with `get_workspace_settings`
+  that its `X-Workspace-ID` header names the CLI's workspace.
   The measured facts, step 2's probe and the Flutter, React Native and Unity notes are references
-  beside SKILL.md.
+  beside SKILL.md. `rudder-core` 0.0.7 to 0.0.8.
 
 - **`rudder-ai-events`** — new plugin that onboards an existing app to RudderStack AI events
   (spec v0.3) with the `@rudderstack/ai` (Node.js), `rudderstack-ai` (Python) and `ai-sdk-go` (Go)

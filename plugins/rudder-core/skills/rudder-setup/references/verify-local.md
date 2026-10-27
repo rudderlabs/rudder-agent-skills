@@ -80,7 +80,10 @@ apps"), and server SDKs must flush before the process exits.
 
 ### 3. Mark the start of each pass
 
-Run this before every pass, the first one included, and keep the three numbers it prints:
+Run this before every pass, the first one included, and keep the three numbers it prints. The check counts only
+what arrives after the mark, so take it before the app can send a planned event, such as one it sends when it
+starts. A dev server sends nothing until a page loads, so it can start first. A mobile app that you launch, or a
+server that sends an event when it starts, starts after the mark (see "Mobile apps"):
 
 ```sh
 d='<D>'; url='<URL>'
@@ -89,7 +92,8 @@ echo "FROM=$(( $(wc -l <"$d/events") )) LOGFROM=$(( $(wc -l <"$d/log") )) CUR=$(
 ```
 
 FROM and LOGFROM are line counts, so the check reads only what arrives after them. CUR is the listener's own
-cursor, for the diagnosis. Then ask the user to go through the flows and say done.
+cursor, for the diagnosis. Then ask the user to go through the flows and say done. On a later pass, ask them to
+reload the page, or to close the app and open it again, so the events it sends on start come after the new mark.
 
 ### 4. Check
 
@@ -137,7 +141,7 @@ line with the app's own start command, pointed at `$url`, on `$port`.
 export RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_SOURCES_LISTEN=true
 check='<CHECK>'; port=5199; wait_s=300
 rudder-cli sources listen --help >/dev/null 2>&1 || { rudder-cli --version; echo 'this rudder-cli has no sources listen'; exit 4; }
-! curl -s -o /dev/null --max-time 2 "http://localhost:$port" || { echo "port $port is in use. Stop what serves it, or set port to a free one and tell the user"; exit 5; }
+curl -s -o /dev/null --max-time 2 "http://localhost:$port"; [ $? -eq 7 ] || { echo "port $port is in use. Stop what holds it, or set port to a free one and tell the user"; exit 5; }
 d=$(mktemp -d)
 rudder-cli sources listen --port 0 --store >"$d/events" 2>"$d/log" &
 pid=$!; app=
@@ -169,7 +173,9 @@ curl -fsS "$url/_dev/v1/events?view=counts" | jq -c '.summary.diagnosis[] | {cod
 exit 1
 ```
 
-The exit codes are the same as in the two-call recipe. The listener and the app stop when the call ends, also
+The port check passes only when curl cannot connect at all (exit 7), so a process that holds the port without
+answering HTTP, or answers slowly, counts as in use, even with a start command that has no `--strictPort`. The
+exit codes are the same as in the two-call recipe. The listener and the app stop when the call ends, also
 when the agent interrupts it. If the agent kills the call outright, they keep running. Stop them with
 `kill <PID> <APP>`, from the numbers the call printed first. For another pass, fix the code and run the whole
 call again.
@@ -194,8 +200,8 @@ machine's loopback, so step 7 is skipped for it.
      ```
 
      Gradle properties win over `.env.local`, and the debug build allows plain HTTP to `10.0.2.2` (Android
-     instrumentation reference). Ask the user to open the app from the emulator's app drawer, not with Run in
-     Android Studio, which builds it again with the real values from `.env.local`.
+     instrumentation reference). Ask the user to open the app from the emulator's app drawer after the mark, not
+     with Run in Android Studio, which builds it again with the real values from `.env.local`.
    - **iOS Simulator.** The simulator shares this machine's loopback, so the URL is `http://127.0.0.1:4321`. Build
      the debug build and install it on a booted simulator without launching it, for example with `xcodebuild -scheme
      '<scheme>' -destination 'generic/platform=iOS Simulator' -derivedDataPath '<D>/xcode' build` and `xcrun simctl
@@ -205,14 +211,16 @@ machine's loopback, so step 7 is skipped for it.
      ask the user to use it without pressing Run again. `<bundle id>` is the target's `PRODUCT_BUNDLE_IDENTIFIER`.
      Read it with `xcodebuild -scheme '<scheme>' -showBuildSettings | grep -m1 ' PRODUCT_BUNDLE_IDENTIFIER ='`, and
      never show `-showBuildSettings` output unfiltered, because it prints the write key from
-     `RudderStack.local.xcconfig`. The launch command:
+     `RudderStack.local.xcconfig`. Run the mark (section 3) first, then the launch command, and launch again after
+     each new mark, because an event the app sends at launch can arrive before the next call:
 
      ```sh
      SIMCTL_CHILD_RUDDERSTACK_WRITE_KEY=dev SIMCTL_CHILD_RUDDERSTACK_DATA_PLANE_URL=http://127.0.0.1:4321 SIMCTL_CHILD_RUDDERSTACK_CONTROL_PLANE_URL=http://127.0.0.1:4321 xcrun simctl launch --terminate-running-process booted '<bundle id>'
      ```
 
    - **Flutter and React Native.** Set the SDK's data plane and control plane URLs to the same addresses in a debug
-     build, as the SDK's documentation shows, and start the app on the emulator or simulator. Both platforms refuse
+     build, as the SDK's documentation shows, and start the app on the emulator or simulator after the mark, and
+     again after each new mark. Both platforms refuse
      plain HTTP unless the app allows it. A Flutter app needs the debug network config from the Android
      instrumentation reference under `android/app/src/debug/`, and the plain HTTP setting from the iOS
      instrumentation reference in `ios/Runner/Info.plist`, each with that reference's check of what the app already
