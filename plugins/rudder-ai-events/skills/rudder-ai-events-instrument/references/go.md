@@ -158,6 +158,25 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 ```
 
 - `StartInteraction(ctx, opts)` returns `(ctx, *Interaction)` for code that cannot use a callback; call `in.End(rudderstackai.EndOptions{})` when the answer is out.
+- An agent loop the handler starts in a goroutine and does not wait for: run `RunInteraction` inside the goroutine, around the code that builds the agent and the loop, so the model calls of both land in the turn. Detach it from the request's cancellation (`context.WithoutCancel`, which keeps the identity values) and mint the ID in the handler so it can return it at once:
+
+  ```go
+  interactionID := uuid.NewString()
+  go func(ctx context.Context) {
+  	err := rudderstackai.RunInteraction(ctx, rudderstackai.InteractionOptions{
+  		ConversationID: body.ConversationID, InteractionID: interactionID, Feature: "support_bot",
+  	}, func(ctx context.Context, in *rudderstackai.Interaction) error {
+  		agent := buildAgent(ctx, params) // the factory runs inside the interaction
+  		return runAgentLoop(ctx, agent)  // the answer ends when the loop returns; an error fails it
+  	})
+  	if err != nil {
+  		logger.Error("agent loop", "err", err) // the app's existing handling
+  	}
+  }(context.WithoutCancel(ctx))
+  w.WriteHeader(http.StatusAccepted) // and return interactionID in the body
+  ```
+
+  Calls made after the interaction ends are reported as separate answers; a loop still open at `Shutdown(ctx)`, or past `Limits.InteractionTTL` (1 hour by default), ends as `incomplete`.
 - Streams: read them inside the `RunInteraction` function (`defer stream.Close()`); there is no `bind`, and a stream still open when the function returns is recorded as cancelled.
 - App-detected failures: an error returned from the function already sets the status (`context.Canceled`: `cancelled`). When the app handles its own failure and returns `nil` (stop button, empty stream, its own deadline, a lost lease), end the answer there, inside the function: `in.End(rudderstackai.EndOptions{Status: rudderstackai.StatusError, ErrorType: "empty_response"})` (`StatusCancelled`, `StatusTimeout`, `StatusIncomplete` likewise). App-only error codes go in `ExtraProperties`. `RunInteraction`'s own `End` afterwards is a no-op.
 - `client_disconnected` is detected only under `Middleware`; `paused` never is. Otherwise call `in.End(EndOptions{ClientDisconnected: true})` or `in.End(EndOptions{Status: rudderstackai.StatusPaused, PauseReason: ...})` from the app's own handling, inside the function.
@@ -233,7 +252,7 @@ err := rudderstackai.Configure(
 
 - `WithClassifier` only with `labels_set_by: classifier`. With `labels_set_by: app`, call `in.SetIntent(label)` / `in.SetOutcome(label)` inside the interaction with the app's own category or outcome, mapped to the plan's lists.
 - Scores from elsewhere: `rudderstackai.TrackScore(ctx, rudderstackai.TrackScoreOptions{Score: rudderstackai.Score{EvaluationName: "groundedness", ScoreValue: &v, Evaluator: rudderstackai.EvaluatorModel}, InteractionID: iid, ConversationID: cid})`.
-- Prices: `TierMultipliers`, `LongContext`, `ServerToolPerCall` and `CacheWrite1hPerMtok` as the plan lists. Gemini API (`gcp.gemini`) and Vertex AI (`gcp.vertex_ai`, also Anthropic on Vertex AI) are priced separately: a price with `Provider` covers that one only, a price without covers both (`google` and `google.vertex` still work as aliases). Azure deployments: `WithAzureDeploymentModels`.
+- Prices: `CacheWritePerMtok` (cache writes; nil prices them at `InputPerMtok`), `TierMultipliers`, `LongContext`, `ServerToolPerCall` and `CacheWrite1hPerMtok` as the plan lists. Gemini API (`gcp.gemini`) and Vertex AI (`gcp.vertex_ai`, also Anthropic on Vertex AI) are priced separately: a price with `Provider` covers that one only, a price without covers both (`google` and `google.vertex` still work as aliases). Azure deployments: `WithAzureDeploymentModels`.
 
 ## 9. trace_id
 

@@ -104,7 +104,7 @@ interaction.recordCall({ // the aiInteraction / aiTask callback's interaction, o
 });
 ```
 
-Claude Agent SDK: construct `query()` inside the `aiInteraction` / `aiTask` callback, not before it, or in-process MCP tools and hooks are counted outside the interaction.
+Claude Agent SDK: construct `query()` inside the `aiInteraction` / `aiTask` callback, not before it, or in-process MCP tools and hooks are counted outside the interaction. A loop the app starts without awaiting: section 4.
 
 `requested_model` needs no code: the OpenAI, Anthropic, Google Gen AI and Vercel AI SDK integrations send it, streamed or not, when a router or fallback served another model than the one requested; a dated snapshot of the requested model (`claude-haiku-4-5` served as `claude-haiku-4-5-20251001`) is the same model and sends none.
 
@@ -156,6 +156,24 @@ const completion = await aiInteraction(
 );
 ```
 
+An agent loop the route starts without awaiting (it answers `202` and the loop posts results later, often with `query()` built in a factory): open the interaction around the factory call and return the loop's promise from the callback. The interaction then stays open until the loop settles, and the model calls made in the factory and the loop land in the turn. The callback runs before `aiInteraction` returns, so the ID is set for the response:
+
+```ts
+// before: const q = buildAgentQuery(params); void runAgentLoop(q); res.status(202).json({ conversationId });
+let interactionId: string | undefined;
+void aiInteraction(
+  { userId: req.user?.id, conversationId, feature: 'support_bot', surface: 'web', inputMethod: 'text' },
+  (interaction) => {
+    interactionId = interaction.id;
+    const q = buildAgentQuery(params); // the factory runs inside: in-process MCP tools and hooks count too
+    return runAgentLoop(q); // the loop's promise: the answer ends when it settles, an error fails it
+  },
+).catch((err) => logger.error(err)); // the app's existing handler for the detached loop
+res.status(202).json({ conversationId, interactionId });
+```
+
+Never end the interaction when the route responds: calls the loop makes after the end are reported as separate answers. A loop still open at `shutdown()`, or past `limits.interactionTtlMs` (1 hour by default), ends as `incomplete`.
+
 A route written from scratch (non-streaming):
 
 ```ts
@@ -206,7 +224,7 @@ res.end();
 // Express + Vercel AI SDK: stream: interaction.bind(toUIMessageStream({ stream: result.stream }))
 ```
 
-Claude Agent SDK with resumed sessions: store `usageSnapshot(resultMessage)` with the session and pass it back as `usageBaseline`, or each resumed turn re-counts the whole session. When the snapshot cannot be stored, pass `resumed: true` to `trackMessages`: tokens then come from the turn's own messages and cost only from registered prices (section 10).
+Claude Agent SDK with resumed sessions: store `usageSnapshot(resultMessage)` with the session and pass it back as `usageBaseline`, or each resumed turn re-counts the whole session. When the snapshot cannot be stored, pass `resumed` to `trackMessages` for a session the turn resumes or continues, `resumed: !!options.resume || options.continue === true` (the two `query()` options `trackedQuery` checks itself): tokens then come from the turn's own messages and cost only from registered prices (section 10).
 
 ## 5. Feedback and other actions (server copy)
 
@@ -340,6 +358,7 @@ configure({
       // tierMultipliers: { batch: 0.5, flex: 0.5, fast: 2 },
       // longContext: { thresholdTokens: 200000, inputPerMtok: 6, outputPerMtok: 22.5 },
       // serverToolPerCall: { web_search: 0.01 },
+      // cacheWritePerMtok: 3.75, // cache writes; without it they are priced at inputPerMtok
       // cacheWrite1hPerMtok: 6,
     },
   },

@@ -82,7 +82,7 @@ When a router or fallback serves another model than the one requested, the OpenA
 | Google Gen AI | `wrap_google_genai(genai.Client(...))` from `rudderstack.ai.google_genai` (provider `gcp.gemini`, or `gcp.vertex_ai` for a `vertexai=True` client) |
 | Bedrock | `wrap_bedrock(boto3.client("bedrock-runtime", region_name=...))` from `rudderstack.ai.bedrock`: tracks `converse` / `converse_stream`; `invoke_model` is not tracked (`record_call` below) |
 | LangChain / LangGraph / Deep Agents | `handler = RudderStackCallbackHandler(agent_name="support_agent")` from `rudderstack.ai.langchain`; add it to the run's `config={"callbacks": [handler]}`, never to a model constructor; tag agents with `"tags": ["agent:<name>"]` |
-| Claude Agent SDK | `tracked_query(prompt=..., options=..., user_id=..., conversation_id=...)` from `rudderstack.ai.claude_agent_sdk` instead of `query()`; `ClaudeSDKClient`, an app-owned `query()` chokepoint, or tests that patch `claude_agent_sdk.query` (`tracked_query` imported its own reference): `async for m in tracked_messages(query(...), user_id=..., conversation_id=...)`. Resumed sessions across processes: store `usage_snapshot(result_message)` with the session and pass it back as `usage_baseline=`, or a resumed turn counts the whole session; when it cannot be stored, `tracked_messages(..., resumed=True)` counts the turn from its own messages, with cost only from registered prices. Call `query()` inside the `ai_interaction` / `ai_task`, or in-process MCP tools and hooks are counted outside it. Known limit: usage is read only from the `ResultMessage`, so a turn that raises after the model answered reports `llm_call_count: 0` and no tokens |
+| Claude Agent SDK | `tracked_query(prompt=..., options=..., user_id=..., conversation_id=...)` from `rudderstack.ai.claude_agent_sdk` instead of `query()`; `ClaudeSDKClient`, an app-owned `query()` chokepoint, or tests that patch `claude_agent_sdk.query` (`tracked_query` imported its own reference): `async for m in tracked_messages(query(...), user_id=..., conversation_id=...)`. Resumed sessions across processes: store `usage_snapshot(result_message)` with the session and pass it back as `usage_baseline=`, or a resumed turn counts the whole session; when it cannot be stored, `tracked_messages(..., resumed=bool(options.resume or options.continue_conversation))` (the two `ClaudeAgentOptions` fields `tracked_query` checks itself) counts a resumed or continued turn from its own messages, with cost only from registered prices. Call `query()` inside the `ai_interaction` / `ai_task`, or in-process MCP tools and hooks are counted outside it; a loop the app starts without awaiting: section 4. Known limit: usage is read only from the `ResultMessage`, so a turn that raises after the model answered reports `llm_call_count: 0` and no tokens |
 | OpenAI Agents SDK | `await tracked_run(agent, input, tracking={"user_id": ..., "feature": ...})` from `rudderstack.ai.openai_agents` (`tracked_run_sync`, `tracked_run_streamed` for `Runner.run_sync` / `run_streamed`); keep Agents SDK tracing on (the default): agents used as tools and `tool_breakdown`'s `mcp_server` for an agent's MCP tools come from its trace spans |
 | LiteLLM SDK | `instrument_litellm()` once at startup, from `rudderstack.ai.litellm` |
 | Anything else | inside the interaction: `interaction.record_call(provider=..., model=..., input_tokens=..., output_tokens=..., response_id=...)` |
@@ -143,6 +143,21 @@ def chat(body: ChatRequest, request: Request, user: User = Depends(current_user)
 ```
 
 - `interaction_id_source: app`: mint or read the app's per-answer ID before `ai_interaction` (move it up if it is minted after the model call) and pass it as `interaction_id`.
+- An agent loop the route starts without awaiting (`asyncio.create_task`, a thread, often with `query()` built in a factory): open the interaction inside the started coroutine, around the factory call and the loop, so the model calls of both land in the turn. Mint the ID in the route so it can return it at once; the task copies the request's context:
+
+  ```python
+  async def _agent_turn(interaction_id: str, params) -> None:
+      async with ai_interaction(user_id=user.id, conversation_id=params.conversation_id,
+                                interaction_id=interaction_id, feature="support_bot", surface="web"):
+          q = build_agent_query(params)  # the factory runs inside the interaction
+          await run_agent_loop(q)  # the answer ends when the loop does; an exception fails it
+
+  interaction_id = str(uuid.uuid4())
+  task = asyncio.create_task(_agent_turn(interaction_id, params))  # keep the app's existing task reference and error handling
+  return JSONResponse({"interaction_id": interaction_id}, status_code=202)
+  ```
+
+  A thread pool: submit `propagate(_agent_turn_sync)` (section 6) with the same structure. Calls made after the interaction ends are reported as separate answers; a loop still open at `shutdown()`, or past `limits.interaction_ttl_ms` (1 hour by default), ends as `incomplete`.
 - Exceptions propagate unchanged and fail the answer; keep the route's error handling.
 - `surface` (`web`, `mobile`, `slack`, `teams`, `email`, `chatgpt_app`, `claude_app`, `ide`, `api`, `other`) comes from the plan; `ai_context(surface=...)` sets it for a whole request.
 - Attachments: `attachment_count=` and `attachment_types=[...]` (`image`, `audio`, `video`, `pdf`, `file`); never names or content.
@@ -270,7 +285,7 @@ rudderstack.ai.configure(
 )
 ```
 
-Only the keys the plan enables; `classifier` only with `labels_set_by: classifier`. With `labels_set_by: app`, call `interaction.set_intent(label)` / `interaction.set_outcome(label)` inside the interaction with the app's own category or outcome, mapped to the plan's lists. Event names starting with `ai_` or `mcp_` are reserved. Price options the plan may list, through `rudderstack.ai.register_price(model, ...)`: `tier_multipliers={"batch": 0.5, "flex": 0.5, "fast": 2}`, `long_context={"threshold_tokens": 200_000, "input_per_mtok": ..., "output_per_mtok": ...}`, `server_tool_per_call={"web_search": 0.01}`, `cache_write_1h_per_mtok=`. Service tier, 1-hour cache writes and hosted tool calls are read from responses automatically. Gemini API calls report provider `gcp.gemini`, Vertex AI calls `gcp.vertex_ai`, priced separately: register each provider the app calls with `provider=` (`google` / `google.vertex` are accepted aliases).
+Only the keys the plan enables; `classifier` only with `labels_set_by: classifier`. With `labels_set_by: app`, call `interaction.set_intent(label)` / `interaction.set_outcome(label)` inside the interaction with the app's own category or outcome, mapped to the plan's lists. Event names starting with `ai_` or `mcp_` are reserved. Price options the plan may list, through `rudderstack.ai.register_price(model, ...)`: `tier_multipliers={"batch": 0.5, "flex": 0.5, "fast": 2}`, `long_context={"threshold_tokens": 200_000, "input_per_mtok": ..., "output_per_mtok": ...}`, `server_tool_per_call={"web_search": 0.01}`, `cache_write_per_mtok=` (cache writes; without it they are priced at `input_per_mtok`), `cache_write_1h_per_mtok=`. Service tier, 1-hour cache writes and hosted tool calls are read from responses automatically. Gemini API calls report provider `gcp.gemini`, Vertex AI calls `gcp.vertex_ai`, priced separately: register each provider the app calls with `provider=` (`google` / `google.vertex` are accepted aliases).
 
 A score computed elsewhere (a human review, an offline judge):
 

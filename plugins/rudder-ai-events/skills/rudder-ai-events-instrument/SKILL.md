@@ -1,7 +1,7 @@
 ---
 name: rudder-ai-events-instrument
 description: "Adds RudderStack AI events code from an approved ai-events.md plan: installs @rudderstack/ai, rudderstack-ai or ai-sdk-go, wraps model clients and MCP servers, opens interactions and tasks, wires feedback and browser events. Use when implementing an approved AI events plan."
-allowed-tools: "Bash(npm *), Bash(npx *), Bash(pnpm *), Bash(yarn *), Bash(bun *), Bash(node *), Bash(uv *), Bash(poetry *), Bash(pip *), Bash(python *), Bash(python3 *), Bash(pytest *), Bash(go get *), Bash(go mod tidy), Bash(go list *), Bash(go build *), Bash(go vet *), Bash(go test *), Bash(git status), Bash(git diff), Bash(git diff *), Bash(git switch -c *), Read, Write, Edit, Glob, Grep"
+allowed-tools: "Bash(npm *), Bash(npx *), Bash(pnpm *), Bash(yarn *), Bash(bun *), Bash(node *), Bash(uv *), Bash(poetry *), Bash(pip *), Bash(python *), Bash(python3 *), Bash(pytest *), Bash(go get *), Bash(go mod tidy), Bash(go list *), Bash(go build *), Bash(go vet *), Bash(go test *), Bash(git status), Bash(git diff), Bash(git diff *), Bash(git show *), Bash(git switch -c *), Read, Write, Edit, Glob, Grep"
 ---
 
 # RudderStack AI Events Instrumentation
@@ -20,7 +20,7 @@ Turns the approved plan into the smallest reviewable diff, for AI events spec v0
 Before writing code, check that the pinned version installs as is:
 
 - **Latest release**: resolve it from a scratch directory outside the repo (inside a repo with `devEngines`, `npm view` fails with `EBADDEVENGINES`): `npm view @rudderstack/ai version`, `pip index versions rudderstack-ai`, `go list -m -versions github.com/rudderlabs/ai-sdk-go` (each Go integration module, `.../rudderopenai`, `.../rudderotel`, ..., has its own tags). Newer than the plan: say so in one line and install the plan's version.
-- **Release-age gates**: pnpm `minimumReleaseAge` / `minimumReleaseAgeExclude` (`pnpm-workspace.yaml`), npm `min-release-age` / `before` (`.npmrc`), uv `exclude-newer` (`pyproject.toml` `[tool.uv]`, `uv.toml`). A gate that blocks the version: add the exemption the plan's `## Dependencies and blockers` lists (only the SDK package, with a comment that says why and the removal date); a gate the plan does not list is a plan change.
+- **Release-age gates**: pnpm `minimumReleaseAge` (minutes) / `minimumReleaseAgeExclude` (`pnpm-workspace.yaml`), npm `min-release-age` / `before` (`.npmrc`), uv `exclude-newer` (`pyproject.toml` `[tool.uv]`, `uv.toml`). A gate that blocks the version: add the exemption the plan's `## Dependencies and blockers` lists (only the SDK package, with a comment that says why and the removal date); a gate the plan does not list is a plan change.
 - **Registries**: scoped or mirrored registries (`.npmrc`, pip `index-url`, uv indexes, `GOPROXY`) must serve the version. The SDKs are public on npm, PyPI and proxy.golang.org: no `GOPRIVATE`, no git credentials. Expired registry auth: ask the user to log in, never write tokens.
 - **Peer ranges**: the SDK's peer or extra range for each provider, framework and MCP SDK the plan lists against the app's installed version. Out of range: stop; it is a plan blocker, not a bump. Node.js: `@rudderstack/ai` needs `@rudderstack/rudder-sdk-node` `>=3.0.16` (npm fails with `ERESOLVE` on older); upgrading the app's client is a plan change for the user, never `--legacy-peer-deps` or `--force`.
 - **Go toolchain**: the minimum is the plan's `sdks[].runtime` (the `go` line of the pinned version's `go.mod`). An app below it gets its `go` line raised by `go get`: name that in `## What changes`; a toolchain its CI cannot run is a blocker.
@@ -39,7 +39,20 @@ Do one surface at a time; after each, run the app's type check (and its tests wh
    go get github.com/rudderlabs/ai-sdk-go@<VERSION>           # plus one module per provider at its own version
    ```
 
-   Other managers: section 1 of the recipe files. Never add a version range, and never bump the app's own LLM libraries. Add the RudderStack server client (`@rudderstack/rudder-sdk-node`, `rudder-sdk-python`, `analytics-go/v4`, at its latest release) only when the plan says `client: new`. Then `git diff` the lockfile: only the SDK and what it pulls may change. Unrelated churn (rewritten `tarball:` / `resolved` URLs, reordered entries) means a different package-manager version: rerun with the repo's; if it persists, stop and show the user the churn.
+   Other managers: section 1 of the recipe files. Never add a version range, and never bump the app's own LLM libraries. Add the RudderStack server client (`@rudderstack/rudder-sdk-node`, `rudder-sdk-python`, `analytics-go/v4`, at its latest release) only when the plan says `client: new`. Then `git diff` the lockfile: only the SDK and what it pulls may change. pnpm drops the `tarball:` URL from unrelated `resolution` entries (packages from a registry with a non-default tarball path, such as a private one) on every install, whatever its version: restore them rather than stopping, keyed by `integrity`:
+
+   ```bash
+   git show HEAD:pnpm-lock.yaml > "$TMPDIR/pnpm-lock.before.yaml"
+   python3 - "$TMPDIR/pnpm-lock.before.yaml" pnpm-lock.yaml <<'PY'
+   import re, sys
+   tarballs = dict(re.findall(r"integrity: (\S+?), tarball: (\S+?)\}", open(sys.argv[1]).read()))
+   lock = open(sys.argv[2]).read()
+   restore = lambda m: f"integrity: {m[1]}, tarball: {tarballs[m[1]]}}}" if m[1] in tarballs else m[0]
+   open(sys.argv[2], "w").write(re.sub(r"integrity: (\S+?)\}", restore, lock))
+   PY
+   ```
+
+   Other unrelated churn (rewritten `resolved` URLs, reordered entries) means a different package-manager version: rerun with the repo's; if it persists, stop and show the user the churn.
 2. **Configure once** in a module that runs before the first request or job: next to the RudderStack client, at module level, works when the app imports it at startup. `configure({ analytics })` with the existing client (Go: `rudderstackai.Configure(rudderstackai.WithAnalytics(client), ...)`), plus the `spec.config` keys that are `configure()` options (Node.js camelCase, Go `With*` options). `intents` / `outcomes` go only into the classifier. `captureContent` stays `false` unless the plan says otherwise. Put it behind the AI events switch (step 13).
 3. **Wrap the model client or add the framework integration** at its construction site, per the surface's `integration`. Call sites keep working unchanged. Calls no integration covers (Bedrock `InvokeModel`, other providers): `recordCall` / `record_call` / `RecordCall` inside the interaction (recipe section 3).
 4. **Chat surfaces**: identity middleware (`aiContextMiddleware`, `withAiContext`, `AIContextMiddleware`, Django/Flask middleware; Go: `rudderstackai.Middleware` around the handlers, or `rudderstackai.WithValues(ctx, ContextValues{Request: r, ...})`) or `request` / `cookies` on the interaction; then one `aiInteraction` / `ai_interaction` / `RunInteraction` per user turn at the entry point. Wrap only the model-call part of the handler when the rest (history, legacy event, response) needs its result. Pass `userId`, `conversationId`, `feature`, `surface`, and `interactionId` when the plan's `interaction_id_source` is `client` (validated UUID) or `app`. Streams: return them from the callback or `bind()` them (Go: read them inside the `RunInteraction` function). Always return the ID the interaction used to the client.
