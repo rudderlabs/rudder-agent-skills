@@ -10,6 +10,8 @@ Proves the instrumentation sends what `ai-events.md` promises, before any real t
 
 The checker (`check`, `what-changes`), the recorders and both schemas ship with the SDKs, `@rudderstack/ai` / `rudderstack-ai` 0.7.0 or later and `ai-sdk-go` v0.3.0 or later (`cmd/aicheck` v0.1.0); this skill adds the mock data plane and model server (`scripts/mock_server.py`, Python 3) and the procedures and checklist in `references/verification.md`. An app instrumented with an older SDK: upgrade first (`rudder-ai-events-setup` re-resolves versions).
 
+**Stacked delivery.** When the plan splits the work into several PRs (`## Files to change`), verify the surfaces instrumented up to the PR at hand, with every check below; report the plan's later surfaces as `n/a (later PR)`. The last PR's run covers the whole plan.
+
 **Migration or new install.** When the plan lists legacy events (the app already sends its own AI-related events through a RudderStack SDK), run every check below. With no legacy events, skip the legacy-switch capture, the legacy and breaking-change checks and the before/after diff: every event in `## What changes` is new, taken from the switch-on capture.
 
 ## Workflow

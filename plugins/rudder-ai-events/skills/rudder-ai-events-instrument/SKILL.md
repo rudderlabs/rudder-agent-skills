@@ -89,7 +89,7 @@ Do one surface at a time; after each, run the app's type check (and its tests wh
 
 ## Delivery
 
-Suggest stacked PRs: (1) the dependency, `configure()`, both switches, flush and the first surface (verify fails a capture with no AI events, and `go mod tidy` and unused-dependency checks strip a dependency without a use); (2) one PR per remaining surface group. Each PR body carries the `## What changes` table built from that PR's captured payloads.
+Suggest stacked PRs: (1) the dependency, `configure()`, both switches, flush and the first surface (verify fails a capture with no AI events, and `go mod tidy` and unused-dependency checks strip a dependency without a use); (2) one PR per remaining surface group. Agree the split with the user and record it under `## Files to change` (which surfaces each PR carries); it is part of the approved plan. Verify then runs per PR on the surfaces that PR and the earlier ones instrument, the switches and the legacy events included; later surfaces are `n/a (later PR)` in its report, and the last PR verifies the whole plan. Each PR body carries the `## What changes` table built from that PR's captured payloads.
 
 ## Credential Security
 
