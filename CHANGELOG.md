@@ -234,7 +234,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in the repository, then Android (`android_kotlin`), iOS
   (`ios_swift`, from an Xcode project or a Podfile), web, and only then server languages; a
   `Package.swift` or a `package.json` alone makes it ask. When it finds several apps, of one type or
-  several, it lists each with its folder and asks which one sends events, and an app in a subfolder
+  several, it lists each with its folder and asks which one sends events, two Android apps in one
+  Gradle build included, each with its module, and an app in a subfolder
   gets its `.env.local` and its build commands in that folder; when it finds none it asks "What
   will send events to RudderStack?", the question step 1 asks outside an app, now defined once. It
   also lists the RudderStack and Segment SDKs the dependencies name, in the manifests of the client
@@ -245,7 +246,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   function, in Kotlin or Java and in Swift or Objective-C. Step 7 checks a mobile app on an Android
   emulator (`10.0.2.2`) or the iOS Simulator, or is skipped without one, and step 8 runs the app
   against the real data plane. A Capacitor or Cordova app gets the JavaScript SDK, and a Unity game
-  the Unity SDK. An app that already uses a RudderStack SDK keeps its current source unless the
+  the Unity SDK, also when the Unity project sits in a subfolder. An app that already uses a RudderStack SDK keeps its current source unless the
   user agrees to move it, and a legacy SDK is replaced only on a yes. When the app keeps its
   source, step 6 writes the new write key to `rudder/first-event.vars.yaml`, not to the app's
   `.env.local`, and step 8's probe and curl send read it from there. The iOS reference never edits
@@ -266,7 +267,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the file still holds what the last run wrote, and asks the user before it takes a file the user
   changed as its own. The undo reads that folder, in
   the same session or a later one: it puts back each file that still holds what step 6 wrote,
-  deletes the ones step 6 created, and asks before replacing a file the user changed since. It then
+  deletes the ones step 6 created, and asks before replacing a file the user changed since. It deals
+  only with the files of the app it undoes, so an undo started from a monorepo's top leaves another
+  app's files alone. It then
   drops its copies of each file it dealt with, so a later onboarding saves the file as it is then.
   The undo runs only when the user asks for it, never as part of step 9's summary, and stops
   unless `rudder-cli workspace info` reports the workspace that step 5 recorded before its apply.
