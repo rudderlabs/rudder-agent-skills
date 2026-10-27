@@ -7,15 +7,16 @@ Read-only. Use Glob and Grep (or `rg` / `grep -rn`) over source files; skip `nod
 | Check | Where | Blocks the surface when |
 |---|---|---|
 | Node.js version | `engines.node` in `package.json`, `.nvmrc`, `.node-version`, `Dockerfile` `FROM node:` | below 24 (`@rudderstack/ai` needs Node.js 24+) |
+| Deno version | `deno.json` / `deno.jsonc`, `.dvmrc`, `Dockerfile` `FROM denoland/deno:`; `deno --version` | Node.js floor does not apply; first instrumented PR must prove the SDK under the repo's own `deno test` |
 | Python version | `requires-python` in `pyproject.toml`, `.python-version`, `runtime.txt`, `Dockerfile` `FROM python:` | below 3.12 (`rudderstack-ai` needs 3.12+) |
 | Go version | the `go` line in `go.mod`, `Dockerfile` `FROM golang:` | below the `go` line of the chosen `ai-sdk-go` version's `go.mod` (v0.2.0: `go 1.26.10`); read it, never assume |
-| Package manager | `package-lock.json` (npm), `pnpm-lock.yaml`, `yarn.lock`, `bun.lock`; `uv.lock`, `poetry.lock`, `Pipfile.lock`, `requirements*.txt`; `go.sum` | |
+| Package manager | `package-lock.json` (npm), `pnpm-lock.yaml`, `yarn.lock`, `bun.lock`, `deno.lock` (deno); `uv.lock`, `poetry.lock`, `Pipfile.lock`, `requirements*.txt`; `go.sum` | |
 
-Manifests give a floor; the interpreter in use comes from `node --version`, `.venv/bin/python --version`, `uv run python --version` or `go version` (read-only commands). Record where the version came from. A blocked surface stays in the plan with `status: blocked` and the reason; do not upgrade the runtime yourself.
+Manifests give a floor; the interpreter in use comes from `node --version`, `deno --version`, `.venv/bin/python --version`, `uv run python --version` or `go version` (read-only commands). Record where the version came from. A blocked surface stays in the plan with `status: blocked` and the reason; do not upgrade the runtime yourself. Deno uses the Node SDK (`language: node`, `package_manager: deno`): it relies on `AsyncLocalStorage` and `node:` builtins, which Deno supports; record the exact Deno version and the repo's `deno test` command under Dependencies and blockers.
 
 ### LLM and agent libraries
 
-Search every manifest (`package.json`, `pyproject.toml`, `requirements*.txt`, `Pipfile`, `setup.cfg`, `go.mod`) for these names. Read the resolved version from the lockfile and compare it with the supported range.
+Search every manifest (`package.json`, `deno.json`, `deno.jsonc`, `pyproject.toml`, `requirements*.txt`, `Pipfile`, `setup.cfg`, `go.mod`) and Deno `npm:` imports for these names. Read the resolved version from the lockfile and compare it with the supported range.
 
 | Library | Node.js package (supported) | Python package (supported) | Integration |
 |---|---|---|---|
@@ -52,7 +53,7 @@ Find what would stop the install before any code is written; record each under D
 |---|---|
 | Release-age gates | pnpm `minimumReleaseAge` (in minutes: `10080` is 7 days) / `minimumReleaseAgeExclude` (`pnpm-workspace.yaml`, `.npmrc`); npm `min-release-age` / `before` (`.npmrc`); uv `exclude-newer` (`pyproject.toml` `[tool.uv]`, `uv.toml`). An SDK release newer than the gate needs an exemption with a removal date. |
 | Private registries and auth | `registry=` / `@scope:registry=` in `.npmrc`, `.yarnrc.yml` `npmRegistryServer`, `[[tool.uv.index]]`, `pip.conf` `index-url`, CodeArtifact login scripts (`aws codeartifact login`, `codeartifact` in `package.json` scripts or CI); Go `GOPROXY` in CI and `go env` files. The SDKs are public (npm, PyPI, proxy.golang.org); a mirror or proxy the app forces must serve them. Record the registry and how auth is obtained, never a token. |
-| Peer ranges | the SDK's `peerDependencies` (`npm view @rudderstack/ai peerDependencies`, from a scratch directory) against the app's resolved versions; a conflict is a blocker. Node.js 0.7.0 declares `@rudderstack/rudder-sdk-node >=3.0.16`: an older core SDK fails `npm install` with `ERESOLVE`, so plan its upgrade. |
+| Peer ranges | the chosen SDK version's `peerDependencies` (`npm view @rudderstack/ai@<VERSION> peerDependencies`, from a scratch directory) against the app's resolved versions; a conflict is a blocker. Node.js 0.7.0 declares `@rudderstack/rudder-sdk-node >=3.0.16`: an older core SDK fails `npm install` with `ERESOLVE`, so plan its upgrade. For every planned framework upgrade, also read that exact version's own peers (`npm view <package>@<VERSION> peerDependencies`), then each forced dependency upgrade's peers: schema-library majors, provider SDK and MCP SDK floors can cascade. List every forced bump with its current and exact target version under Dependencies and blockers. |
 
 A library outside its supported range is a blocker for that integration: record it and, in the one batched round, ask whether to upgrade the library or use `recordCall` / `record_call` instead. These ranges are from `@rudderstack/ai` 0.7.0, `rudderstack-ai` 0.7.0 and `ai-sdk-go` v0.3.0; for a later release, re-read its README compatibility table and trust it over this one.
 
@@ -78,7 +79,8 @@ Then walk callers up to the entry point and classify the surface:
 | Entry point found | Surface | Unit |
 |---|---|---|
 | HTTP route that a person's UI calls: `app.post(`, `router.post(`, Next.js `route.ts` `export async function POST`, Hono/Fastify routes, FastAPI `@app.post`, Django views, Flask `@app.route`, Go `http.HandleFunc(` / `mux.HandleFunc(` / chi, gin, echo routes, WebSocket/SSE handlers | `chat` | one interaction per user turn |
-| Cron or scheduler (`node-cron`, `cron.schedule`, `@Cron`, `APScheduler`, `celery beat`, `schedule.every`, GitHub Actions `schedule:`), queue consumer (`bullmq Worker`, `sqs`, `kafka` consumer, `celery @task`, `rq`), webhook route called by another system, Lambda / Cloud Function `handler`, CLI script `if __name__ == "__main__"` / `bin/` scripts / Go `cmd/` binaries, Slack bot event handlers | `background` | one task per job or run (`aiTask` / `ai_task`) |
+| Slack bot handler answering a person who waits for the answer | `chat` | one interaction per user turn |
+| Cron or scheduler (`node-cron`, `cron.schedule`, `@Cron`, `APScheduler`, `celery beat`, `schedule.every`, GitHub Actions `schedule:`), queue consumer (`bullmq Worker`, `sqs`, `kafka` consumer, `celery @task`, `rq`), webhook route called by another system, Lambda / Cloud Function `handler`, CLI script `if __name__ == "__main__"` / `bin/` scripts / Go `cmd/` binaries, Slack messages from other bots or workflow automations with no person waiting | `background` | one task per job or run (`aiTask` / `ai_task`) |
 | A UI call that fires on page load or render without a typed prompt (suggestions, summaries, auto-titles) | `background` | one task per call (`trigger_source: user`) |
 | An HTTP route used by another service rather than a person | chat if a person waits for the answer, else background; ask in the one batched round (SKILL.md step 2.5) only when the code cannot tell | |
 
@@ -87,6 +89,8 @@ One code path can serve both (a function called from a route and from a cron): r
 A new chat's first message often takes another path than follow-ups: a welcome or empty-state component, a "new chat" or starter-suggestion handler, or a route that creates the conversation and answers in one call. Trace where the first message of a new chat is sent, as well as where follow-ups go, and list both entry points (and both browser handlers) under Files to change; the first turn is also where `conversation_id` may not exist yet.
 
 Streaming: note whether the route returns a stream (`stream: true`, `.stream(`, `streamText`, `StreamingResponse`, `res.write`, SSE). Streams need `bind()` or returning the stream from the interaction callback; in Go the stream must be read inside `RunInteraction`.
+
+Claude Agent SDK session resume: search `resume:` / `resume=`, `continue:` / `continue_conversation`, and stored session IDs; trace the session store and whether usage snapshots survive pods or restarts. Raise one plan question: persist snapshot (recommended), mark resumed with no cost, or in-memory only. Record the choice and sources in `surfaces[].usage_baseline_source` and the Cost section; in-memory state cannot cover another pod or a restart.
 
 Thread pools (Python): `ThreadPoolExecutor`, `run_in_executor` inside a background job need `propagate()`.
 
@@ -106,6 +110,8 @@ Failures the app handles itself: for each entry point, note where it catches a f
 | Chat UI | components or templates with `chat`, `assistant`, `copilot`, `message`, `prompt` in names; `useChat(` (Vercel AI SDK UI); `fetch('/api/chat'` / EventSource / WebSocket calls to the chat route |
 | Feedback and actions | thumbs up/down, `rating`, `feedback`, copy-to-clipboard (`navigator.clipboard.writeText`), share, report, regenerate/retry buttons, approval or interactive blocks the user accepts or rejects (`ai_user_action` `accepted` / `rejected`), cards, sources or links opened from an answer (click-through), and the endpoints they call; for each endpoint, whether its request already carries the answer's ID and the conversation ID (`trackAction` needs both) |
 | Browser event sampling | a sample rate or `Math.random()` gate around `rudderanalytics.track` in the app's analytics module; client copies of AI events must bypass it |
+| Typed tracking | RudderTyper or similar generated calls, tracking-plan catalogs, `ruddertyper.yml`, repo rules forbidding raw `track` calls; raise catalog + generated client versus raw helper in the batched questions |
+| Separate backend | chat API origin, existing response/config fields and flags client; a browser-only repo names its server repo/plan dependency, `client_events.switch_source` and needed `response_changes`, with the server PR first |
 | Assistant open/close, conversation list | launcher/toggle handlers, new-chat, switch, rename, delete conversation handlers |
 
 No RudderStack JavaScript SDK on the page: the `client` surface is `status: skipped` with the reason. Do not add a browser SDK; server events still work.

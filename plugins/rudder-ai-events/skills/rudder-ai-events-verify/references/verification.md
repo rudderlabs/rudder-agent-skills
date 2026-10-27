@@ -16,6 +16,8 @@ Three equivalent commands: the same flags, the same output lines, the same exit 
 | Python 3.12+ | `uv run --no-project -p 3.12 --with "rudderstack-ai[check]==<VERSION>" python -m rudderstack.ai.check events.jsonl [flags]` (or `pip install "rudderstack-ai[check]==<VERSION>"` in a 3.12 virtualenv) | the same with `python -m rudderstack.ai.check what-changes before.jsonl events.jsonl` |
 | Go | `go run github.com/rudderlabs/ai-sdk-go/cmd/aicheck@v0.1.0 events.jsonl [flags]` | `go run github.com/rudderlabs/ai-sdk-go/cmd/aicheck@v0.1.0 what-changes before.jsonl events.jsonl` |
 
+Deno and browser-only repos use any available checker above at an exact published version; record it in the report and keep checker dependencies outside the browser repo. Deno recorder tests run under the repo's own `deno test`.
+
 Run them from the scratch directory (inside a repo, `devEngines` can make `npx` fail with `EBADDEVENGINES`). `--help` lists every flag. The browser-event schema is `spec/ai-client-events-v0.2.schema.json` in the npm package, `rudderstack/ai/check/ai-client-events-v0.2.schema.json` in the Python wheel and `cmd/aicheck/schemas/` in the Go module; `--spec` / `--client-schema` override them only for a newer draft.
 
 ## 2. Capture events
@@ -32,11 +34,14 @@ Drive, per planned surface (skip what the app does not have):
 
 - chat: one turn, a second turn in the same conversation, one feedback action, and with `interaction_id_source: client` one turn with an invalid `x-interaction-id`;
 - an app-detected failure: one turn or run the app catches itself and returns normally from (empty stream, deadline, lost lease, a job runner that swallows errors). Note its interaction ID for `--failed-interaction`. Its response carries the conversation and interaction IDs, so the browser sends its failure copy; a failure whose response never reaches the browser (a dropped connection) leaves a server answer with no browser copy, so drive that one only in a capture checked without `--expect-joins`;
+- Claude Agent SDK resume: drive a new session, save its usage snapshot, then resume it; with `usage_baseline_source.mode: persist`, resume in a fresh process using the stored baseline and assert per-turn cost, not session totals. With `resumed_no_cost`, or `memory` after restart, assert resumed fallback and no reported cost without registered prices;
 - background: one full run;
 - client: the planned browser events, driven with the interaction ID the server returned (below);
 - event rules: one turn that calls each ruled tool; scores: one `trackScore` / `track_score` or an evaluator run;
 - MCP servers: section D;
 - switches: the same traffic again with `spec.switches.ai_events_env` off (`before.jsonl`), and once with `legacy_events_env` off. Set them for that command only. The AI switch is required (instrument adds it): no `ai_events_env`, or one that does not stop the AI events, is a FAIL that goes back to `rudder-ai-events-instrument`. Only to check an older instrumentation that predates the switch, take `before.jsonl` with the app's `configure()` given a no-op client (Node.js `{ track() {} }`, Python an object whose `track` does nothing, Go a client whose `Enqueue` returns `nil`) while its legacy calls still reach the recorder or mock, and note the substitute in the report.
+
+Browser-only plans drive the backend named in `server_dependency`, combine its server capture with the browser capture, and check IDs and `client_events.switch_source`. Toggle the backend AI switch and observe the supplied value stop browser copies; toggle any local legacy switch separately. No local `ai_events_env` or server tests are required in that repo.
 
 ### A. Stub client
 
@@ -117,7 +122,7 @@ window.rudderanalytics = {
 // then write captured as JSON lines and append them to events.jsonl
 ```
 
-Drive the page against the server that answers it, so the browser's actions use the interaction ID the server returned. A stubbed `fetch` that invents IDs hides join bugs; use one only for pages with no server turn. In Node.js the page's `fetch` sends no browser cookies: wrap it to add the test `cookie` header so turns pass `--expect-session`, or check sessions on the curl turns only.
+With generated tracking, stub the existing analytics transport beneath the generated client so catalog types and generated calls are exercised. Drive the page against the server that answers it (including a separate backend from `server_dependency`), so the browser's actions use the interaction ID the server returned. A stubbed `fetch` that invents IDs hides join bugs; use one only for pages with no server turn. In Node.js the page's `fetch` sends no browser cookies: wrap it to add the test `cookie` header so turns pass `--expect-session`, or check sessions on the curl turns only.
 
 ## 3. Validate
 

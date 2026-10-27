@@ -1,6 +1,6 @@
 # Node.js recipes (`@rudderstack/ai`, spec v0.3)
 
-Node.js 24+. ESM shown; CommonJS works the same with `require('@rudderstack/ai')` and `require('@rudderstack/ai/openai')`. Every entry point: `@rudderstack/ai`, `/openai`, `/anthropic`, `/google-genai`, `/bedrock`, `/vercel-ai-sdk`, `/langchain`, `/claude-agent-sdk`, `/openai-agents`, `/middleware`, `/mcp`, `/tracing` and `/tracing/vercel-ai-sdk` (advanced OpenTelemetry export, not needed for AI events).
+Node.js 24+, or Deno with npm compatibility. The SDK relies on `AsyncLocalStorage` and `node:` builtins, which Deno supports; the first instrumented PR must prove context propagation and captured events under the repo's own `deno test`. ESM shown; CommonJS works the same with `require('@rudderstack/ai')` and `require('@rudderstack/ai/openai')`. Every entry point: `@rudderstack/ai`, `/openai`, `/anthropic`, `/google-genai`, `/bedrock`, `/vercel-ai-sdk`, `/langchain`, `/claude-agent-sdk`, `/openai-agents`, `/middleware`, `/mcp`, `/tracing` and `/tracing/vercel-ai-sdk` (advanced OpenTelemetry export, not needed for AI events).
 
 `<VERSION>` below is the plan's `sdks[].version`: 0.7.0 or later.
 
@@ -14,8 +14,9 @@ Full API reference: the package README, shipped at `node_modules/@rudderstack/ai
 | pnpm | `pnpm add --save-exact @rudderstack/ai@<VERSION>` |
 | yarn | `yarn add --exact @rudderstack/ai@<VERSION>` |
 | bun | `bun add --exact @rudderstack/ai@<VERSION>` |
+| deno | `deno add npm:@rudderstack/ai@<VERSION>` |
 
-Only when the plan says `rudderstack.client: new`, add the client too, `@rudderstack/rudder-sdk-node` at its latest release (`>=3.0.16` is the SDK's peer range). An existing older client fails `npm install` with `ERESOLVE`: when `## Dependencies and blockers` approves its upgrade, install that exact pin in the same command (`npm install --save-exact @rudderstack/ai@<VERSION> @rudderstack/rudder-sdk-node@<approved version>`); otherwise stop, it is a plan change. The provider and framework packages (`openai`, `@anthropic-ai/sdk`, `ai`, `@langchain/core`, ...) are optional peer dependencies the app already has; do not add or bump them. The same holds for the MCP SDK on MCP servers (supported: `@modelcontextprotocol/sdk` `>=1.31.0 <2.0.0` and `@modelcontextprotocol/server` `>=2.0.0 <3.0.0`). Run the install from the `sdks[].path` directory; the lockfile change belongs in the same diff.
+Only when the plan says `rudderstack.client: new`, add the client too, `@rudderstack/rudder-sdk-node` at its latest release (`>=3.0.16` is the SDK's peer range). An existing older client fails `npm install` with `ERESOLVE`: when `## Dependencies and blockers` approves its upgrade, install that exact pin in the same command (`npm install --save-exact @rudderstack/ai@<VERSION> @rudderstack/rudder-sdk-node@<approved version>`); otherwise stop, it is a plan change. The provider and framework packages (`openai`, `@anthropic-ai/sdk`, `ai`, `@langchain/core`, ...) are optional peer dependencies the app already has; add or bump them only to exact pins approved under Dependencies and blockers, including any cascaded peers. The same holds for the MCP SDK on MCP servers (supported: `@modelcontextprotocol/sdk` `>=1.31.0 <2.0.0` and `@modelcontextprotocol/server` `>=2.0.0 <3.0.0`). Run the install from the `sdks[].path` directory; the lockfile change belongs in the same diff. Deno writes `deno.json` / `deno.jsonc` and `deno.lock`; add approved peers the same way (`deno add npm:@rudderstack/rudder-sdk-node@<approved exact version>`). Use the repo's npm import aliases or `npm:` specifiers.
 
 ## 2. Configure once at startup
 
@@ -224,7 +225,7 @@ res.end();
 // Express + Vercel AI SDK: stream: interaction.bind(toUIMessageStream({ stream: result.stream }))
 ```
 
-Claude Agent SDK with resumed sessions: store `usageSnapshot(resultMessage)` with the session and pass it back as `usageBaseline`, or each resumed turn re-counts the whole session. When the snapshot cannot be stored, pass `resumed` to `trackMessages` for a session the turn resumes or continues, `resumed: !!options.resume || options.continue === true` (the two `query()` options `trackedQuery` checks itself): tokens then come from the turn's own messages and cost only from registered prices (section 10).
+Claude Agent SDK with resumed sessions: follow `surfaces[].usage_baseline_source`: persist `usageSnapshot(resultMessage)` durably per session and pass it back as `usageBaseline`, or each resumed turn re-counts the whole session. An in-memory snapshot breaks across pods/restarts: use the resumed fallback whenever it is missing. When the plan chooses no baseline, pass `resumed` to `trackMessages` for a session the turn resumes or continues, `resumed: !!options.resume || options.continue === true` (the two `query()` options `trackedQuery` checks itself): tokens then come from the turn's own messages and cost only from registered prices (section 10).
 
 ## 5. Feedback and other actions (server copy)
 

@@ -76,7 +76,7 @@ Decided from code (override any): legacy `chatTurnCompleted` keeps sending; pric
 | chatTurnCompleted.promptLength | ai_response_received.prompt_length (extra property) | Same | carried with `extraProperties` on `end()` |
 
 - Volume and coverage: legacy fires for user turns only; `ai_response_received` also fires for each nightly-digest run and workspace child task (`trigger: system`).
-- Casing and codegen: the repo names events in camelCase and generates typed tracking calls from its tracking plan; AI events are snake_case and sent by the SDK, outside the generated client.
+- Casing and codegen: the repo names events in camelCase and generates typed tracking calls from its tracking plan; AI events are snake_case; the server SDK sends server rows, and the browser catalog gains client events for generated tracking calls.
 - Request and response changes: `POST /api/feedback` starts receiving `interaction_id` and `conversation_id`; `POST /api/chat` returns `x-interaction-id`.
 - Browser copies: the browser sends its own prompt, answer and feedback events (`source: client`) alongside the server's.
 - Background actor: digest runs send `ai_system` with `on_behalf_of`, never a user ID.
@@ -257,6 +257,7 @@ spec:
   client_events:
     sdk_path: public/app.js
     interaction_id_minted_by: app
+    tracking: { mode: generated, catalog_path: analytics/tracking-plan.yaml, client_path: src/generated/analytics.ts }
     events:
       - { event: ai_user_prompt_created, handler: public/app.js (chat form submit) }
       - { event: ai_response_received, handler: "public/app.js (answer rendered, failed or stopped)" }
@@ -309,7 +310,8 @@ spec:
 
 Values not shown in the example:
 
-- `sdks[].version`: the exact latest release resolved in setup step 2.3 (0.7.0 / v0.3.0 or later). `runtime` for Go: the `go` line of that version's `go.mod`. `extras`: Python extras, or Go integration modules with their exact versions, resolved in step 2.3 like the root (`[rudderopenai@v0.2.0, rudderotel@v0.1.1]`); instrument installs those versions only. `package_manager`: `npm | pnpm | yarn | bun | uv | poetry | pip | go`.
+- `sdks[].version`: the exact latest published release resolved in setup step 2.3, or a user-named unreleased exact target (Dependencies and blockers notes that install waits for publication) (0.7.0 / v0.3.0 or later). `runtime` for Go: the `go` line of that version's `go.mod`. `extras`: Python extras, or Go integration modules with their exact versions, resolved in step 2.3 like the root (`[rudderopenai@v0.2.0, rudderotel@v0.1.1]`); instrument installs those versions only. `package_manager`: `npm | pnpm | yarn | bun | deno | uv | poetry | pip | go`. Deno keeps `language: node`, records its exact detected version in `runtime`, and uses `deno.lock`.
+- `server_dependency`: `{ repo, plan, pr_order: server_first, response_changes: [{ path, symbol, fields }] }` for a separate backend; `repo` and `plan` identify its repo and AI events plan, `response_changes` lists backend contract changes needed by this browser (IDs and switch field). Describe them under Breaking and semantic changes and Dependencies and blockers; Files to change lists only this repo's files and the server-first PR split.
 - `rudderstack.client`: `existing | new` (new adds `rudder-sdk-node` / `rudder-sdk-python`).
 - `config.capture_content: true` sends prompt, answer and feedback text, score explanations and MCP `call_reason` / `capability_detail` (masked); with a client surface the browser copies may carry prompt and feedback text too, masked the same way, never answer text.
 - `config.labels_set_by`: `classifier` (`classifier.enabled: true`), `app` (the app calls `setIntent` / `setOutcome` or `trackScore`; the Intents and outcomes section names where), `none` (never populated).
@@ -322,12 +324,41 @@ Values not shown in the example:
 - `surfaces[].surface`: `web | mobile | slack | teams | email | chatgpt_app | claude_app | ide | api | other`, or `per request: <expression>`.
 - `surfaces[].integration`: `wrapOpenAI | wrapAnthropic | wrapGoogleGenAI | wrapBedrock | rudderstackMiddleware | RudderStackCallbackHandler | trackMessages | trackedQuery | trackedRun | recordCall | instrument_litellm` (Python: snake_case names); Go: `rudderopenai | rudderanthropic | ruddergenai | rudderbedrock | RecordCall`.
 - `surfaces[].unit`: `interaction` (one per user turn) `| task` (one per run). `flush`: `shutdown | task | per-run`. `client_disconnect`: `middleware | bound-stream | none` (Django/Flask: known limit). `attachments: true` passes `attachment_count` / `attachment_types` (kinds only).
+- `surfaces[].response_changes[]`: `{ path, symbol, fields }` for returned conversation/interaction IDs or the effective switch value, including error responses after the interaction opens; name the contract change under Breaking and semantic changes.
+- `surfaces[].usage_baseline_source`: `{ mode: persist | resumed_no_cost | memory, session_id_source, resume_source, path, symbol }` for Claude Agent SDK session resume. `persist` stores the result usage snapshot per session durably and passes it back as the baseline (recommended); `resumed_no_cost` marks resumed turns and omits reported cost without registered prices; `memory` keeps snapshots only in-process and must mark turns resumed when a snapshot is missing. Name the choice under Cost and record `claude_resume_cost_omitted` or `claude_resume_baseline_memory` under Known limits when that choice applies.
+- `surfaces[].app_detected_failures[]`: `{ path, symbol, status, error_type }` where the app catches a failure and returns normally; instrumentation explicitly ends it with that failure status.
+- `surfaces[].extra_properties`: a map of nonstandard answer property names to source expressions for `end({ extraProperties })` / `end(extra_properties=...)`; no captured free text or SDK-owned fields.
 - `surfaces[].trigger_source`: `schedule | webhook | queue | slack | agent | api | user | mcp_event`; with `mcp_event`, `trigger_event_id_source` is the update's `event_id`. `anonymous_id_source`: a stable per-tenant ID for multi-tenant jobs; `null` keeps `ai_system`.
 - `surfaces[].feedback[].action_type`: `feedback_given`, or `accepted | rejected | edited` for drafts and other artifacts.
 - `tracing.tool`: `none | langfuse | langsmith | opentelemetry`; `trace_id_source` e.g. `langfuse.getCurrentTraceId() (src/tracing.ts)`, `SDK span processor, linkTraceId: true` (Node.js; Python `link_trace_id=True`), `rudderotel.TraceID` (Go).
 - `client_events.interaction_id_minted_by`: `client` (`crypto.randomUUID()` per prompt, sent to the server) `| app | sdk` (read from the chat response); matches the chat surface's `interaction_id_source`. `events[]` may also list `ai_user_action` with `clicked_through` (browser only; `card_kind` and `target_type`, never a URL), `accepted | rejected | edited`, and `ai_assistant_opened`. `opt_out`: `client_prompt | client_response | client_feedback | server_feedback`.
+- `client_events.switch_source`: `{ path, symbol, value }` identifying where the browser reads the effective backend AI events switch, e.g. `{ path: src/api/config.ts, symbol: loadConfig, value: response.aiEventsEnabled }` on an existing API response; use that value before sending client events. It follows the server switch, not a separate browser default.
+- `client_events.tracking`: `{ mode: raw | generated, catalog_path, client_path }`; `raw` is the default without codegen. `generated` adds the planned client events and properties to the catalog and uses the generated client; list catalog, generated output and handlers under Files to change.
 - `mcp.servers[].sdk`: `@modelcontextprotocol/sdk | @modelcontextprotocol/server | mcp | github.com/modelcontextprotocol/go-sdk | github.com/mark3labs/mcp-go`. `integration`: `wrapMcpServer | wrap_mcp_server | WrapMCPServer | ruddermcpgo.WrapServer`. `transport`: `stdio | streamable_http | sse`. `session_mode`: `stateful | stateless` (stateless also covers a server built per request). `processes`: `one | several`. One entry per endpoint, each with a distinct `name`. `identify` is empty for stdio without auth (`ai_system`). `event_rules`: declared tool events, never `ai_` or `mcp_` names. `legacy_events`: hand-built `mcp_<method>_*` events, mapped like `legacy_events`. `agent_meta[]`: `{ path, symbol, helper: rudderStackMcpToolMeta }` for agents in the repo that call these servers.
 - `known_limits`: ids from "Known limit ids" below, only those that apply.
+
+A browser-only plan keeps all eleven sections; server-only sections say "None: implemented by the server dependency". Set `sdks: []`, omit `rudderstack` and server switches, keep only browser-relevant `config` (`capture_content: false` by default), list only local client surfaces, and include `server_dependency`, `client_events.switch_source` and `client_events.tracking`. If local legacy events exist, keep their independent switch in `switches.legacy_events_env`. Server instrumentation and response contract changes land first; browser verification then joins captures from that backend. A mixed repo uses the normal layout with `server_dependency` only for its separate backend surfaces.
+
+Browser-only Config variant (other applicable keys stay as above):
+
+```yaml
+spec:
+  sdks: []
+  server_dependency:
+    repo: support-api
+    plan: ai-events.md
+    pr_order: server_first
+    response_changes:
+      - { path: src/routes/chat.ts, symbol: POST /api/chat, fields: [interactionId, conversationId] }
+      - { path: src/routes/config.ts, symbol: GET /api/config, fields: [aiEventsEnabled] }
+  config: { capture_content: false }
+  client_events:
+    sdk_path: src/analytics.ts
+    switch_source: { path: src/api/config.ts, symbol: loadConfig, value: response.aiEventsEnabled }
+    tracking: { mode: raw }
+    interaction_id_minted_by: app
+    opt_out: []
+```
 
 Omit a block that does not apply (no browser: no `client_events`; no MCP server: no `mcp`; no hand-built events: `legacy_events: []`).
 
@@ -339,6 +370,8 @@ Ids for Config `known_limits`; the plan's Known limits section names each one th
 |---|---|
 | `intent_lists_manual_review` | Intents and outcomes (and MCP `request_context` intents) are a static list set in code. Review them before launch and once `other` grows; changes need a deploy, and past answers are never relabelled. |
 | `prices_missing` | A model with no registered price sends tokens but no `total_cost_usd`, and one unpriced call drops it for the whole turn, until the customer adds rates at the `TODO`. |
+| `claude_resume_cost_omitted` | Resumed Claude Agent SDK turns without a usage baseline send per-turn tokens but no reported `total_cost_usd`; only registered prices can supply cost. |
+| `claude_resume_baseline_memory` | In-memory Claude Agent SDK usage snapshots break across pods/restarts; a missing snapshot must use the resumed fallback, with cost absent without registered prices. |
 | `wsgi_no_client_disconnect` | `client_disconnected` is detected under the Node.js middleware, Python ASGI middleware, Go `rudderstackai.Middleware` and bound streams. Django and Flask (WSGI) cannot see a disconnect. |
 | `mcp_sdk_support` | Supported: Node.js `@modelcontextprotocol/sdk` 1.x (`>=1.31.0`) and `@modelcontextprotocol/server` 2.x; Python `mcp` 1.x (`>=1.30.0`) and 2.x; Go the official go-sdk v1.8.0 and `mark3labs/mcp-go` v0.55.1 or later. The stateless 2026-07-28 revision is tracked only on Node.js 2.x, Python 2.x, go-sdk v1.8.0 and mcp-go v1.x. The standalone `fastmcp` package is not supported. |
 | `mcp_stateless_no_client` | On an endpoint without sessions (stateless streamable HTTP, or a server built per request) on a protocol before 2026-07-28, tool calls carry no `client_name`, `client_version` or `mcp_session_id`: Claude Code and Cursor look alike. `mcp_client_seen` still fires once per server, client and user per window; `call_index` counts per session, else per calling interaction, else is absent. |
@@ -358,21 +391,21 @@ Ids for Config `known_limits`; the plan's Known limits section names each one th
 - References use `path` plus `symbol` (route, function, variable). Use `path:line` only in chat; lines go stale.
 - `spec.config.intents`: for chat surfaces, 3 to 10 snake_case labels drafted from system prompts, tool descriptions, routes and docs, never from production data, plus `other` last. Background-only apps with the classifier off: `[other]`. The SDK adds `other` itself, so instrumentation passes the list without it.
 - `spec.config.event_rules[].when`: `result_seen` fires only after the app sends the tool's result back to the model in the same interaction; use it when the app runs the tool loop, else `always`.
-- `spec.config.prices`: rates from the app's own code or given by the user; never looked up, never from an internal list. Every other model ID goes in `unpriced_models`: events carry tokens and no `total_cost_usd` (unless a gateway or the Claude Agent SDK reports cost), an unpriced call drops it for the whole turn, instrument leaves a `TODO` at the price config, and verify uses dummy prices. Never a blocker.
+- `spec.config.prices`: rates from the app's own code or given by the user; never looked up, never from an internal list. Every other model ID goes in `unpriced_models`: events carry tokens and no `total_cost_usd` (unless a gateway or the Claude Agent SDK reports cost), an unpriced call drops it for the whole turn, instrument leaves a `TODO` at the price config, and verify uses dummy prices. Never a blocker. Claude Agent SDK new-session cost needs no prices; resumed-session cost requires `surfaces[].usage_baseline_source`: persist the snapshot per session and pass it back as the baseline, or mark resumed and omit reported cost without registered prices. In-memory snapshots break across pods/restarts; record that limit and the customer's choice under Cost.
 - `surfaces[].interaction_id_source`:
   - `sdk`: the SDK mints it.
   - `client`: the browser mints a UUID v4 per prompt and sends it (header `x-interaction-id` or a body field); the server validates it is a UUID before passing it, else lets the SDK mint one.
   - `app`: an ID the app already mints per answer and the client already holds (a turn or message ID). Prefer it when it exists: a legacy per-answer ID (`messageId`, `turnId`) then maps to `interaction_id`.
   - In every case the server returns the ID it used (response field or `x-interaction-id` header).
 - `surfaces[].feedback[].request_changes`: `trackAction` needs `interaction_id` and `conversation_id`; list them when the endpoint does not receive them today, and name the request change under Breaking and semantic changes.
-- `surfaces[].status`: `skipped` (user chose not to, or no browser SDK), `blocked` (runtime or library version, or an unsupported MCP SDK), `unsupported` (no SDK for the language or framework).
+- `surfaces[].status`: `skipped` (user chose not to, no browser SDK, or dev-only CLI/REPL with no user identity recommended in the batched questions, override any), `blocked` (runtime or library version, or an unsupported MCP SDK), `unsupported` (no SDK for the language or framework).
 - `surfaces[]` with `type: mcp` carry only `id`, `type`, `status`, `reason`, `feature` and `entry_points`; the rest is under `mcp.servers[]` with the same `surface_id`.
 - `mcp.servers[].request_context.intents`: drafted like chat intents from tool names and descriptions, ending with `other`; instrumentation passes the list without `other`. It is published in every tool's schema: keep it short and free of sensitive categories.
 - `mcp.servers[].identify`: expressions over the verified token, never a token value. Without auth the server's events go out as `ai_system`.
 - Background `child_tasks`: one entry per nested step that should report its own usage. The parent task then reports only calls made outside the children; per-run totals come from summing the tree by `parent_interaction_id`. Children default to `trigger_source: agent`.
 - `client_events.events[].event`: only the browser events listed in `rudder-ai-events-instrument` `references/client-events.md` ("Who sends what"). Browser-sent actions live here; server-sent ones under `surfaces[].feedback`.
 - Client copies: with a `client` surface to instrument, the browser sends its own `ai_user_prompt_created` and `ai_response_received` (`source: client`) alongside the server's, and feedback goes from both sides. They measure the client/server gap per `interaction_id` and are never sampled. Either side opts out only when the user asks: record it in `client_events.opt_out` and drop that side's entry. Feedback with no server endpoint is browser-only; do not add an endpoint for it.
-- `switches`: instrumentation adds both. `ai_events_env` off stops every AI event, server and browser (the server exposes it to the page; MCP wrappers and SDK tracing only after a restart); `legacy_events_env` off stops the legacy events; each works without the other. They use the app's config library, reloadable when it supports that.
+- `switches`: server instrumentation adds both; browser-only plans consume `client_events.switch_source` from the server dependency and gate local legacy events separately when present. `ai_events_env` off stops every AI event, server and browser (the server exposes it to the page; MCP wrappers and SDK tracing only after a restart); `legacy_events_env` off stops the legacy events; each works without the other. They use the app's config library, reloadable when it supports that.
 - `legacy_events[].migration.remove_after`: `null` by default; the legacy event keeps sending. Removing it is a separate, later change.
 
 ## Breaking-change checks

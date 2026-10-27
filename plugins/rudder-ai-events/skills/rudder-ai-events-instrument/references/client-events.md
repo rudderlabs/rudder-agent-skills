@@ -15,6 +15,8 @@ The server SDK sends the prompt, the answer and feedback. The browser sends its 
 | `ai_user_action` with `action_type: "clicked_through"` | browser only | the user opened a card, resource or doc from the answer, or used a component the AI rendered (a chart, an MCP Apps widget): `action_details.card_kind` names it, `action_details.target_type` the kind of object opened; never a URL. A form the AI rendered that the user submits is tracked by the business action it triggers, not here; nothing is sent just for rendering |
 | `ai_assistant_opened`, `ai_assistant_closed`, `ai_conversation_started`, `ai_conversation_switched`, `ai_conversation_renamed`, `ai_conversation_deleted` | browser | engagement; no server counterpart |
 
+Escalating to human support has no matching `action_type`: leave it out of AI client actions, or send the app's own product event. Do not force it into another action type.
+
 Either side can opt out of a copy: the plan then omits it (the browser simply does not call `track`; the server endpoint does not call `trackAction`). Client copies are never sampled: if the app samples its browser analytics, send them outside that sampling, since the per-interaction gap needs every row.
 
 Gaps, matched per `interaction_id`: a client prompt with no server prompt means the request never reached the SDK; a server answer with no client answer means it was produced but not shown, or the client event was lost (ad blocker, failed render). The server's `client_disconnected: true` on its answer separates the user leaving from a lost client event. The spec v0.3 SDKs set it when the request closes under their middleware (Node.js middleware, Python ASGI, Go `rudderstackai.Middleware`) or a bound stream is cancelled; Django and Flask (WSGI) cannot see a disconnect, so there a missing client copy stays ambiguous.
@@ -27,12 +29,14 @@ Identity: the JavaScript SDK supplies `userId` / `anonymousId` itself; `userId` 
 
 ## Code
 
+Without tracking-plan codegen, use the raw helper below. When the repo generates typed tracking calls (RudderTyper or similar), or forbids raw `track` calls, add the planned `ai_*` client events and their properties to its catalog and use the generated client instead. Preserve `source: client`, switch gating, omitted unknown IDs and no sampling in generated calls too. Setup raises this in the batched questions and records `client_events.tracking`; catalog changes are required even when optional tracking-plan upload is declined.
+
 One helper, so every client AI event carries `source`, `feature` and `surface`, unknown IDs are left out rather than sent as `null`, and nothing is sent when the AI events switch is off. Put it in the app's browser analytics module (exported), or at the top of the page script when there is none:
 
 ```js
 const AI_FEATURE = 'support_bot'; // the surface's feature from the plan's ## Config
 const AI_SURFACE = 'web'; // the surface's channel from the plan's ## Config (web | mobile | ...)
-// ai_events_env as the server evaluated it, read from wherever the app already exposes config or flags to the page
+// effective backend AI switch from client_events.switch_source, or the app's existing config/flags channel
 const AI_EVENTS_ON = appConfig.aiEventsEnabled !== false;
 
 function trackAi(event, properties = {}) {
@@ -44,7 +48,7 @@ function trackAi(event, properties = {}) {
 
 With `@rudderstack/analytics-js`, call `.track` on the app's existing `RudderAnalytics` instance instead of `window.rudderanalytics`. With the script-tag snippet, check its method stub list includes `track` (calls made before the SDK loads are queued only for stubbed methods).
 
-`appConfig.aiEventsEnabled` stands for the app's own channel: a server-rendered value, the config or flags endpoint the page already fetches, or the flags client it already uses. The server sets it from the same `ai_events_env` value it passes to `configure()`; the page's legacy `track` calls do not read it. With a reloadable switch, the page picks up a change on its next load.
+`appConfig.aiEventsEnabled` stands for the app's own channel: a server-rendered value, the config or flags endpoint the page already fetches, or the flags client it already uses. The server sets it from the same `ai_events_env` value it passes to `configure()`; the page's legacy `track` calls do not read it. With a reloadable switch, the page picks up a change on its next load. In a browser-only or cross-repo plan, `client_events.switch_source` can be a field on an existing backend API response (e.g. `response.aiEventsEnabled`); the named `server_dependency` supplies it from the same switch. Load it before sending client events; if it comes from the chat response, defer copies until it is known. Server response/ID changes land in the backend PR first, then this browser PR; no server SDK or `configure()` is added to the browser repo.
 
 Chat submit: mint the ID, send the client prompt copy, send the request, then send the client answer copy when the turn reaches its final state on screen (completed, failed, or stopped by the user). From the response on, use the ID the server returns (it differs only if the server rejected yours).
 
