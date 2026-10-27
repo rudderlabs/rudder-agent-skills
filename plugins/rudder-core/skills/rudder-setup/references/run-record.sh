@@ -19,7 +19,8 @@
 #   revert              revert the run's commits that are not reverted yet, newest first
 #   restore [<file>]    put back the key files the run saved that still hold what it wrote; with a file, put back
 #                       that one as it was before step 6 whatever it holds now. It writes the saved bytes into the
-#                       file, so a key file that is a symbolic link stays one and its target gets them back
+#                       file, so a key file that is a symbolic link stays one and its target gets them back. A file
+#                       it cannot write or delete keeps its copies, and it exits 1
 #   undone              after the undo's apply: mark the run undone and drop its copies
 set -u
 B=$(git rev-parse --git-path "rudderstack-backup/$(git rev-parse --show-prefix)") || exit 2
@@ -98,14 +99,19 @@ show|revert|restore|unexpected|undone)
     mkdir -p "$R/undo"
     if [ -n "${1-}" ]; then
       # one file the restore named as changed, which the user wants back as it was before step 6
-      f=$1; if [ -e "$R/files/$f" ]; then cat "$R/files/$f" > "$f" || exit 2; elif [ -e "$R/created/$f" ]; then rm -f "$f"; else die "no copy of $f"; fi
+      f=$1; if [ -e "$R/files/$f" ]; then cat "$R/files/$f" > "$f" || die "could not write $f; its copy is kept"
+      elif [ -e "$R/created/$f" ]; then rm -f "$f" && [ ! -e "$f" ] || die "could not delete $f; its copy is kept"
+      else die "no copy of $f"; fi
       rm -f "$R/files/$f" "$R/after/$f" "$R/created/$f"; exit 0
     fi
-    for s in files created; do [ ! -d "$R/$s" ] || (cd "$R/$s" && find . -type f | sed 's|^\./||'); done | while IFS= read -r f; do
-      if cmp -s "$f" "$R/after/$f"; then if [ -e "$R/files/$f" ]; then cat "$R/files/$f" > "$f" || continue; else rm "$f"; fi
+    # a file it cannot write or delete keeps its copies, and the restore then fails, so asking again retries it
+    for s in files created; do [ ! -d "$R/$s" ] || (cd "$R/$s" && find . -type f | sed 's|^\./||'); done | { bad=0; while IFS= read -r f; do
+      if cmp -s "$f" "$R/after/$f"; then
+        if [ -e "$R/files/$f" ]; then cat "$R/files/$f" > "$f" || { echo "could not write $f; its copy is kept" >&2; bad=1; continue; }
+        else rm "$f" || { echo "could not delete $f; its copy is kept" >&2; bad=1; continue; }; fi
       elif [ -e "$f" ] || [ -e "$R/files/$f" ]; then echo "changed since step 6: $f"; continue; fi
       rm -f "$R/files/$f" "$R/after/$f" "$R/created/$f"
-    done
+    done; exit $bad; } || exit 1
     touch "$R/undo/restored" ;;
   unexpected)
     # what this run's successful reverts took out of rudder/, as kind:id lines: what each reverted commit added, so a
