@@ -174,9 +174,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as it is before changing it, so a `git revert` never deletes the app's files. Every commit names
   its paths, in `git add` and after `git commit --`, so changes the user staged stay out of it.
   Step 3 writes the event names and property types to `rudder/plan.events.json`, and steps 6 to 8
-  read them from there. Step 7 captures events with `rudder-cli sources listen` and
+  read them from there. Step 3 puts the plan's table in the agent's message before the user
+  approves it, because some agents fold command output. Step 7 captures events with `rudder-cli sources listen` and
   checks them against that file with a jq program shipped beside the references, in two shell
-  calls, or in one for agents that stop background processes when a call returns. The destination
+  calls, or in one for agents that stop background processes when a call returns. It stops the
+  listener and the app by their process ids only, never with `pkill` or a name pattern. The destination
   reference leaves unfilled secrets as `NAME:` with no value, names every secret key of Amplitude
   and Mixpanel, and lists the 24 verified destination types. It says a secret that spans lines,
   such as a PEM key, keeps its line breaks only from rudder-cli 0.29.0, as a `|` block. Step 4 asks
