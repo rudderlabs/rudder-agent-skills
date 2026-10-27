@@ -5,7 +5,7 @@
 # how far an undo of it got. A run lasts from step 1 to step 9's summary; a later session continues a run that has not
 # reached step 9, and starts a new one otherwise.
 #
-#   begin               step 1: continue the open run or start one; prints its id
+#   begin               step 1: continue the open run or start one; prints `continued <id>` or `started <id>`
 #   workspace <id>      step 5, before the apply: the workspace this run changes; fails if it recorded another
 #   commit revert|keep  after each commit: HEAD, for the undo to revert, or to leave alone
 #   save <file>         step 6, before the first write to a git-ignored key file
@@ -14,7 +14,8 @@
 #   close               step 9, after the summary
 #   show [<id>]         the run an undo takes (the newest with something to undo), and whether <id> is its workspace
 #   unexpected          read a filtered dry run on stdin and print it, then an `unexpected: <kind>:<id>` line for
-#                       each removal the run's reverts did not take out of rudder/; exits 1 when there is one
+#                       each removal that no recorded revert of the run took out of rudder/, and one when the dry
+#                       run did not end with `exit 0`; exits 1 when it printed one
 #   revert              revert the run's commits that are not reverted yet, newest first
 #   restore [<file>]    put back the key files the run saved that still hold what it wrote; with a file, put back
 #                       that one as it was before step 6 whatever it holds now. It writes the saved bytes into the
@@ -39,8 +40,10 @@ begin)
   if [ -z "$r" ] || [ -e "$B/runs/$r/closed" ] || [ -e "$B/runs/$r/undone" ]; then
     r=$(printf '%03d-%s' $(($(runs | wc -l) + 1)) "$(date -u +%Y%m%dT%H%M%SZ)")
     mkdir -p "$B/runs/$r" && date +%s > "$B/runs/$r/began" || exit 2
-  fi
-  echo "$r" ;;
+    echo "started $r"
+  else
+    echo "continued $r"
+  fi ;;
 workspace|commit|save|record|forget|close)
   r=$(newest); [ -n "$r" ] || die "no run: run begin first"; R=$B/runs/$r
   case $cmd in
@@ -105,9 +108,10 @@ show|revert|restore|unexpected|undone)
     done
     touch "$R/undo/restored" ;;
   unexpected)
-    # what the reverts took out of rudder/, as kind:id lines; plain diff output whatever the user's diff settings say
-    ours=$(git diff --no-ext-diff --no-color --no-textconv -U100000 "$(cat "$R/undo/from" 2>/dev/null || git rev-parse HEAD)" HEAD -- rudder | awk 'function v(s) {sub(/[ \t]+#.*/, "", s); sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); q = substr(s, 1, 1); if ((q == "\"" || q == sprintf("%c", 39)) && substr(s, length(s)) == q) s = substr(s, 2, length(s) - 2); return s} /^diff --git /{k=""} /^[ -]kind:/{k=v(substr($0, 7)); if (k=="event-stream-connections") k="event-stream-connection"} /^- +(- )?id:/{sub(/^- +(- )?id:/,""); print k ":" v($0)}')
-    O=$ours awk 'BEGIN { n = split(ENVIRON["O"], o, "\n"); for (i = 1; i <= n; i++) ok[o[i]] = 1 } { print } /^Removed resources:/ { r = 1; next } r && /^ / { if (/^  - /) { u = substr($0, 5); if (!(u in ok)) x[++m] = u } next } { r = 0 } END { for (i = 1; i <= m; i++) print "unexpected: " x[i]; exit m > 0 }' ;;
+    # what this run's successful reverts took out of rudder/, as kind:id lines: what each reverted commit added, so a
+    # commit made since cannot widen it. Plain diff output, whatever the user's diff settings say
+    ours=$(for c in $(cat "$R/undo/reverted" 2>/dev/null); do p=$(git rev-parse -q --verify "$c^" || git hash-object -t tree /dev/null); git diff --no-ext-diff --no-color --no-textconv -U100000 "$c" "$p" -- rudder; done | awk 'function v(s) {sub(/[ \t]+#.*/, "", s); sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); q = substr(s, 1, 1); if ((q == "\"" || q == sprintf("%c", 39)) && substr(s, length(s)) == q) s = substr(s, 2, length(s) - 2); return s} /^diff --git /{k=""} /^[ -]kind:/{k=v(substr($0, 7)); if (k=="event-stream-connections") k="event-stream-connection"} /^- +(- )?id:/{sub(/^- +(- )?id:/,""); print k ":" v($0)}')
+    O=$ours awk 'BEGIN { n = split(ENVIRON["O"], o, "\n"); for (i = 1; i <= n; i++) ok[o[i]] = 1 } { print } /^exit [0-9]+$/ { s = $2 } /^Removed resources:/ { r = 1; next } r && /^ / { if (/^  - /) { u = substr($0, 5); if (!(u in ok)) x[++m] = u } next } { r = 0 } END { for (i = 1; i <= m; i++) print "unexpected: " x[i]; if (s == "") { print "unexpected: no exit status; run the dry run through the rule'"'"'s filter"; m++ } else if (s != "0") { print "unexpected: the dry run ended with exit " s; m++ } exit m > 0 }' ;;
   undone)
     rm -rf "$R/files" "$R/after" "$R/created"; touch "$R/undone" ;;
   esac ;;
