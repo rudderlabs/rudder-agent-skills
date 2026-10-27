@@ -39,8 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   applies in Phase 6 first check that `rudder-cli workspace info --json` shows
   the target workspace, and the prod step switches the CLI to the prod
   workspace before it applies.
-- **Versions.** `rudder-cli` 0.0.3 to 0.0.4, `rudder-mcp` 0.0.2 to 0.0.3,
-  `rudder-core` 0.0.6 to 0.0.7.
+- **Versions.** `rudder-cli` 0.0.3 to 0.0.5, `rudder-mcp` 0.0.2 to 0.0.3,
+  `rudder-core` 0.0.6 to 0.0.8.
 
 - **Breaking (repo layout):** renamed the top-level `skills/` directory back to
   `plugins/` (reverting the earlier `plugins/` → `skills/` rename). Each plugin
@@ -75,7 +75,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rudder-typer-workflow's CI reference used a `rudderstack/setup-rudder-cli`
   action that does not exist. The guide now gives the same install, and
   both CI examples download the release archive and check its checksum.
-  `rudder-cli` 0.0.4 to 0.0.5 for the move to the release asset.
 - **`rudder-cli` / `rudder-cli-setup`, `rudder-cli-workflow`, `rudder-transformations`.**
   Replaced `RUDDER_ACCESS_TOKEN` with `RUDDERSTACK_ACCESS_TOKEN`, the variable
   rudder-cli reads (rudder-iac `cli/internal/config/config.go:86`).
@@ -149,128 +148,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   token that expired or was revoked, and `401`
   `bearer token authorization failed` to a token refused during the workspace
   lookup.
-- **`rudder-core` / `rudder-setup`** — nine steps from an app with no analytics to one real
-  event delivered to a destination the user picks: start, explore, goal, destination and secrets,
-  plan and apply, instrument, verify locally, verify live, wrap up. Specs live in `rudder/`; the
-  skill carries the measured traps (silent decline without `--confirm=false`, workspace-wide
-  deletes, the write key's two-minute 401 window, MCP metrics without timestamps, hashed live
-  event values). References cover destination specs with secrets as variables, browser
-  instrumentation, and local and live verification.
-  Step 1 looks at the folder before changing anything. Outside an app (an empty folder, the home
-  folder, a folder of several repositories) it recommends starting again in the app, and can
-  instead continue without one, in a new subfolder unless the folder is empty, and send the first
-  planned event with curl. It stops on uncommitted changes, and commits an app that was not in git
-  as it is before changing it, so a `git revert` never deletes the app's files. Every commit names
-  its paths, in `git add` and after `git commit --`, so changes the user staged stay out of it.
-  Step 3 writes the event names and property types to `rudder/plan.events.json`, and steps 6 to 8
-  read them from there. Step 3 puts the plan's table in the agent's message before the user
-  approves it, because some agents fold command output. Step 7 captures events with `rudder-cli sources listen` and
-  checks them against that file with a jq program shipped beside the references, in two shell
-  calls, or in one for agents that stop background processes when a call returns. It stops the
-  listener and the app by their process ids only, never with `pkill` or a name pattern. The destination
-  reference leaves unfilled secrets as `NAME:` with no value, names every secret key of Amplitude
-  and Mixpanel, and lists the 24 verified destination types. It says a secret that spans lines,
-  such as a PEM key, keeps its line breaks only from rudder-cli 0.29.0, as a `|` block, and that a
-  one-line value in the var file is single-quoted, with each `'` written four times. Step 4 asks
-  whether a webhook needs an authentication header and, on yes, for its name, `Authorization` by
-  default; the user fills its value, such as `Bearer <token>`, in the var file.
-  Step 1 runs its read-only checks before it changes the folder, and commits the `.gitignore` lines
-  for the var file and `.env.local` on their own, so the undo (revert the instrumentation and specs
-  commits, then apply) never un-ignores a secret. Step 5 shows validate's errors without the source
-  lines, which print secret values. The skill needs rudder-cli 0.26.0 or later, the first release
-  that accepts its destination specs without experimental flags, and step 1 installs the latest
-  release when the copy it finds is older. Step 7 needs 0.29.0 or later and is skipped on an older
-  one; its one-call recipe exits 5 when the app cannot start or anything accepts a connection on its
-  port, and both recipes exit 3 when the listener stops during a check. Step 7 counts only events
-  that arrive after its mark, so it takes the mark before the app can send one, and launches a
-  mobile app after it. Step 8 builds the curl event
-  from the plan. Step 1 downloads the installer attached to the latest rudder-iac release into a new
-  temporary folder and runs it. When the download of the installer gets a 404 because a release that
-  just came out is still uploading its files, the agent waits a minute and tries again, up to 10 times,
-  then tells the user to try again in a few minutes. It does not retry an error the installer itself
-  prints, and when a sandbox keeps the installer from writing to `~/.local/bin` or reaching github.com,
-  it asks the user to run the install outside the sandbox instead of installing into the project. After an install, or when only a copy an earlier install left in `~/.local/bin`
-  works, and a plain `rudder-cli` runs another copy or none, the agent runs
-  `"$HOME/.local/bin/rudder-cli"` for the rest of the session and gives the user that path for any
-  rudder-cli command they run. Step 9's summary shows the `export PATH` line for the user's shell
-  profile, and so does any stop before step 9.
-  Step 2 runs a probe that names the app's source type: Flutter and React Native first, because
-  their apps also hold `android/` and `ios/` folders, which they claim without hiding the other apps
-  in the repository, then Android (`android_kotlin`), iOS
-  (`ios_swift`, from an Xcode project or a Podfile), web, and only then server languages; a
-  `Package.swift` or a `package.json` alone makes it ask. When it finds several apps, of one type or
-  several, it lists each with its folder and asks which one sends events, two Android apps in one
-  Gradle build included, each with its module, and an app in a subfolder
-  gets its `.env.local` and its build commands in that folder; when it finds none it asks "What
-  will send events to RudderStack?", the question step 1 asks outside an app, now defined once. It
-  also lists the RudderStack and Segment SDKs the dependencies name, in the manifests of the client
-  apps and of every server language, the legacy Android (Java) and iOS (Objective-C) SDKs included,
-  and a RudderStack snippet in the app's pages counts too. New Android (Kotlin SDK) and iOS (Swift
-  SDK) references add the dependency, keep the write key out of git, load the SDK once and give each
-  agreed event a typed
-  function, in Kotlin or Java and in Swift or Objective-C. Step 7 checks a mobile app on an Android
-  emulator (`10.0.2.2`) or the iOS Simulator, or is skipped without one, and step 8 runs the app
-  against the real data plane. A Capacitor or Cordova app gets the JavaScript SDK, and a Unity game
-  the Unity SDK, also when the Unity project sits in a subfolder. An app that already uses a RudderStack SDK keeps its current source unless the
-  user agrees to move it, and a legacy SDK is replaced only on a yes. When the app keeps its
-  source, step 6 writes the new write key to `rudder/first-event.vars.yaml`, not to the app's
-  `.env.local`, and step 8's probe and curl send read it from there. The iOS reference never edits
-  `project.pbxproj` and gives the user its Xcode changes in one list, and includes
-  `RudderStack.xcconfig` from an app's configuration file by the path from that file's folder.
-  Neither mobile reference
-  turns off plain HTTP an app already allows: iOS gets `NSAllowsLocalNetworking` only without
-  `NSAllowsArbitraryLoads`, and Android's debug network config is skipped when
-  `usesCleartextTraffic` is on and no network security config is set. With one, which Android 7.0
-  and later obey over that attribute, the debug config copies its rules and adds `10.0.2.2`. An
-  Expo app gets a development build instead of Expo Go, GA4 on a mobile source uses its Firebase
-  app stream, and an app the user will not upgrade, or cannot run on any emulator, simulator or
-  device, sends its first event with curl.
-  Steps 7 and 8 commit each fix they make, and the undo reverts those commits with the rest. Before
-  step 6 writes the write key or data plane URL to a git-ignored file, such as `.env.local` or an
-  iOS app's `RudderStack.local.xcconfig`, on any path, it saves the file in the git directory under
-  the app folder's own path, and afterwards records what it wrote. A later run first checks that
-  the file still holds what the last run wrote, and asks the user before it takes a file the user
-  changed as its own. The undo reads that folder, in
-  the same session or a later one: it puts back each file that still holds what step 6 wrote,
-  deletes the ones step 6 created, and asks before replacing a file the user changed since. It deals
-  only with the files of the app it undoes, so an undo started from a monorepo's top leaves another
-  app's files alone. It then
-  drops its copies of each file it dealt with, so a later onboarding saves the file as it is then.
-  The undo runs only when the user asks for it, never as part of step 9's summary, and stops
-  unless `rudder-cli workspace info` reports the workspace that step 5 recorded before its apply.
-  It starts with a dry run and stops if it would remove anything, because the workspace then
-  holds resources that `rudder/` does not, such as another project's. After its reverts it stops
-  again if the dry run would remove a resource that the reverts did not take out of `rudder/`,
-  comparing kind and id, read as YAML values, since ids are unique only per kind.
-  Every validate, dry run and apply runs through a filter that first drops each message's source
-  block, from the gutter line to the `^^^` line under it, then keeps only the lines rudder-cli is
-  known to print, because validate shows the spec line a message is about with secrets filled in,
-  and a multi-line secret's later lines may look like any line. Step 8's probe reads only its two
-  values from `.env.local`, both under the prefix of the names step 6 wrote, as dotenv reads them,
-  and never runs the file as shell. It stops 5 minutes after it starts, however slow each answer
-  is. It gives each
-  request 10 seconds, stops on any status but 400, 2xx and 401, and prints the data plane's answer,
-  so a disabled source (404), a rate limit (429) or a server error is not taken for a wrong data
-  plane URL; it reruns for those a bounded number of times. The curl send waits until the probe
-  accepts the key. When the workspace holds resources another project manages, step 2 stops and
-  offers an empty workspace: `rudder-cli import workspace` cannot take them over, and specs copied
-  from that project would be deleted by the undo. On resume, step 1 makes git ignore the var file
-  before it writes it. After any uncommitted changes are dealt with, it commits specs it finds in
-  `rudder/` that no commit holds yet, on their own, and the undo never reverts that commit. When
-  the app's source type differs from the resumed source's, it adds a source of the new type beside
-  the old one, which keeps its write key, so neither step 5 nor the undo removes a source. When
-  one of the two sources is a mobile app and the other is not, the new source gets a GA4
-  destination of its own, because a GA4 destination sends to one data stream.
-  Step 9 copies `rudder/` to the app without the var file. A site without a
-  build keeps its write key in the page. A mobile app skips step 7 in an agent that stops background
-  processes, and reruns after a listener or app failure are bounded. When `claude mcp list` shows a
-  server at `https://mcp.rudderstack.com/mcp` or `https://mcp.rudderstack.com/bearer-auth-mcp`,
-  under any name, the rudder-core plugin's included, step 1 uses it instead of adding a second one.
-  The user authenticates an `/mcp` server. A `/bearer-auth-mcp` server needs
-  `RUDDERSTACK_ACCESS_TOKEN` in the agent's shell, and step 1 checks with `get_workspace_settings`
-  that its `X-Workspace-ID` header names the CLI's workspace.
-  The measured facts, step 2's probe and the Flutter, React Native and Unity notes are references
-  beside SKILL.md. `rudder-core` 0.0.7 to 0.0.8.
+- **`rudder-core` / `rudder-setup`.** New skill that takes an app from no analytics to one real
+  event delivered to a destination the user picks, in nine steps: start, explore, goal,
+  destination and secrets, plan and apply, instrument, verify locally, verify live, wrap up. The
+  pipeline is rudder-cli specs in `rudder/`, and each change is a commit of its own.
+  - It sets up web apps (Capacitor and Cordova included), Android (Kotlin or Java), iOS (Swift
+    or Objective-C), Flutter, React Native (Expo through a development build), Unity and server
+    apps. In a repository with several apps it asks which one sends events. With no app, or an
+    app the user will not upgrade or cannot run, the first event goes out with curl.
+  - Step 1 stops on uncommitted changes and commits an app that is not in git before it changes
+    anything. When rudder-cli is missing or older than 0.26.0, it installs the latest release
+    with the installer attached to it, and it uses a RudderStack MCP server that is already set
+    up instead of adding a second one.
+  - The user approves the event plan, picks the destination, and says yes to every apply after
+    seeing its dry run. A dry run that would delete a resource this project did not create, such
+    as another project's, stops the skill.
+  - Secrets and the write key go in git-ignored files, and the skill drops the spec lines
+    rudder-cli prints with secrets filled in.
+  - An app that already uses a RudderStack SDK keeps its source unless the user agrees to move
+    it. Run in a folder whose `rudder/` came from an earlier run, the skill adds a source of the
+    app's type beside the old one.
+  - Step 7 checks the app's events against the plan on this machine with `rudder-cli sources
+    listen` (rudder-cli 0.29.0 or later; an emulator or simulator for a mobile app). Step 8 sends
+    a real event and confirms that the destination received it.
+  - When the user asks, in the same session or a later one, step 9 undoes a run from the record
+    it keeps in the git directory: it reverts the commits that run made, puts back the key files
+    it changed, and applies, after checking that rudder-cli points at the workspace the run
+    changed and that the apply removes only what the run created.
 
 - **`rudder-ai-events`** — new plugin that onboards an existing app to RudderStack AI events
   (spec v0.3) with the `@rudderstack/ai` (Node.js), `rudderstack-ai` (Python) and `ai-sdk-go` (Go)
