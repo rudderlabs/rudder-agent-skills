@@ -198,7 +198,7 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 - `client_disconnected` is detected only under `Middleware`; `paused` never is. Otherwise call `in.End(EndOptions{ClientDisconnected: true})` or `in.End(EndOptions{Status: rudderstackai.StatusPaused, PauseReason: ...})` from the app's own handling, inside the function.
 - analytics-go gives every track call without an `anonymousId` a random one, also when `userId` is set, so with no cookie and no `AnonymousID` the `anonymousId` differs per event: join AI events to users on `userId`.
 - Statuses from the integrations: an Anthropic `max_tokens` or OpenAI/Gemini/Bedrock length stop on the last call makes the answer `incomplete` with `error_type: length`; a content filter is an `error`.
-- Attachments: `AttachmentCount` (`*int`, `rudderstackai.Ptr(n)`) and `AttachmentTypes`; never names or content. Extras: `EndOptions{ExtraProperties: ...}`.
+- Attachments: `AttachmentCount` (`*int`, `rudderstackai.Ptr(n)`) and `AttachmentTypes`; never names or content. Evaluate planned `surfaces[].extra_properties` on successful and failed turns and pass `in.End(rudderstackai.EndOptions{ExtraProperties: ...})` inside the function at finalization, before the automatic end; preserve failure status and error type. SDK-owned names are ignored.
 
 ## 5. Feedback (server copy)
 

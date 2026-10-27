@@ -31,16 +31,16 @@ Identity: the JavaScript SDK supplies `userId` / `anonymousId` itself; `userId` 
 
 Without tracking-plan codegen, use the raw helper below. When the repo generates typed tracking calls (RudderTyper or similar), or forbids raw `track` calls, add the planned `ai_*` client events and their properties to its catalog and use the generated client instead. Preserve `source: client`, switch gating, omitted unknown IDs and no sampling in generated calls too. Setup raises this in the batched questions and records `client_events.tracking`; catalog changes are required even when optional tracking-plan upload is declined.
 
-One helper, so every client AI event carries `source`, `feature` and `surface`, unknown IDs are left out rather than sent as `null`, and nothing is sent when the AI events switch is off. Put it in the app's browser analytics module (exported), or at the top of the page script when there is none:
+One helper, so every client AI event carries `source`, `feature` and `surface`, unknown IDs are left out rather than sent as `null`, and nothing is sent when the AI events switch is off. This example uses configuration loaded before submission. Put it in the app's browser analytics module (exported), or at the top of the page script when there is none:
 
 ```js
 const AI_FEATURE = 'support_bot'; // the surface's feature from the plan's ## Config
 const AI_SURFACE = 'web'; // the surface's channel from the plan's ## Config (web | mobile | ...)
 // effective backend AI switch from client_events.switch_source, or the app's existing config/flags channel
-const AI_EVENTS_ON = appConfig.aiEventsEnabled !== false;
+const AI_EVENTS_ON = appConfig.aiEventsEnabled === true;
 
-function trackAi(event, properties = {}) {
-  if (!AI_EVENTS_ON) return; // configure() never reaches the browser, so the switch must
+function trackAi(event, properties = {}, enabled = AI_EVENTS_ON) {
+  if (!enabled) return; // configure() never reaches the browser, so the switch must
   const defined = Object.fromEntries(Object.entries(properties).filter(([, v]) => v != null));
   window.rudderanalytics?.track(event, { source: 'client', feature: AI_FEATURE, surface: AI_SURFACE, ...defined });
 }
@@ -48,9 +48,9 @@ function trackAi(event, properties = {}) {
 
 With `@rudderstack/analytics-js`, call `.track` on the app's existing `RudderAnalytics` instance instead of `window.rudderanalytics`. With the script-tag snippet, check its method stub list includes `track` (calls made before the SDK loads are queued only for stubbed methods).
 
-`appConfig.aiEventsEnabled` stands for the app's own channel: a server-rendered value, the config or flags endpoint the page already fetches, or the flags client it already uses. The server sets it from the same `ai_events_env` value it passes to `configure()`; the page's legacy `track` calls do not read it. With a reloadable switch, the page picks up a change on its next load. In a browser-only or cross-repo plan, `client_events.switch_source` can be a field on an existing backend API response (e.g. `response.aiEventsEnabled`); the named `server_dependency` supplies it from the same switch. Load it before sending client events; if it comes from the chat response, defer copies until it is known. Server response/ID changes land in the backend PR first, then this browser PR; no server SDK or `configure()` is added to the browser repo.
+`appConfig.aiEventsEnabled` stands for the app's own channel: a server-rendered value, the config or flags endpoint the page already fetches, or the flags client it already uses. The server sets it from the same `ai_events_env` value it passes to `configure()`; the page's legacy `track` calls do not read it. With a reloadable switch, the page picks up a change on its next load. In a browser-only or cross-repo plan, `client_events.switch_source` can be a field on an existing backend API response (e.g. `response.aiEventsEnabled`); the named `server_dependency` supplies it from the same switch. Load it before sending client events; for a chat-response switch, use the buffered variant below. Server response/ID changes land in the backend PR first, then this browser PR; no server SDK or `configure()` is added to the browser repo.
 
-Chat submit: mint the ID, send the client prompt copy, send the request, then send the client answer copy when the turn reaches its final state on screen (completed, failed, or stopped by the user). From the response on, use the ID the server returns (it differs only if the server rejected yours).
+Chat submit with configuration loaded before submission: mint the ID, send the client prompt copy, send the request, then send the client answer copy when the turn reaches its final state on screen (completed, failed, or stopped by the user). From the response on, use the ID the server returns (it differs only if the server rejected yours).
 
 ```js
 let interactionId = crypto.randomUUID();
@@ -83,7 +83,7 @@ try {
   status = err?.name === 'AbortError' ? 'cancelled' : 'error'; // the user pressed stop
   if (status === 'error') errorKind = navigator.onLine ? 'interrupted' : 'offline';
 }
-trackAi('ai_response_received', {
+if (conversationId) trackAi('ai_response_received', {
   interaction_id: interactionId,
   conversation_id: conversationId,
   response_status: status, // success | error | cancelled
@@ -95,6 +95,50 @@ trackAi('ai_response_received', {
 Fit this into the app's existing submit handler; do not restructure it. With `interaction_id_source: sdk` or `app` the browser learns the ID only from the response: send the prompt copy then, just before the answer copy. An error reported inside a successful HTTP response or stream is `client_error_kind: 'agent_error'`. The server returns `conversationId` and `interactionId` on its error responses too, once the interaction has opened (a failed answer has a server row to join): extend the route's error path if it returns neither. When the first message of a new thread fails before the server returns a `conversation_id` (the request never reached it, or failed before the interaction opened), skip the answer copy: both schemas require `conversation_id` on `ai_response_received`, and there is no server answer to join.
 
 A chat API on another origin needs `credentials: 'include'` (and CORS that allows credentials) for the cookies to arrive.
+
+Chat-response switch: replace the helper's `AI_EVENTS_ON` declaration with `let AI_EVENTS_ON = false` and use this submit variant. Buffer only the prompt properties; read the effective switch on success and error responses. A missing switch sends neither copy. Each turn gates its copies with its own response value; later actions use the latest known switch.
+
+```js
+let interactionId = crypto.randomUUID();
+const submittedAt = performance.now();
+const promptCopy = {
+  conversation_id: conversationId,
+  prompt_source: 'composer',
+  prompt_length: message.length,
+};
+let aiEventsOn = false;
+let status = 'success';
+let errorKind;
+try {
+  const response = await fetch('/api/chat', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-interaction-id': interactionId },
+    body: JSON.stringify({ message, conversationId }),
+  });
+  const data = response.ok ? await response.json() : await response.json().catch(() => ({}));
+  aiEventsOn = data.aiEventsEnabled === true; // effective backend switch, never default an absent field on
+  AI_EVENTS_ON = aiEventsOn;
+  conversationId = data.conversationId ?? conversationId;
+  interactionId = data.interactionId ?? interactionId;
+  trackAi('ai_user_prompt_created', { ...promptCopy, conversation_id: conversationId, interaction_id: interactionId }, aiEventsOn);
+  if (!response.ok) {
+    status = 'error';
+    errorKind = response.status >= 500 ? 'http_5xx' : 'http_4xx';
+  } else {
+    render(data);
+  }
+} catch (err) {
+  status = err?.name === 'AbortError' ? 'cancelled' : 'error';
+  if (status === 'error') errorKind = navigator.onLine ? 'interrupted' : 'offline';
+}
+if (conversationId) trackAi('ai_response_received', {
+  interaction_id: interactionId,
+  conversation_id: conversationId,
+  response_status: status,
+  client_error_kind: errorKind,
+  time_to_first_render_ms: Math.round(performance.now() - submittedAt),
+}, aiEventsOn);
+```
 
 Actions the browser sends (those listed in the plan's `client_events`):
 

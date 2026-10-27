@@ -12,7 +12,7 @@ Read-only. Use Glob and Grep (or `rg` / `grep -rn`) over source files; skip `nod
 | Go version | the `go` line in `go.mod`, `Dockerfile` `FROM golang:` | below the `go` line of the chosen `ai-sdk-go` version's `go.mod` (v0.2.0: `go 1.26.10`); read it, never assume |
 | Package manager | `package-lock.json` (npm), `pnpm-lock.yaml`, `yarn.lock`, `bun.lock`, `deno.lock` (deno); `uv.lock`, `poetry.lock`, `Pipfile.lock`, `requirements*.txt`; `go.sum` | |
 
-Manifests give a floor; the interpreter in use comes from `node --version`, `deno --version`, `.venv/bin/python --version`, `uv run python --version` or `go version` (read-only commands). Record where the version came from. A blocked surface stays in the plan with `status: blocked` and the reason; do not upgrade the runtime yourself. Deno uses the Node SDK (`language: node`, `package_manager: deno`): it relies on `AsyncLocalStorage` and `node:` builtins, which Deno supports; record the exact Deno version and the repo's `deno test` command under Dependencies and blockers.
+Manifests give a floor; the interpreter in use comes from `node --version`, `deno --version`, `.venv/bin/python --version`, `uv run python --version` or `go version` (read-only commands). Record where the version came from. For Deno, discover the selected manifest and lock settings, including a custom lockfile path or disabled locking; list only the actual files under Files to change. A blocked surface stays in the plan with `status: blocked` and the reason; do not upgrade the runtime yourself. Deno uses the Node SDK (`language: node`, `package_manager: deno`): it relies on `AsyncLocalStorage` and `node:` builtins, which Deno supports; record the exact Deno version and the repo's `deno test` command under Dependencies and blockers.
 
 ### LLM and agent libraries
 
@@ -90,7 +90,7 @@ A new chat's first message often takes another path than follow-ups: a welcome o
 
 Streaming: note whether the route returns a stream (`stream: true`, `.stream(`, `streamText`, `StreamingResponse`, `res.write`, SSE). Streams need `bind()` or returning the stream from the interaction callback; in Go the stream must be read inside `RunInteraction`.
 
-Claude Agent SDK session resume: search `resume:` / `resume=`, `continue:` / `continue_conversation`, and stored session IDs; trace the session store and whether usage snapshots survive pods or restarts. Raise one plan question: persist snapshot (recommended), mark resumed with no cost, or in-memory only. Record the choice and sources in `surfaces[].usage_baseline_source` and the Cost section; in-memory state cannot cover another pod or a restart.
+Claude Agent SDK session resume: search `resume:` / `resume=`, `continue:` / `continue_conversation`, and stored session IDs; trace the session store and whether usage snapshots survive pods or restarts. Raise one plan question: persist snapshot (recommended), mark resumed with no durable baseline (cost needs registered prices when no cached baseline exists), or in-memory only. Record the choice and sources in `surfaces[].usage_baseline_source` and the Cost section; in-memory state cannot cover another pod or a restart.
 
 Thread pools (Python): `ThreadPoolExecutor`, `run_in_executor` inside a background job need `propagate()`.
 
