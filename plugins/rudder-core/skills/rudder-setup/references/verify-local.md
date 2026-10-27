@@ -127,7 +127,11 @@ wait exits 3, not 1.
 kill <PID> <APP>
 ```
 
-The listener exits 0. The files in `<D>` stay until you delete them.
+The listener exits 0, and `npm run dev` passes the signal on to the dev server it started. The files in `<D>` stay
+until you delete them. Stop these two process ids and nothing else. Never use `pkill`, `killall` or a match on a
+name such as `vite`: it also stops the user's other servers, and macOS `pkill` reads any option after the pattern
+as one more pattern. If the app's address still answers after the `kill`, show the user what listens on its port
+(`lsof -nP -iTCP:<port> -sTCP:LISTEN`) and ask before you stop it.
 
 ## One call
 

@@ -320,7 +320,7 @@ Needs: `sender`.
 3. Propose at most four events, named Object Action in Title Case (Product Viewed, Order Completed). Give each the properties the code already has, with types: string, number, integer or boolean. Money is a number.
 4. Write the events to `rudder/plan.events.json`, the only place event names and property types are written. Each event name maps to its properties, and each property to `string`, `number`, `integer` or `boolean`: `{"Order Completed": {"order_id": "string", "total": "number"}}`.
 5. Write `rudder/plan.md`: the question under `## Question`, and under `## Where each event fires` one line per event, `- <Event Name>: <file and function>`. Property names and types stay out of it. The CLI loads only YAML from `rudder/`, so neither file changes what apply does.
-6. Show the plan's table. Render it from the JSON with the shipped program, unchanged: `jq -r --rawfile md rudder/plan.md -f '<skill folder>/references/plan-table.jq' rudder/plan.events.json`.
+6. Show the plan's table. Render it from the JSON with the shipped program, unchanged: `jq -r --rawfile md rudder/plan.md -f '<skill folder>/references/plan-table.jq' rudder/plan.events.json`. Then copy the table it printed, unchanged, into your message above the question. Some agents fold a command's output, so the user may not see the table otherwise.
 
 If `sender` is `curl`:
 
@@ -457,7 +457,7 @@ Needs: `events`, `sender`.
 4. Before each pass, run the reference's mark command and keep FROM, LOGFROM and CUR. The check counts only what arrives after the mark, so take it before the app can send a planned event, such as one it sends when it starts: a mobile app that the reference launches for you is launched after the mark. If it says the listener is not running, this agent stops background processes. Use the one-call recipe, or for a mobile app skip this step, as its branch says.
 5. Ask the user to open the app, or on a later pass to reload the page or close and reopen the app, go through the flows that fire every event in `rudder/plan.events.json`, and say done. With the one-call recipe, say this before the call, because the user cannot answer during it.
 6. Run the check command. Exit 0 is a pass. Exit 1 is a failed check: show the table, then the failed requests and the diagnosis printed under it. Exit 2 (the checker could not run), exit 3 (the listener stopped) and exit 5 (the app did not start) are not a failed check. Fix the cause and run the pass again. Such a rerun is not an attempt, but after 3 of them, stop and report what the last one printed.
-7. Stop the listener and the app when the check passes.
+7. Stop the listener and the app when the check passes, with the reference's stop command: `kill` with the two process ids the start calls printed. Never use `pkill`, `killall` or a match on a name such as `vite`, which also stops the user's other servers.
 
 If `sender` is `curl`:
 
