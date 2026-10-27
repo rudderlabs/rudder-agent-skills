@@ -16,6 +16,7 @@ This skill guides instrumentation planning for **existing products** where you d
 | Codebase has domain types (enums, interfaces) you want to track | Yes |
 | Restructuring messy existing tracking | Yes |
 | Building new feature, events not yet defined | No — use `rudder-design-first-instrumentation` |
+| LLM chat, AI agent or MCP server usage | No — use `rudder-ai-events-setup` (standard AI events via the AI SDKs) |
 
 ## Why Code-First?
 
