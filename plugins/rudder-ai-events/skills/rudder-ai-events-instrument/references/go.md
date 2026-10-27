@@ -9,7 +9,7 @@ Events carry `context.wrapperLibrary.name: ai-sdk-go`. The root module (package 
 | Model clients | `github.com/openai/openai-go/v3` v3.70.0+, `github.com/anthropics/anthropic-sdk-go` v1.78.0+, `google.golang.org/genai` v1.72.0+, `github.com/aws/aws-sdk-go-v2/service/bedrockruntime` v1.63.1+; anything else through `RecordCall` |
 | MCP servers | `github.com/modelcontextprotocol/go-sdk` v1.8.0 (`rudderstackai.WrapMCPServer`) or `github.com/mark3labs/mcp-go` v0.55.1+, tested through v1.2.1 (`ruddermcpgo.WrapServer`) |
 
-`<VERSION>` is the plan's `sdks[].version`: v0.3.0 or later for the root module. Each integration module is tagged on its own (`rudderopenai/v0.2.0`, `rudderotel/v0.1.1`, ...): pin each at its latest tag (`go list -m -versions github.com/rudderlabs/ai-sdk-go/rudderopenai`). The modules are public on proxy.golang.org. Never pin a branch or pseudo-version.
+`<VERSION>` is the plan's `sdks[].version`: v0.3.0 or later for the root module. Each integration module is tagged on its own (`rudderopenai/v0.2.0`, `rudderotel/v0.1.1`, ...): install each at the exact version the plan records in `sdks[].extras` (`rudderopenai@v0.2.0`), never a newer one resolved here; a plan without versions there goes back to setup. The modules are public on proxy.golang.org. Never pin a branch or pseudo-version.
 
 Runnable references in the SDK repository's `examples/`: `openai`, `anthropic`, `google-genai`, `bedrock-converse`, `background-agent`, `manual`, `mcp-server`, `mcp-server-mcpgo`, `mcp-stateless-http`, `mcp-auth`.
 
@@ -17,9 +17,9 @@ Runnable references in the SDK repository's `examples/`: `openai`, `anthropic`, 
 
 ```bash
 go get github.com/rudderlabs/ai-sdk-go@<VERSION>
-go get github.com/rudderlabs/ai-sdk-go/rudderopenai@<its version>   # one per provider the plan lists:
+go get github.com/rudderlabs/ai-sdk-go/rudderopenai@<plan's version>  # one per sdks[].extras entry:
                                                                   # rudderanthropic, ruddergenai, rudderbedrock
-go get github.com/rudderlabs/ai-sdk-go/rudderotel@<its version>     # only with a tracing.trace_id_source
+go get github.com/rudderlabs/ai-sdk-go/rudderotel@<plan's version>    # only with a tracing.trace_id_source
 go get github.com/rudderlabs/analytics-go/v4@<latest>               # only when the plan says client: new
 go mod tidy
 ```
@@ -65,12 +65,27 @@ type lazyClient struct{}
 
 func (lazyClient) Enqueue(m analytics.Message) error {
 	if t, ok := m.(analytics.Track); ok && t.Context != nil {
+		if t.Context.Extra == nil {
+			t.Context.Extra = map[string]any{}
+		}
 		t.Context.Extra["groupId"] = currentGroupID() // same context the app's own Enqueue calls set
 		m = t
 	}
 	return getClient().Enqueue(m)
 }
 func (lazyClient) Close() error { return getClient().Close() }
+
+// Flush forwards the client's own flush, so Flush(ctx) / Shutdown(ctx) can drain it. A client without
+// one (analytics-go v4.3.1) sends its queue on Close().
+func (lazyClient) Flush(ctx context.Context) error {
+	switch c := getClient().(type) {
+	case interface{ Flush(context.Context) error }:
+		return c.Flush(ctx)
+	case interface{ Flush() error }:
+		return c.Flush()
+	}
+	return nil
+}
 
 // rudderstackai.WithAnalytics(lazyClient{})
 ```
@@ -179,7 +194,7 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 
   Calls made after the interaction ends are reported as separate answers; a loop still open at `Shutdown(ctx)`, or past `Limits.InteractionTTL` (1 hour by default), ends as `incomplete`.
 - Streams: read them inside the `RunInteraction` function (`defer stream.Close()`); there is no `bind`, and a stream still open when the function returns is recorded as cancelled.
-- App-detected failures: an error returned from the function already sets the status (`context.Canceled`: `cancelled`). When the app handles its own failure and returns `nil` (stop button, empty stream, its own deadline, a lost lease), end the answer there, inside the function: `in.End(rudderstackai.EndOptions{Status: rudderstackai.StatusError, ErrorType: "empty_response"})` (`StatusCancelled`, `StatusTimeout`, `StatusIncomplete` likewise). App-only error codes go in `ExtraProperties`. `RunInteraction`'s own `End` afterwards is a no-op.
+- App-detected failures: an error returned from the function already sets the status (`context.Canceled`: `cancelled`) and the error type: the failed call's own when a wrapped call failed with it, else `ErrorTypeOf(err)`, with `app_error` in place of `api_error` when nothing in the error chain names a provider. When the app handles its own failure and returns `nil` (stop button, empty stream, its own deadline, a lost lease), end the answer there, inside the function: `in.End(rudderstackai.EndOptions{Status: rudderstackai.StatusError, ErrorType: "empty_response"})` (`StatusCancelled`, `StatusTimeout`, `StatusIncomplete` likewise). App-only error codes go in `ExtraProperties`. `RunInteraction`'s own `End` afterwards is a no-op.
 - `client_disconnected` is detected only under `Middleware`; `paused` never is. Otherwise call `in.End(EndOptions{ClientDisconnected: true})` or `in.End(EndOptions{Status: rudderstackai.StatusPaused, PauseReason: ...})` from the app's own handling, inside the function.
 - analytics-go gives every track call without an `anonymousId` a random one, also when `userId` is set, so with no cookie and no `AnonymousID` the `anonymousId` differs per event: join AI events to users on `userId`.
 - Statuses from the integrations: an Anthropic `max_tokens` or OpenAI/Gemini/Bedrock length stop on the last call makes the answer `incomplete` with `error_type: length`; a content filter is an `error`.

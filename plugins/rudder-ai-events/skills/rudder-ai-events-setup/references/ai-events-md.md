@@ -309,7 +309,7 @@ spec:
 
 Values not shown in the example:
 
-- `sdks[].version`: the exact latest release resolved in setup step 2.3 (0.7.0 / v0.3.0 or later). `runtime` for Go: the `go` line of that version's `go.mod`. `extras`: Python extras, or Go integration modules (`[rudderopenai, rudderotel]`). `package_manager`: `npm | pnpm | yarn | bun | uv | poetry | pip | go`.
+- `sdks[].version`: the exact latest release resolved in setup step 2.3 (0.7.0 / v0.3.0 or later). `runtime` for Go: the `go` line of that version's `go.mod`. `extras`: Python extras, or Go integration modules with their exact versions, resolved in step 2.3 like the root (`[rudderopenai@v0.2.0, rudderotel@v0.1.1]`); instrument installs those versions only. `package_manager`: `npm | pnpm | yarn | bun | uv | poetry | pip | go`.
 - `rudderstack.client`: `existing | new` (new adds `rudder-sdk-node` / `rudder-sdk-python`).
 - `config.capture_content: true` sends prompt, answer and feedback text, score explanations and MCP `call_reason` / `capability_detail` (masked); with a client surface the browser copies may carry prompt and feedback text too, masked the same way, never answer text.
 - `config.labels_set_by`: `classifier` (`classifier.enabled: true`), `app` (the app calls `setIntent` / `setOutcome` or `trackScore`; the Intents and outcomes section names where), `none` (never populated).
