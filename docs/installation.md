@@ -6,16 +6,40 @@ This guide covers installing RudderStack agent skills for various coding agents.
 
 ### Rudder CLI
 
-Install the Rudder CLI from the [rudder-iac repository](https://github.com/rudderlabs/rudder-iac):
+Install `rudder-cli` from the [rudder-iac releases](https://github.com/rudderlabs/rudder-iac/releases). On macOS and Linux, the install script picks the archive for your OS and CPU from the latest release, checks it against the release's checksums file, and puts `rudder-cli` in `~/.local/bin` without `sudo`:
 
 ```bash
-# macOS (Homebrew)
-brew tap rudderlabs/rudder-iac
-brew install rudder-cli
-
-# Or download from releases
-# https://github.com/rudderlabs/rudder-iac/releases
+d=$(mktemp -d) && curl -fsSL https://raw.githubusercontent.com/rudderlabs/rudder-iac/main/install.sh -o "$d/install.sh" && sh "$d/install.sh"
 ```
+
+If the first command fails with a 404, the script is not published yet. This block installs the same archive with the same checksum check, and the arm64 build under Rosetta as the script does. It runs in a subshell, so an error ends the block and leaves your shell open:
+
+```bash
+(
+  set -e
+  releases=https://github.com/rudderlabs/rudder-iac/releases
+  tag=$(curl -fsSLI -o /dev/null -w '%{url_effective}' "$releases/latest"); tag=${tag##*/}
+  case "$(uname -m)" in
+    x86_64 | amd64) arch=x86_64 ;;
+    arm64 | aarch64) arch=arm64 ;;
+    i386 | i486 | i586 | i686) arch=i386 ;;
+    *) echo "no rudder-cli build for $(uname -m)" >&2; exit 1 ;;
+  esac
+  if [ "$(uname -s)" = Darwin ] && [ "$arch" = x86_64 ] && [ "$(sysctl -in hw.optional.arm64 2>/dev/null)" = 1 ]; then arch=arm64; fi
+  archive="rudder-cli_$(uname -s)_$arch.tar.gz"
+  d=$(mktemp -d); trap 'rm -rf "$d"' EXIT
+  curl -fsSL -o "$d/$archive" "$releases/download/$tag/$archive"
+  curl -fsSL -o "$d/checksums.txt" "$releases/download/$tag/rudder-cli_${tag#v}_checksums.txt"
+  want=$(awk -v f="$archive" '$2 == f { print $1 }' "$d/checksums.txt")
+  got=$(sha256sum <"$d/$archive" 2>/dev/null || shasum -a 256 <"$d/$archive"); got=${got%% *}
+  [ -n "$want" ] && [ "$got" = "$want" ] || { echo "checksum mismatch for $archive; not installing" >&2; exit 1; }
+  tar -xzf "$d/$archive" -C "$d" rudder-cli
+  mkdir -p "$HOME/.local/bin" && mv "$d/rudder-cli" "$HOME/.local/bin/rudder-cli"
+  "$HOME/.local/bin/rudder-cli" --version
+)
+```
+
+If `~/.local/bin` is not on your `PATH`, add `export PATH="$HOME/.local/bin:$PATH"` to your shell profile and open a new terminal. On Windows, download the `.zip` for your CPU from the [latest release](https://github.com/rudderlabs/rudder-iac/releases/latest). No npm package or Homebrew tap ships rudder-cli; the npm package named `rudder-cli` belongs to someone else.
 
 ### RudderStack Authentication
 
@@ -270,7 +294,7 @@ This pre-approves common Rudder CLI commands. Note: Do not commit `settings.loca
 
 1. Ensure Rudder CLI is installed: `which rudder-cli`
 2. Check your PATH includes the CLI location
-3. Try the full path: `/usr/local/bin/rudder-cli`
+3. Try the full path: `~/.local/bin/rudder-cli`, where the install above puts it
 
 ### Authentication errors
 

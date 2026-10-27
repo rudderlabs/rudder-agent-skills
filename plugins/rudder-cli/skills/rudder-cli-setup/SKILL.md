@@ -11,74 +11,97 @@ Install rudder-cli, authenticate with RudderStack, and verify the setup works.
 ## Setup Workflow
 
 ```
-1. Check Installation ──► which rudder-cli
+1. Check Installation ──► command -v rudder-cli, then ~/.local/bin
          │
          ├── Found ──► Skip to Authentication
          │
-         └── Not Found ──► Install from GitHub Releases
+         └── Not Found ──► Install the latest release into ~/.local/bin
                                     │
 2. Verify Installation ◄────────────┘
          │
          └── rudder-cli --version
 
-3. Check Authentication ──► rudder-cli workspace info
+3. Check Authentication ──► rudder-cli workspace info --json
          │
          ├── Authenticated ──► Done! Show workspace info
          │
-         └── Not Authenticated ──► Guide through auth flow
+         └── Not Authenticated ──► RUDDERSTACK_ACCESS_TOKEN (agents)
+                                   or rudder-cli auth login (people)
 ```
 
 ## Step 1: Check if Installed
 
 ```bash
-which rudder-cli
+command -v rudder-cli || ls "$HOME/.local/bin/rudder-cli"
 ```
 
-**If found:** Skip to Step 3 (Authentication).
+**If `command -v` prints a path:** Skip to Step 3 (Authentication).
 
-**If not found:** Continue to Step 2 (Installation).
+**If only `~/.local/bin/rudder-cli` exists:** An earlier install put it there, and that folder is not on PATH. Follow "If `~/.local/bin` is not on PATH" below, then skip to Step 3.
+
+**If neither exists:** Continue to Step 2 (Installation).
 
 ## Step 2: Install rudder-cli
 
-### Detect Operating System
+Both commands below install the latest release from [GitHub Releases](https://github.com/rudderlabs/rudder-iac/releases) on macOS or Linux, on x86_64 or arm64 (Linux also on i386). They check the archive against the release's checksums file, put `rudder-cli` in `~/.local/bin` without `sudo`, and replace no copy elsewhere. On Windows, download the `.zip` for your CPU from the [latest release](https://github.com/rudderlabs/rudder-iac/releases/latest) instead.
+
+Never install rudder-cli with npm, npx or Homebrew. No npm package or Homebrew tap ships it, and the npm package named `rudder-cli` belongs to someone else.
+
+### Run the install script
+
+Download the script into a new temporary folder, then run it. Do not pipe it into a shell.
 
 ```bash
-uname -s
+d=$(mktemp -d) && curl -fsSL https://raw.githubusercontent.com/rudderlabs/rudder-iac/main/install.sh -o "$d/install.sh" && sh "$d/install.sh"
 ```
 
-- `Darwin` = macOS
-- `Linux` = Linux
+### If the script download fails with 404
 
-### Download from GitHub Releases
-
-Go to: https://github.com/rudderlabs/rudder-iac/releases
-
-Download the appropriate binary for your OS and architecture:
-
-| OS | Architecture | Binary Name |
-|----|--------------|-------------|
-| macOS | Intel | `rudder-cli_darwin_amd64` |
-| macOS | Apple Silicon | `rudder-cli_darwin_arm64` |
-| Linux | x86_64 | `rudder-cli_linux_amd64` |
-| Linux | ARM64 | `rudder-cli_linux_arm64` |
-| Windows | x86_64 | `rudder-cli_windows_amd64.exe` |
-
-### Installation Commands (macOS/Linux)
+The script is not published yet. Install the release archive directly instead. This block does what the script does, including the arm64 build under Rosetta. It runs in a subshell, so an error ends the block and leaves the shell running:
 
 ```bash
-# Example for macOS Apple Silicon - adjust URL for your platform
-# Check latest version at https://github.com/rudderlabs/rudder-iac/releases
+(
+  set -e
+  releases=https://github.com/rudderlabs/rudder-iac/releases
+  tag=$(curl -fsSLI -o /dev/null -w '%{url_effective}' "$releases/latest"); tag=${tag##*/}
+  case "$(uname -m)" in
+    x86_64 | amd64) arch=x86_64 ;;
+    arm64 | aarch64) arch=arm64 ;;
+    i386 | i486 | i586 | i686) arch=i386 ;;
+    *) echo "no rudder-cli build for $(uname -m)" >&2; exit 1 ;;
+  esac
+  if [ "$(uname -s)" = Darwin ] && [ "$arch" = x86_64 ] && [ "$(sysctl -in hw.optional.arm64 2>/dev/null)" = 1 ]; then arch=arm64; fi
+  archive="rudder-cli_$(uname -s)_$arch.tar.gz"
+  d=$(mktemp -d); trap 'rm -rf "$d"' EXIT
+  curl -fsSL -o "$d/$archive" "$releases/download/$tag/$archive"
+  curl -fsSL -o "$d/checksums.txt" "$releases/download/$tag/rudder-cli_${tag#v}_checksums.txt"
+  want=$(awk -v f="$archive" '$2 == f { print $1 }' "$d/checksums.txt")
+  got=$(sha256sum <"$d/$archive" 2>/dev/null || shasum -a 256 <"$d/$archive"); got=${got%% *}
+  [ -n "$want" ] && [ "$got" = "$want" ] || { echo "checksum mismatch for $archive; not installing" >&2; exit 1; }
+  tar -xzf "$d/$archive" -C "$d" rudder-cli
+  mkdir -p "$HOME/.local/bin" && mv "$d/rudder-cli" "$HOME/.local/bin/rudder-cli"
+  "$HOME/.local/bin/rudder-cli" --version
+)
+```
 
-# Download (replace VERSION and BINARY with actual values)
-curl -L -o rudder-cli https://github.com/rudderlabs/rudder-iac/releases/download/VERSION/BINARY
+In the first minutes after a new release, its files may still be uploading, and a download fails. Wait a few minutes and run the block again.
 
-# Make executable
-chmod +x rudder-cli
+### If `~/.local/bin` is not on PATH
 
-# Move to PATH (choose one)
-sudo mv rudder-cli /usr/local/bin/    # System-wide
-# OR
-mv rudder-cli ~/.local/bin/           # User-only (ensure ~/.local/bin is in PATH)
+After either install, check which rudder-cli a plain `rudder-cli` runs:
+
+```bash
+command -v rudder-cli
+```
+
+If it prints the path of `~/.local/bin/rudder-cli`, go on. If it prints nothing, `~/.local/bin` is not on PATH. If it prints another path, an older copy comes first on PATH. In both cases:
+
+- Do not stop, and do not ask the user to edit their shell profile or restart you now. The install script prints an `export PATH` line for the profile and says to open a new terminal. That line goes in your closing summary instead.
+- For the rest of the session, run `"$HOME/.local/bin/rudder-cli"` wherever this skill or another RudderStack skill says `rudder-cli`. When you ask the user to run a rudder-cli command, such as `rudder-cli auth login`, give it with the full path as well.
+- In your closing summary, or in your last message if you stop before it, show the line the user adds to their shell profile (`~/.zshrc`, `~/.bash_profile` for bash on macOS, `~/.bashrc` for bash on Linux, or `~/.profile`) so that a new terminal runs this copy:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
 ```
 
 ### Verify Installation
@@ -87,6 +110,8 @@ mv rudder-cli ~/.local/bin/           # User-only (ensure ~/.local/bin is in PAT
 rudder-cli --version
 ```
 
+Use `"$HOME/.local/bin/rudder-cli" --version` if `~/.local/bin` is not on PATH.
+
 Expected output: Version number (e.g., `rudder-cli version 0.x.x`)
 
 ## Step 3: Authenticate
@@ -94,12 +119,12 @@ Expected output: Version number (e.g., `rudder-cli version 0.x.x`)
 ### Check Current Status
 
 ```bash
-rudder-cli workspace info
+rudder-cli workspace info --json
 ```
 
-**If authenticated:** Shows workspace name and ID. You're done!
+**If authenticated:** Prints the workspace as JSON. `workspaceID` and `name` identify it. You're done!
 
-**If not authenticated:** Continue with authentication.
+**If not authenticated:** The command exits non-zero with an error. Continue with authentication.
 
 ### Get Access Token
 
@@ -108,31 +133,43 @@ rudder-cli workspace info
 3. Click **Generate New Token**
 4. Copy the token (you won't see it again)
 
-### Run Authentication
+### Provide the Token
+
+rudder-cli reads the token from the `RUDDERSTACK_ACCESS_TOKEN` environment variable, or from the config file that `rudder-cli auth login` writes. When the variable is set, it wins over the config file.
+
+**Agents: use the environment variable.** `rudder-cli auth login` prompts for the token on a terminal, which an agent cannot answer, and a token typed into the conversation ends up in the transcript. Never ask the user to paste a token into the chat. Ask the user to set the variable in their own terminal, in the shell that starts the agent, then restart the agent:
 
 ```bash
-rudder-cli auth login
+# The user runs this in their own terminal. read -s keeps the token
+# off the screen and out of shell history.
+read -rs RUDDERSTACK_ACCESS_TOKEN && export RUDDERSTACK_ACCESS_TOKEN
 ```
 
-This prompts for your access token. Paste it when asked.
+**People at a terminal** can run `rudder-cli auth login` instead. It prompts for the token and saves it in the config file.
 
 ### Verify Authentication
 
 ```bash
-rudder-cli workspace info
+rudder-cli workspace info --json
 ```
 
 Expected output:
-```
-Workspace Information:
-  ID:   2iKXWU4QnqclkpPIfXfsbBqrAVa
-  Name: My Workspace
+```json
+{
+  "dataPlaneURL": "https://example.dataplane.rudderstack.com",
+  "environment": "PRODUCTION",
+  "name": "My Workspace",
+  "region": "US",
+  "status": "ACTIVE",
+  "workspaceID": "2iKXWU4QnqclkpPIfXfsbBqrAVa"
+}
 ```
 
 ## Credential Security
 
 - **Never echo or log your access token**
-- Store tokens in environment variables if needed: `RUDDER_ACCESS_TOKEN`
+- **Never ask the user to paste a token into the chat.** Agents read it from `RUDDERSTACK_ACCESS_TOKEN`
+- Store tokens in the `RUDDERSTACK_ACCESS_TOKEN` environment variable, which rudder-cli reads directly
 - Add `.env` files to `.gitignore`
 - For CI/CD, use repository secrets
 - Rotate tokens periodically in the RudderStack dashboard
@@ -141,10 +178,11 @@ Workspace Information:
 
 | Issue | Solution |
 |-------|----------|
-| `command not found` after install | Check PATH includes install location |
-| `unauthorized` error | Re-run `rudder-cli auth login` with new token |
-| Wrong workspace | Token is tied to workspace; generate new token in correct workspace |
-| Download fails | Check network; try browser download from releases page |
+| `command not found` after install | `~/.local/bin` is not on PATH. Run `"$HOME/.local/bin/rudder-cli"` for the rest of the session, and show the `export PATH` line from Step 2 in the closing summary |
+| `unauthorized` error | Check that `RUDDERSTACK_ACCESS_TOKEN` holds a valid token in the shell that started the agent, or have the user re-run `rudder-cli auth login` with a new token |
+| Wrong workspace | Token is tied to workspace; generate new token in correct workspace. If `RUDDERSTACK_ACCESS_TOKEN` is set, it overrides the token that `auth login` saved |
+| Download fails | A 404 for `install.sh` means the script is not published yet; use the release archive block in Step 2. Otherwise check the network, or wait a few minutes if a release came out just now |
+| `checksum mismatch` | Install nothing. Run the block again once; if it fails the same way, stop and tell the user |
 
 ## Next Steps
 
