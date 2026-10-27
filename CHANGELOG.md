@@ -206,7 +206,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   listener and the app by their process ids only, never with `pkill` or a name pattern. The destination
   reference leaves unfilled secrets as `NAME:` with no value, names every secret key of Amplitude
   and Mixpanel, and lists the 24 verified destination types. It says a secret that spans lines,
-  such as a PEM key, keeps its line breaks only from rudder-cli 0.29.0, as a `|` block. Step 4 asks
+  such as a PEM key, keeps its line breaks only from rudder-cli 0.29.0, as a `|` block, and that a
+  one-line value in the var file is single-quoted, with each `'` written four times. Step 4 asks
   whether a webhook needs an authentication header and, on yes, for its name, `Authorization` by
   default; the user fills its value, such as `Bearer <token>`, in the var file.
   Step 1 runs its read-only checks before it changes the folder, and commits the `.gitignore` lines
@@ -260,15 +261,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Steps 7 and 8 commit each fix they make, and the undo reverts those commits with the rest. Before
   step 6 writes the write key or data plane URL to a git-ignored file, such as `.env.local` or an
   iOS app's `RudderStack.local.xcconfig`, on any path, it saves the file in the git directory under
-  the app folder's own path, and afterwards records what it wrote. The undo reads that folder, in
+  the app folder's own path, and afterwards records what it wrote. A later run first checks that
+  the file still holds what the last run wrote, and asks the user before it takes a file the user
+  changed as its own. The undo reads that folder, in
   the same session or a later one: it puts back each file that still holds what step 6 wrote,
   deletes the ones step 6 created, and asks before replacing a file the user changed since. It then
   drops its copies of each file it dealt with, so a later onboarding saves the file as it is then.
-  The undo runs only when the user asks for it, never as part of step 9's summary.
+  The undo runs only when the user asks for it, never as part of step 9's summary, and stops
+  unless `rudder-cli workspace info` reports the workspace that step 5 recorded before its apply.
   It starts with a dry run and stops if it would remove anything, because the workspace then
   holds resources that `rudder/` does not, such as another project's. After its reverts it stops
   again if the dry run would remove a resource that the reverts did not take out of `rudder/`,
-  comparing kind and id, since ids are unique only per kind.
+  comparing kind and id, read as YAML values, since ids are unique only per kind.
   Every validate, dry run and apply runs through a filter that first drops each message's source
   block, from the gutter line to the `^^^` line under it, then keeps only the lines rudder-cli is
   known to print, because validate shows the spec line a message is about with secrets filled in,
@@ -285,7 +289,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   before it writes it. After any uncommitted changes are dealt with, it commits specs it finds in
   `rudder/` that no commit holds yet, on their own, and the undo never reverts that commit. When
   the app's source type differs from the resumed source's, it adds a source of the new type beside
-  the old one, which keeps its write key, so neither step 5 nor the undo removes a source.
+  the old one, which keeps its write key, so neither step 5 nor the undo removes a source. When
+  one of the two sources is a mobile app and the other is not, the new source gets a GA4
+  destination of its own, because a GA4 destination sends to one data stream.
   Step 9 copies `rudder/` to the app without the var file. A site without a
   build keeps its write key in the page. A mobile app skips step 7 in an agent that stops background
   processes, and reruns after a listener or app failure are bounded. When `claude mcp list` shows a

@@ -84,8 +84,12 @@ NAME:
 - Pass the file with `--var-file rudder/secrets.vars.yaml` on `validate` and `apply`; nothing else reads it. An
   environment variable `RUDDER_<NAME>` overrides the line `NAME`.
 - The CLI reads the value from the var file, then pastes it into the spec's text before parsing it, inside the
-  single quotes of the slot. So in the value the CLI reads, every `'` must be doubled. Write a plain value as it
-  is, with each `'` in it written twice (`it''s`).
+  single quotes of the slot. So in the value the CLI reads, every `'` must be doubled.
+- The var file is YAML too, so write a one-line value in single quotes, `NAME: 'value'`, with each `'` of the
+  value written four times, as in `'it''''s'` for `it's`. YAML turns the four into two, and the slot's quotes
+  turn the two into one. Unquoted, YAML cuts the value at ` #`, reads a leading `!` or `&` as a tag or an
+  anchor, and drops trailing spaces, and validate still passes. A `RUDDER_<NAME>` environment variable is not
+  YAML, so there each `'` is written twice.
 - Write a JSON value, such as a service account key, on one line in single quotes, `NAME: '{"type": ...}'`, and
   keep its `\n` escapes as they are. Inside those quotes, each `'` of the value is written four times.
 - For a key file, ask the user for its path and run this command with that path and the variable's name in
