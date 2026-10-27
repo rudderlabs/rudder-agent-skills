@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (rudder-iac#990), which name a secret key that holds a value and a variable that fills two keys.
   Validate exits 0 with either warning, so step 5 does not go on to the dry run, or commit, while
   one shows. Step 4 turns away a destination that needs the dashboard's OAuth sign-in (a required
-  `rudder_account_id`) and one that takes only device mode, which step 8 cannot confirm.
+  `rudder_account_id`) and one whose connection mode is device, which step 8 cannot confirm.
   When the output lists secret keys that nothing requires, no custom validator checks and the
   template does not hold, such as a webhook's header value, step 4 asks one question that names
   them, with No first, and adds the ones the user picks.
@@ -29,12 +29,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   when a plain `rudder-cli` runs another copy or none, and stops only if the latest release lacks
   them. The skill never falls back to written-down keys. When no platform is detected, the "What will send
   events" options come from `rudder-cli docs source --json`. `references/destinations.md` keeps
-  only the layout, the source and connection specs, how to get a webhook endpoint, and how to
-  write values in the var file, JSON keys and `'` included. It gives a command that writes a key
+  only how to read the docs output, the layout, the source and connection specs, how to get a
+  webhook endpoint (a quick tunnel started in the background where an agent keeps background
+  processes, and stopped in step 9, or a request bin), and how to write values in the var file,
+  JSON keys and `'` included. It gives a command that writes a key
   file into the var file without printing it, and says that a multi-line secret, such as a PEM
   private key, goes in the var file as a `|` block, which keeps its line breaks from rudder-cli
   0.29.0 (rudderlabs/rudder-iac#998) and so in every release step 1 accepts. It names no
-  destination keys, samples or secret names. `rudder-core` 0.0.10.
+  destination keys, samples or secret names.
 - **`rudder-cli` / `rudder-cli-setup`, `rudder-cli-workflow`, `rudder-transformations`,
   `rudder-import-and-evolve`; `rudder-core` / `rudder-instrumentation-debugging`.**
   Agents now check auth with `rudder-cli workspace info --json` and read the token
@@ -66,7 +68,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the target workspace, and the prod step switches the CLI to the prod
   workspace before it applies.
 - **Versions.** `rudder-cli` 0.0.3 to 0.0.5, `rudder-mcp` 0.0.2 to 0.0.3,
-  `rudder-core` 0.0.6 to 0.0.9.
+  `rudder-core` 0.0.6 to 0.0.10.
 
 - **Breaking (repo layout):** renamed the top-level `skills/` directory back to
   `plugins/` (reverting the earlier `plugins/` → `skills/` rename). Each plugin
