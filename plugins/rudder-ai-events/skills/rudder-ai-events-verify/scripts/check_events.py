@@ -392,6 +392,8 @@ if args.no_ai_events and sdk_events:
     problems.append(f"{sdk_events} AI SDK events sent with the AI events switch off")
 if args.no_ai_events and browser_events:
     problems.append(f"{browser_events} browser AI events sent with the AI events switch off (trackAi not gated on it)")
+if args.expect_joins and not args.no_ai_events and not answers:  # browser events alone hide a missing server side
+    problems.append("no server ai_response_received captured (--expect-joins needs the server side)")
 if not args.no_ai_events and not sdk_events and not browser_events:  # a silent recorder must not pass
     problems.append("no AI events captured (recorder not wired, or the AI events switch is off)")
 
