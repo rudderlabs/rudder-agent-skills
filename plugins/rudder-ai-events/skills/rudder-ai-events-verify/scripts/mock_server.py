@@ -56,7 +56,7 @@ class Handler(BaseHTTPRequestHandler):
                     "model": body.get("model", "mock"),
                     "choices": [{"index": 0, "finish_reason": "tool_calls", "message": {
                         "role": "assistant", "content": None, "tool_calls": [{
-                            "id": "call_mock_1", "type": "function",
+                            "id": f"call_mock_{next(CALLS)}", "type": "function",
                             "function": {"name": call, "arguments": json.dumps({"priority": "high"})}}]}}],
                     "usage": {"prompt_tokens": 12, "completion_tokens": 5, "total_tokens": 17},
                 })

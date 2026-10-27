@@ -65,7 +65,8 @@ try {
     headers: { 'content-type': 'application/json', 'x-interaction-id': interactionId },
     body: JSON.stringify({ message, conversationId }), // same-origin requests send cookies by default
   });
-  const data = await response.json().catch(() => ({})); // error bodies carry the IDs too
+  // error bodies carry the IDs too; only they may be unreadable (a stop mid-body still throws: cancelled)
+  const data = response.ok ? await response.json() : await response.json().catch(() => ({}));
   conversationId = data.conversationId ?? conversationId;
   interactionId = data.interactionId ?? interactionId;
   if (!response.ok) {
