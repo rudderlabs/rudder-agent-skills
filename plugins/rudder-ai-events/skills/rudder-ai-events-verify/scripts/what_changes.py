@@ -3,8 +3,8 @@
 Usage: what_changes.py before.jsonl after.jsonl
 before: AI events switched off (the app as it was); after: AI events on.
 Prints the event table (counts per capture) and, per changed event, a redacted before/after JSON pair
-with the differing fields and values listed. Every occurrence is compared in capture order, an unmatched one
-with the other capture's first; the pair shown is the first that differs. Fields that differ on every run (IDs, timestamps, durations) count by presence
+with the differing fields and values listed. Equal occurrences pair first, whatever their order; the rest pair in
+capture order, an unmatched one with the other capture's first; the pair shown is the first that differs. Fields that differ on every run (IDs, timestamps, durations) count by presence
 and type only, inside lists too. IDs, user and account IDs, on_behalf_of, emails, traits and timestamps
 are redacted; check the rest before sharing.
 """
@@ -52,8 +52,12 @@ def row_key(m):
     return name + (" (legacy)" if not sdk and reserved else "")
 
 
+TIME_KEY = re.compile(r"At\Z|_at\Z|[Tt]imestamp|(^|_)time\Z|Time(UnixNano)?\Z")  # the timestamp part of VARY
+
+
 def redact(value, key=""):
-    if key in PERSONAL or (value is not None and not isinstance(value, (dict, list)) and ID_KEY.search(key)):
+    scalar = value is not None and not isinstance(value, (dict, list))
+    if key in PERSONAL or (scalar and (ID_KEY.search(key) or TIME_KEY.search(key))):
         return f"<{key}>"
     if isinstance(value, dict):
         return {k: redact(v, k) for k, v in value.items()}
@@ -113,11 +117,19 @@ for name in sorted(by_b.keys() | by_a.keys()):
     elif not na:
         status = "removed"
     else:
-        # Compare every occurrence in capture order; a change in a later turn counts too.
+        # Compare every occurrence; a change in a later turn counts too.
         diff, pair = [], (by_b[name][0], by_a[name][0])
-        # unmatched occurrences (added or removed turns) are compared with the other side's first one
-        pairs = list(zip(by_b[name], by_a[name])) + [(by_b[name][0], m) for m in by_a[name][nb:]] \
-            + [(m, by_a[name][0]) for m in by_b[name][na:]]
+        # equal occurrences pair first, whatever their order (concurrent jobs finish in any order);
+        # the rest pair in capture order, and unmatched ones with the other side's first occurrence
+        rest_b, rest_a = list(by_b[name]), []
+        for m in by_a[name]:
+            twin = next((i for i, o in enumerate(rest_b) if fields(o) == fields(m)), None)
+            if twin is None:
+                rest_a.append(m)
+            else:
+                rest_b.pop(twin)
+        pairs = list(zip(rest_b, rest_a)) + [(by_b[name][0], m) for m in rest_a[len(rest_b):]] \
+            + [(m, by_a[name][0]) for m in rest_b[len(rest_a):]]
         for mb, ma in pairs:
             d = diff_of(fields(mb), fields(ma))
             if d and not diff:
