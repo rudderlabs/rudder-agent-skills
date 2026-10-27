@@ -2,6 +2,7 @@
 import gzip
 import itertools
 import json
+import re
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -46,7 +47,9 @@ class Handler(BaseHTTPRequestHandler):
         if path.endswith("/chat/completions"):  # OpenAI Chat Completions (non-streaming)
             tools = [t["function"]["name"] for t in body.get("tools", []) if t.get("type") == "function"]
             last = str((body.get("messages") or [{}])[-1].get("content", ""))
-            call = next((name for name in tools if f"call:{name}" in last), None)
+            # the whole tool name after call: (create_ticket must not pick create_ticket_with_attachment)
+            wanted = set(re.findall(r"call:([A-Za-z0-9_-]+)", last))
+            call = next((name for name in tools if name in wanted), None)
             if call:  # a prompt containing "call:<tool>" gets a tool call, to exercise event_rules
                 return self._json(200, {
                     "id": f"chatcmpl-mock-tool-{next(CALLS)}", "object": "chat.completion", "created": 0,
