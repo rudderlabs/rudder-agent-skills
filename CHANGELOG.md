@@ -86,9 +86,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `install.sh` attached to the latest rudder-iac release into a new temporary
   folder and runs it. The script installs that release's archive (the arm64
   build under Rosetta) after checking it against the release's checksums file,
-  and puts `rudder-cli` in `~/.local/bin`. When the download gets a 404 because
-  a release that just came out is still uploading its files, the agent waits a
-  minute and tries again, up to 5 times. When `~/.local/bin` is not on PATH, the
+  and puts `rudder-cli` in `~/.local/bin`. When the download of the script gets
+  a 404 because a release that just came out is still uploading its files, the
+  agent waits a minute and tries again, up to 10 times. It does not retry an
+  error the script itself prints, and when a sandbox keeps the script from
+  writing to `~/.local/bin` or reaching github.com, it asks the user to run the
+  install outside the sandbox instead of installing into the project. When
+  `~/.local/bin` is not on PATH, the
   agent runs `"$HOME/.local/bin/rudder-cli"` for the rest of the session, gives
   the user that path for any rudder-cli command they run, and shows the
   `export PATH` line in its closing summary, or when it stops earlier. The
@@ -225,9 +229,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that arrive after its mark, so it takes the mark before the app can send one, and launches a
   mobile app after it. Step 8 builds the curl event
   from the plan. Step 1 downloads the installer attached to the latest rudder-iac release into a new
-  temporary folder and runs it. When the download gets a 404 because a release that just came out is
-  still uploading its files, the agent waits a minute and tries again, up to 5 times, then tells the
-  user to try again in a few minutes. After an install, or when only a copy an earlier install left in `~/.local/bin`
+  temporary folder and runs it. When the download of the installer gets a 404 because a release that
+  just came out is still uploading its files, the agent waits a minute and tries again, up to 10 times,
+  then tells the user to try again in a few minutes. It does not retry an error the installer itself
+  prints, and when a sandbox keeps the installer from writing to `~/.local/bin` or reaching github.com,
+  it asks the user to run the install outside the sandbox instead of installing into the project. After an install, or when only a copy an earlier install left in `~/.local/bin`
   works, and a plain `rudder-cli` runs another copy or none, the agent runs
   `"$HOME/.local/bin/rudder-cli"` for the rest of the session and gives the user that path for any
   rudder-cli command they run. Step 9's summary shows the `export PATH` line for the user's shell
