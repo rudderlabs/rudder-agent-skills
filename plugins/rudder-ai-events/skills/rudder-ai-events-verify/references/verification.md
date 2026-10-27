@@ -2,34 +2,21 @@
 
 Plan values below (surfaces, `capture_content`, `switches`, legacy events, event rules, MCP servers, `prices`, `unpriced_models`) come from the fenced `yaml` block under `## Config` in `ai-events.md`.
 
-Everything runs locally, without provider keys and without sending anything to RudderStack. Work in a scratch directory outside the repo (for example `$TMPDIR/ai-events-verify/`), never in the user's source tree. The kit ships with this skill:
+Everything runs locally, without provider keys and without sending anything to RudderStack. Work in a scratch directory outside the repo (for example `$TMPDIR/ai-events-verify/`), never in the user's source tree.
 
-| File | Use |
-|---|---|
-| `scripts/check_events.py` | validates a capture (section 3) |
-| `scripts/what_changes.py` | drafts the `## What changes` events table and before/after pairs (section 5) |
-| `scripts/mock_server.py` | mock data plane and mock OpenAI / Anthropic (option B) |
-| `scripts/recorder.mjs`, `scripts/recorder.py`, `scripts/recorder.go` | stub RudderStack clients that append every message to a JSONL file (option A) |
-| `assets/ai-client-events.schema.json` | client-event schema, the single source of truth (`rudder-ai-events-instrument` points here) |
+The checker, the recorders and both schemas ship with the SDKs (`@rudderstack/ai` / `rudderstack-ai` 0.7.0 or later, `ai-sdk-go` v0.3.0 or later); this skill ships only `scripts/mock_server.py`, the mock data plane and model server for option B (Python 3, standard library only; copy it into the scratch directory).
 
-Copy `scripts/` and `assets/` into the scratch directory. Create the checker's environment with uv (system `python3` with `pip` is often missing or externally managed):
+## 1. Checker
 
-```text
-uv venv -p 3.12 $TMPDIR/ai-events-verify/.venv
-uv pip install -p $TMPDIR/ai-events-verify/.venv/bin/python jsonschema==4.26.0
-```
+Three equivalent commands: the same flags, the same output lines, the same exit codes (0 pass, 1 a check failed, 2 bad usage or an unreadable file). Each validates against the spec schema and the browser-event schema it ships, so no schema download is needed. They read any capture, whatever language the app is written in: use the one matching the app's runtime, and pin it to the plan's SDK version (or the latest when the app has no SDK of that language).
 
-Without uv, any Python 3.10 or later `-m venv` works. `mock_server.py` and `what_changes.py` need only the standard library.
+| Runtime | Check | What changes |
+|---|---|---|
+| Node.js 24+ | `npx -y @rudderstack/ai@<VERSION> check events.jsonl [flags]` | `npx -y @rudderstack/ai@<VERSION> what-changes before.jsonl events.jsonl` |
+| Python 3.12+ | `uv run --no-project -p 3.12 --with "rudderstack-ai[check]==<VERSION>" python -m rudderstack.ai.check events.jsonl [flags]` (or `pip install "rudderstack-ai[check]==<VERSION>"` in a 3.12 virtualenv) | the same with `python -m rudderstack.ai.check what-changes before.jsonl events.jsonl` |
+| Go | `go run github.com/rudderlabs/ai-sdk-go/cmd/aicheck@v0.1.0 events.jsonl [flags]` | `go run github.com/rudderlabs/ai-sdk-go/cmd/aicheck@v0.1.0 what-changes before.jsonl events.jsonl` |
 
-## 1. Schemas
-
-`ai-events-v0.3.schema.json` ships in the npm package and the Go module (not in the Python wheel). Read it as a file; it is not an importable export. It covers the chat, background and `mcp_*` events and the client copies' fields. `<VERSION>` is the version the plan pins (`spec.sdks[].version`); without a Node.js or Go app, resolve the latest from a scratch directory (`npm view @rudderstack/ai version`; inside a repo, `devEngines` can fail it with `EBADDEVENGINES`). A version without `spec/ai-events-v0.3.schema.json` is too old.
-
-| App | Get the schema |
-|---|---|
-| Node.js, after install | copy `node_modules/@rudderstack/ai/spec/ai-events-v0.3.schema.json` |
-| Go, after `go get` | copy `$(go env GOMODCACHE)/github.com/rudderlabs/ai-sdk-go@<VERSION>/spec/ai-events-v0.3.schema.json` |
-| Python, or any app (one download from the public npm registry; use the `@rudderstack/ai` release with the same spec version, 0.6.0 or later) | `curl -sSLo ai.tgz https://registry.npmjs.org/@rudderstack/ai/-/ai-<VERSION>.tgz`, then `tar -xzf ai.tgz --strip-components=2 package/spec/ai-events-v0.3.schema.json` |
+Run them from the scratch directory (inside a repo, `devEngines` can make `npx` fail with `EBADDEVENGINES`). `--help` lists every flag. The browser-event schema is `spec/ai-client-events-v0.2.schema.json` in the npm package, `rudderstack/ai/check/ai-client-events-v0.2.schema.json` in the Python wheel and `cmd/aicheck/schemas/` in the Go module; `--spec` / `--client-schema` override them only for a newer draft.
 
 ## 2. Capture events
 
@@ -55,17 +42,19 @@ Drive, per planned surface (skip what the app does not have):
 
 Make the recorder the app's own RudderStack client before the app wires it: replace the client where the app builds it (its factory, module or dependency injection; in tests, the existing mock or override for that client), so the app's `configure()`, its switches and its legacy calls all go through the recorder. Calling `configure()` with a recorder after the app starts would replace the AI switch's no-op client and miss legacy calls. Drive the surfaces, then flush. The recorders write each message as it arrives, so a crash still leaves a capture. The model still needs a stand-in: the app's existing test doubles, or the mock model in option B through the provider's base URL variable.
 
-- Node.js: `import { recorder } from '<scratch>/scripts/recorder.mjs'`, then `configure({ analytics: recorder('<scratch>/events.jsonl') })`; `await flush()` at the end.
-- Python: run from the scratch directory with the app's environment (`env PYTHONPATH=<repo>:<scratch>/scripts uv --directory <repo> run python <scratch>/harness.py`), then `from recorder import Recorder` and `rudderstack.ai.configure(analytics=Recorder("<scratch>/events.jsonl"))`; `rudderstack.ai.flush()` at the end.
-- Go: copy `scripts/recorder.go` into the harness or test package, change its `package` clause, then `rec, _ := NewRecorder("<scratch>/events.jsonl")`, `rudderstackai.Configure(rudderstackai.WithAnalytics(rec))` (MCP: the wrapper's `Analytics` option); `rudderstackai.Flush(ctx)` and `rec.Close()` at the end. Remove the copied file afterwards. It needs `github.com/rudderlabs/analytics-go/v4`, already in the module graph through `ai-sdk-go`.
+The recorders ship with the SDK the app already installs (0.7.0 / v0.3.0 or later), so the harness needs nothing from this skill:
 
-`check_events.py` reads the Node.js, Python (`user_id` / `anonymous_id`) and data plane message shapes.
+- Node.js: `import { Recorder } from '@rudderstack/ai/testing'`; `new Recorder('<scratch>/events.jsonl')` where the app builds its `new Analytics(...)`; `await flush()` at the end.
+- Python: `from rudderstack.ai.testing import Recorder`; `Recorder("<scratch>/events.jsonl")` where the app builds its `rudderstack.analytics` client (same method signatures and `(success, message)` results); run the harness with the app's environment (`uv --directory <repo> run python <scratch>/harness.py`); `rudderstack.ai.flush()` at the end.
+- Go: `rec, err := ruddertest.NewRecorder("<scratch>/events.jsonl")` from `github.com/rudderlabs/ai-sdk-go/ruddertest`, in place of `analytics.NewWithConfig(...)` (MCP: the wrapper's `Analytics` option); `rudderstackai.Flush(ctx)` and `rec.Close()` at the end.
+
+Each records every `track`, `identify`, `page`, `screen`, `group` and `alias` call as one JSON line, appends to an existing capture and creates it at start, so a run that sends nothing still leaves a file. The checkers read the Node.js, Python (`user_id` / `anonymous_id`) and data plane message shapes.
 
 ### B. Mock data plane and mock model (no code changes)
 
 Runs the app as is, with its real RudderStack client and real provider SDK pointed at localhost.
 
-1. Start it in the background: `python3 <scratch>/scripts/mock_server.py 8787 <scratch>/events.jsonl`.
+1. Start it in the background (Python 3, standard library only): `python3 <scratch>/mock_server.py 8787 <scratch>/events.jsonl`.
 2. Run the app from its usual working directory (static files and relative paths depend on it), with variables set for that command only, never in `.env`. Without a `cd`, use the package manager's directory flag: `env NAME=value ... npm --prefix <repo> start`, `env NAME=value ... uv --directory <repo> run python -m <module>`, `env NAME=value ... go -C <repo> run ./cmd/<app>`. Variables:
    - the plan's data plane URL variable: `http://127.0.0.1:8787`; its write key variable: `local-test`
    - OpenAI: `OPENAI_BASE_URL=http://127.0.0.1:8787/v1`, `OPENAI_API_KEY=test`; Anthropic: `ANTHROPIC_BASE_URL=http://127.0.0.1:8787`, `ANTHROPIC_API_KEY=test`
@@ -133,13 +122,14 @@ Drive the page against the server that answers it, so the browser's actions use 
 ## 3. Validate
 
 ```text
-$TMPDIR/ai-events-verify/.venv/bin/python scripts/check_events.py events.jsonl \
-  --spec ai-events-v0.3.schema.json --client-schema assets/ai-client-events.schema.json \
+npx -y @rudderstack/ai@<VERSION> check events.jsonl \
   --feature support_bot --surface web --user-id demo_user_1 --expect-session --expect-joins \
   --feedback-endpoint web:feedback_given --expect-legacy chatTurnCompleted \
   --failed-interaction <id of the app-detected failure> \
   --mcp-server docs-server --mcp-intent docs-server:search_docs --mcp-intent docs-server:read_page
 ```
+
+The Python and Go commands (section 1) take the same flags.
 
 Pass only the flags that apply:
 
@@ -174,17 +164,19 @@ const ids: [string, string][] = [['aws.bedrock', 'us.anthropic.claude-haiku-4-5-
 for (const [provider, model] of ids) console.log(provider, model, estimateCost(provider, model, 1000, 100) ?? 'UNPRICED');
 ```
 
-Python: `register_price(model, input_per_mtok=1, output_per_mtok=1)`, then `estimate_cost(provider, model, 1000, 100)` returns `None` when unpriced; Go: `WithPrices` on `Configure`, then `EstimateCost(provider, model, 1000, 100, 0, 0)` returns `ok == false`. Any `UNPRICED` ID is a FAIL. For `aws.bedrock` the SDKs strip the cross-region inference profile prefix (`us.`, `us-gov.`, `eu.`, `apac.`, `jp.`, `au.`, `in.`, `global.`) and then the vendor prefix before matching; versions before 0.6.0 miss some of these, so an unpriced geo-prefixed ID there means upgrading.
+Python: `register_price(model, input_per_mtok=1, output_per_mtok=1)`, then `estimate_cost(provider, model, 1000, 100)` returns `None` when unpriced; Go: `WithPrices` on `Configure`, then `EstimateCost(provider, model, 1000, 100, 0, 0)` returns `ok == false`. Any `UNPRICED` ID is a FAIL. For `aws.bedrock` the SDKs strip the cross-region inference profile prefix (`us.`, `us-gov.`, `eu.`, `apac.`, `jp.`, `au.`, `in.`, `global.`) and then the vendor prefix before matching; 0.7.0 / v0.3.0 and later strip them all.
 
 ## 5. What changes
 
 After the first PASS, rebuild the plan's `## What changes` from what was captured, as a block for the PR body:
 
 ```text
-python3 scripts/what_changes.py before.jsonl events.jsonl
+npx -y @rudderstack/ai@<VERSION> what-changes before.jsonl events.jsonl
 ```
 
-`before.jsonl` is the same traffic with `ai_events_env` off. The script prints the events table (`new`, `changed`, `unchanged`, `removed`, with counts; browser copies, legacy events that use an `ai_*` or `mcp_*` name (`(legacy)`), and AI SDK events with a customer name (`(AI SDK)`, declared tool events) on their own rows; a span's raw `otlp` block is left out) and, per changed event, one redacted before/after JSON pair with the differing fields and their before and after values listed. A value change counts (status, model, cost); fields that differ on every run (interaction, conversation and session IDs, `anonymousId`, timestamps such as `createdAt` or `created_at`, durations and latency) count only when added, removed or retyped. Equal occurrences pair first, whatever order the captures hold them in; the rest pair in capture order, and an occurrence with no counterpart (an added or dropped turn) is compared with the other capture's first one. Timestamps are masked in the printed pairs too. IDs, user and account IDs, `on_behalf_of`, emails, `traits` and timestamps are redacted; check the remaining values before sharing. Add the "When it fires" column and the other five parts (code touched, identity, data that leaves the app, impact, switch off and roll back) from the plan, corrected by what the capture showed.
+(or the Python / Go `what-changes`, section 1).
+
+`before.jsonl` is the same traffic with `ai_events_env` off. It prints the events table (`new`, `changed`, `unchanged`, `removed`, with counts; browser copies, legacy events that use an `ai_*` or `mcp_*` name (`(legacy)`), and AI SDK events with a customer name (`(AI SDK)`, declared tool events) on their own rows; a span's raw `otlp` block is left out) and, per changed event, one redacted before/after JSON pair with the differing fields and their before and after values listed. A value change counts (status, model, cost); fields that differ on every run (interaction, conversation and session IDs, `anonymousId`, timestamps such as `createdAt` or `created_at`, durations and latency) count only when added, removed or retyped. Equal occurrences pair first, whatever order the captures hold them in; the rest pair in capture order, and an occurrence with no counterpart (an added or dropped turn) is compared with the other capture's first one. Timestamps are masked in the printed pairs too. IDs, user and account IDs, `on_behalf_of`, emails, `traits` and timestamps are redacted; check the remaining values before sharing. Add the "When it fires" column and the other five parts (code touched, identity, data that leaves the app, impact, switch off and roll back) from the plan, corrected by what the capture showed.
 
 ## 6. Checklist
 
@@ -245,4 +237,6 @@ A row is `n/a` only when the app has no surface it applies to. Page-load is `n/a
 | MCP counters or `mcp_client_seen` shared across endpoints | two endpoints wrapped with the same server name: give each its own |
 | Feedback on one side only | the browser handler or the endpoint's `trackAction` is missing, and the plan does not opt that side out |
 | Mock data plane captures nothing, app logs connection resets | the mock cannot read the gzip batch (use `mock_server.py` as shipped), or the app exited before its batch was sent |
+| `feature None not in [...]` (or `surface None`) on an `ai_response_received` | an answer that escaped its interaction: a model call ran after the interaction ended or without its context (a stream read after the callback returned, a thread or goroutine without the interaction's context, a detached loop), and the SDK reported it as an answer of its own: no `ai_user_prompt_created`, no `feature` or `surface`, its own `interaction_id` (Python adds a `parent_interaction_id` naming the turn it escaped), and a warning in the app log ("model call ran after its ... ended"). Keep the call inside the interaction: return or `bind()` the stream, `propagate()` threads, pass the interaction's `ctx` (Go), or open the interaction around a detached loop (instrument recipes, section 4) |
+| `what-changes` shows more new `ai_response_received` than the turns and runs driven | stray answers, counted as ordinary new answers: escaped calls (the row above) or a call outside any interaction or task (`check` notes those as `system answer without task_name`). Count the turns and runs you drove against the answer count, find the extras in the capture (an answer with no prompt copy and no `feature`, or `trigger: system` without `task_name`), and fix them before regenerating `## What changes` |
 | No `anonymousId` / `context.sessionId` from test cookies | cookie values not in the JavaScript SDK's encoding (`RUDDERSTACK_AI_DEBUG=1` logs "unreadable cookie"); Go: the request not passed to `WithValues` / `InteractionOptions.Request` |
