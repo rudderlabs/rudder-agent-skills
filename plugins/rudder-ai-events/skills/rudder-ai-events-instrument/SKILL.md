@@ -42,8 +42,8 @@ Do one surface at a time; after each, run the app's type check (and its tests wh
    Other managers: section 1 of the recipe files. Never add a version range, and never bump the app's own LLM libraries. Add the RudderStack server client (`@rudderstack/rudder-sdk-node`, `rudder-sdk-python`, `analytics-go/v4`, at its latest release) only when the plan says `client: new`. Then `git diff` the lockfile: only the SDK and what it pulls may change. pnpm drops the `tarball:` URL from unrelated `resolution` entries (packages from a registry with a non-default tarball path, such as a private one) on every install, whatever its version: restore them rather than stopping, keyed by `integrity`:
 
    ```bash
-   git show HEAD:pnpm-lock.yaml > "$TMPDIR/pnpm-lock.before.yaml"
-   python3 - "$TMPDIR/pnpm-lock.before.yaml" pnpm-lock.yaml <<'PY'
+   git show HEAD:pnpm-lock.yaml > "${TMPDIR:-/tmp}/pnpm-lock.before.yaml"
+   python3 - "${TMPDIR:-/tmp}/pnpm-lock.before.yaml" pnpm-lock.yaml <<'PY'
    import re, sys
    tarballs = dict(re.findall(r"integrity: (\S+?), tarball: (\S+?)\}", open(sys.argv[1]).read()))
    lock = open(sys.argv[2]).read()
