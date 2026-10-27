@@ -49,7 +49,7 @@ Drive, per planned surface (skip what the app does not have):
 - client: the planned browser events, driven with the interaction ID the server returned (below);
 - event rules: one turn that calls each ruled tool; scores: one `trackScore` / `track_score` or an evaluator run;
 - MCP servers: section D;
-- switches: the same traffic again with `spec.switches.ai_events_env` off (`before.jsonl`), and once with `legacy_events_env` off. Set them for that command only.
+- switches: the same traffic again with `spec.switches.ai_events_env` off (`before.jsonl`), and once with `legacy_events_env` off. Set them for that command only. The AI switch is required (instrument adds it): no `ai_events_env`, or one that does not stop the AI events, is a FAIL that goes back to `rudder-ai-events-instrument`. Only to check an older instrumentation that predates the switch, take `before.jsonl` with the app's `configure()` given a no-op client (Node.js `{ track() {} }`, Python an object whose `track` does nothing, Go a client whose `Enqueue` returns `nil`) while its legacy calls still reach the recorder or mock, and note the substitute in the report.
 
 ### A. Stub client
 
@@ -112,8 +112,18 @@ Protocol: 2026-07-28 needs a client and a server that speak it (Node.js `@modelc
 Record what the page sends by replacing the SDK with a recorder before the page script runs (a browser test, or Node.js with stubbed `window`/`document` globals importing the page script):
 
 ```js
+// Like the browser SDK: anonymousId on every event, userId after identify() until reset().
+// Use the anonymous ID the curl turns send in their rl_anonymous_id cookie, so both sides share it.
 const captured = [];
-window.rudderanalytics = { track: (event, properties) => captured.push({ type: 'track', event, properties }) };
+const anonymousId = 'anon-123';
+let userId;
+window.rudderanalytics = {
+  identify: (id) => { userId = id; },
+  reset: () => { userId = undefined; },
+  getAnonymousId: () => anonymousId,
+  getUserId: () => userId,
+  track: (event, properties) => captured.push({ type: 'track', event, properties, anonymousId, ...(userId ? { userId } : {}) }),
+};
 // ...click through: open the assistant, send a message, copy, give feedback, open a card, close...
 // then write captured as JSON lines and append them to events.jsonl
 ```
