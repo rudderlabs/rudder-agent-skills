@@ -15,7 +15,7 @@ Full API reference: the package README, shipped at `node_modules/@rudderstack/ai
 | yarn | `yarn add --exact @rudderstack/ai@<VERSION>` |
 | bun | `bun add --exact @rudderstack/ai@<VERSION>` |
 
-Only when the plan says `rudderstack.client: new`, add the client too, `@rudderstack/rudder-sdk-node` at its latest release (`>=3.0.16` is the SDK's peer range; an existing older client fails `npm install` with `ERESOLVE`). The provider and framework packages (`openai`, `@anthropic-ai/sdk`, `ai`, `@langchain/core`, ...) are optional peer dependencies the app already has; do not add or bump them. The same holds for the MCP SDK on MCP servers (supported: `@modelcontextprotocol/sdk` `>=1.31.0 <2.0.0` and `@modelcontextprotocol/server` `>=2.0.0 <3.0.0`). Run the install from the `sdks[].path` directory; the lockfile change belongs in the same diff.
+Only when the plan says `rudderstack.client: new`, add the client too, `@rudderstack/rudder-sdk-node` at its latest release (`>=3.0.16` is the SDK's peer range). An existing older client fails `npm install` with `ERESOLVE`: when `## Dependencies and blockers` approves its upgrade, install that exact pin in the same command (`npm install --save-exact @rudderstack/ai@<VERSION> @rudderstack/rudder-sdk-node@<approved version>`); otherwise stop, it is a plan change. The provider and framework packages (`openai`, `@anthropic-ai/sdk`, `ai`, `@langchain/core`, ...) are optional peer dependencies the app already has; do not add or bump them. The same holds for the MCP SDK on MCP servers (supported: `@modelcontextprotocol/sdk` `>=1.31.0 <2.0.0` and `@modelcontextprotocol/server` `>=2.0.0 <3.0.0`). Run the install from the `sdks[].path` directory; the lockfile change belongs in the same diff.
 
 ## 2. Configure once at startup
 
