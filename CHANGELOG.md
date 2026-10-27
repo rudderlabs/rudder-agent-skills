@@ -9,34 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **`rudder-core` / `rudder-setup` reads every destination spec from rudder-cli.** It needs
-  the first rudder-cli release that contains rudderlabs/rudder-iac#989 and #990. Step 4 writes the
-  spec from `rudder-cli docs destination <type> --source <source type> --id <id> --json`
-  (rudder-iac#989): its `specTemplate`, then the keys, allowed values, defaults, patterns,
-  connection modes and conditional rules that output lists, with each secret key holding the slot
-  it prints and each variable written to the var file as `NAME:`. Its done check is validate's
-  `destination/secret-reference` and `destination/secret-reference-unique` warnings
-  (rudder-iac#990), which name a secret key that holds a value and a variable that fills two keys.
-  Validate exits 0 with either warning, so step 5 does not go on to the dry run, or commit, while
-  one shows. Step 4 turns away a destination that needs the dashboard's OAuth sign-in (a required
-  `rudder_account_id`) and one whose connection mode is device, which step 8 cannot confirm.
-  When the output lists secret keys that nothing requires, no custom validator checks and the
-  template does not hold, such as a webhook's header value, step 4 asks one question that names
-  them, with No first, and adds the ones the user picks.
-  Step 1 probes for both features, not for a version, and stops with upgrade instructions when
-  either is missing. It first probes a copy an earlier install left in `~/.local/bin` by its full
-  path, and uses that copy when it has both. After an install it probes again, by the full path
-  when a plain `rudder-cli` runs another copy or none, and stops only if the latest release lacks
-  them. The skill never falls back to written-down keys. When no platform is detected, the "What will send
-  events" options come from `rudder-cli docs source --json`. `references/destinations.md` keeps
-  only how to read the docs output, the layout, the source and connection specs, how to get a
-  webhook endpoint (a quick tunnel started in the background where an agent keeps background
-  processes, and stopped in step 9, or a request bin), and how to write values in the var file,
-  JSON keys and `'` included. It gives a command that writes a key
-  file into the var file without printing it, and says that a multi-line secret, such as a PEM
-  private key, goes in the var file as a `|` block, which keeps its line breaks from rudder-cli
-  0.29.0 (rudderlabs/rudder-iac#998) and so in every release step 1 accepts. It names no
-  destination keys, samples or secret names.
 - **`rudder-cli` / `rudder-cli-setup`, `rudder-cli-workflow`, `rudder-transformations`,
   `rudder-import-and-evolve`; `rudder-core` / `rudder-instrumentation-debugging`.**
   Agents now check auth with `rudder-cli workspace info --json` and read the token
@@ -203,9 +175,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     apps. In a repository with several apps it asks which one sends events. With no app, or an
     app the user will not upgrade or cannot run, the first event goes out with curl.
   - Step 1 stops on uncommitted changes and commits an app that is not in git before it changes
-    anything. When rudder-cli is missing or older than 0.26.0, it installs the latest release
-    with the installer attached to it, and it uses a RudderStack MCP server that is already set
-    up instead of adding a second one.
+    anything. When rudder-cli is missing or lacks `docs destination` and validate's secret check,
+    it installs the latest release with the installer attached to it, and it uses a RudderStack
+    MCP server that is already set up instead of adding a second one.
+  - Step 4 writes the destination spec from what `rudder-cli docs destination` lists for the
+    installed release and checks its secrets with validate, so the skill needs the first
+    rudder-cli release with rudderlabs/rudder-iac#989 and #990. A webhook with no public endpoint
+    gets a quick tunnel to this machine, where the agent keeps background processes, or a request
+    bin.
   - The user approves the event plan, picks the destination, and says yes to every apply after
     seeing its dry run. A dry run that would delete a resource this project did not create, such
     as another project's, stops the skill.
@@ -215,8 +192,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     it. Run in a folder whose `rudder/` came from an earlier run, the skill adds a source of the
     app's type beside the old one.
   - Step 7 checks the app's events against the plan on this machine with `rudder-cli sources
-    listen` (rudder-cli 0.29.0 or later; an emulator or simulator for a mobile app). Step 8 sends
-    a real event and confirms that the destination received it.
+    listen` (an emulator or simulator for a mobile app). Step 8 sends a real event and confirms
+    that the destination received it.
   - When the user asks, in the same session or a later one, step 9 undoes a run from the record
     it keeps in the git directory: it reverts the commits that run made, puts back the key files
     it changed, and applies, after checking that rudder-cli points at the workspace the run

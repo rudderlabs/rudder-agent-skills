@@ -107,6 +107,7 @@ d=$(mktemp -d)
 node -e "require('http').createServer((q,s)=>{let b='';q.on('data',c=>b+=c).on('end',()=>{console.log(b);s.end('ok')})}).listen(0,'127.0.0.1',function(){console.error('port '+this.address().port)})" >"$d/hook.log" 2>"$d/server.log" &
 spid=$!
 until grep -qs '^port ' "$d/server.log"; do kill -0 "$spid" 2>/dev/null || { cat "$d/server.log" >&2; exit 3; }; sleep 0.1; done
+: >"$d/tunnel.log"
 cloudflared tunnel --no-autoupdate --url "http://127.0.0.1:$(sed -n 's/^port //p' "$d/server.log")" >"$d/tunnel.log" 2>&1 &
 tpid=$!; n=0
 until url=$(sed -n 's/.*| *\(https:\/\/[a-z0-9-]*\.trycloudflare\.com\) *|.*/\1/p' "$d/tunnel.log" | head -n 1); [ -n "$url" ]; do
@@ -120,7 +121,8 @@ echo "D=$d PIDS=$spid $tpid URL=$url"
   payloads there.
 - When you are not sure the agent keeps background processes, as in Cursor, run `kill -0 <PIDS>` in your next
   call. If it fails, the agent stopped them: say so and offer a request bin.
-- Step 9 stops both with `kill <PIDS>`. Never use `pkill` or a match on a name.
+- Step 9 stops both with `kill <PIDS>`. Never use `pkill` or a match on a name. If you stop before step 9, stop
+  both the same way first, and say in your last message that the webhook's URL no longer answers.
 - A quick tunnel can stop answering after a few days while its process stays up, and its URL changes each time.
   Start a new one for each run, a resume in a later session included, and write the new URL into the spec
   before step 5's dry run.
