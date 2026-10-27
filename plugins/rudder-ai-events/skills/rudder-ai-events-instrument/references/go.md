@@ -231,7 +231,7 @@ client.Close()              // the SDK never closes it; sends analytics-go's que
 
 `Flush(ctx)` (no deadline on `ctx`: 10 s) waits for pending classifications, scores and held provider retries, then flushes every client the SDK used, MCP wrappers' included. A client with `Flush(ctx)` or `Flush()` sends its queue then; analytics-go without one (v4.3.1) is reported once as `client_outdated` and sends on `Close()`. Use `Flush(ctx)` where the process keeps running (per Lambda invocation), `Shutdown(ctx)` when it stops.
 
-From the release after v0.2.0, `Flush(ctx)` and `Shutdown(ctx)` drain the app's client too: when the client's `Flush` returns an error, they return `false` and pass that first error, unchanged, to the `WithOnError` hook with `info.Kind == "flush_failed"`. If the app logs or alerts on its client's flush errors, move that into `WithOnError` for `flush_failed` (called at most once per kind per minute) instead of around its own flush call; `client.Close()` stays. On v0.2.0, keep it where it is.
+From the release after v0.2.0, `Flush(ctx)` and `Shutdown(ctx)` drain the app's client too: when the client's `Flush` returns an error, they return `false` and pass that first error, unchanged, to the `WithOnError` hook with `info.Kind == "flush_failed"`. A timeout does not hide it (both `flush_timeout` and `flush_failed` are reported), and an error the client raises after the deadline is still reported once. If the app logs or alerts on its client's flush errors, move that into `WithOnError` for `flush_failed` (called at most once per kind per minute) instead of around its own flush call; `client.Close()` stays. On v0.2.0, keep it where it is.
 
 ## 8. Optional config (only what the plan lists)
 
