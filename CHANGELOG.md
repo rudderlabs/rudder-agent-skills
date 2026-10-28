@@ -40,7 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the target workspace, and the prod step switches the CLI to the prod
   workspace before it applies.
 - **Versions.** `rudder-cli` 0.0.3 to 0.0.5, `rudder-mcp` 0.0.2 to 0.0.3,
-  `rudder-core` 0.0.6 to 0.0.9.
+  `rudder-core` 0.0.6 to 0.0.10.
 
 - **Breaking (repo layout):** renamed the top-level `skills/` directory back to
   `plugins/` (reverting the earlier `plugins/` → `skills/` rename). Each plugin
@@ -175,9 +175,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     apps. In a repository with several apps it asks which one sends events. With no app, or an
     app the user will not upgrade or cannot run, the first event goes out with curl.
   - Step 1 stops on uncommitted changes and commits an app that is not in git before it changes
-    anything. When rudder-cli is missing or older than 0.26.0, it installs the latest release
-    with the installer attached to it, and it uses a RudderStack MCP server that is already set
-    up instead of adding a second one.
+    anything. When rudder-cli is missing or lacks `docs destination` and validate's secret check,
+    it installs the latest release with the installer attached to it, and it uses a RudderStack
+    MCP server that is already set up instead of adding a second one.
+  - Step 4 writes the destination spec from what `rudder-cli docs destination` lists for the
+    installed release and checks its secrets with validate, so the skill needs the first
+    rudder-cli release with rudderlabs/rudder-iac#989 and #990. A webhook with no public endpoint
+    gets a quick tunnel to this machine, where the agent keeps background processes, or a request
+    bin.
   - The user approves the event plan, picks the destination, and says yes to every apply after
     seeing its dry run. A dry run that would delete a resource this project did not create, such
     as another project's, stops the skill.
@@ -187,8 +192,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     it. Run in a folder whose `rudder/` came from an earlier run, the skill adds a source of the
     app's type beside the old one.
   - Step 7 checks the app's events against the plan on this machine with `rudder-cli sources
-    listen` (rudder-cli 0.29.0 or later; an emulator or simulator for a mobile app). Step 8 sends
-    a real event and confirms that the destination received it.
+    listen` (an emulator or simulator for a mobile app). Step 8 sends a real event and confirms
+    that the destination received it.
   - When the user asks, in the same session or a later one, step 9 undoes a run from the record
     it keeps in the git directory: it reverts the commits that run made, puts back the key files
     it changed, and applies, after checking that rudder-cli points at the workspace the run

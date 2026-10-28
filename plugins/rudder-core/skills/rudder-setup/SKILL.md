@@ -17,7 +17,7 @@ Done means one real event reached the destination the user chose. The app sends 
 
 ## Before you start
 
-- **rudder-cli**: check with `rudder-cli --version`. If missing, install with `d=$(mktemp -d) && curl -fsSL https://github.com/rudderlabs/rudder-iac/releases/latest/download/install.sh -o "$d/install.sh" && sh "$d/install.sh"`. The command downloads the installer into a new temporary folder, then runs that file; do not pipe it into a shell. It is the installer attached to the latest rudder-iac release. It installs that release's archive for this OS and CPU in `~/.local/bin`, after checking it against the release's checksums file. If a plain `rudder-cli` then runs another copy or none, follow the full-path rule under Rules that hold in every step. If the download of the installer prints `The requested URL returned error: 404`, a release came out in the last few minutes and its files are still uploading. Wait one minute and run the same command again, up to 10 times. Go by that message, not by curl's exit code, which is 22 or 56 for the same 404. If the last try also gets a 404, tell the user that a new rudder-cli release is being published and that they can try again in a few minutes, and stop. A line that starts with `rudder-cli install:` comes from the installer, which ran and failed; that is not the 404 above, even when a curl message comes before it, so do not retry. If curl cannot reach github.com, or the installer says it cannot write to `~/.local/bin`, the agent's sandbox is the likely cause. Ask the user to let the command run outside the sandbox or to run it in their own terminal, and never set `RUDDER_CLI_INSTALL_DIR` to a folder inside the project. For any other `rudder-cli install:` line, show it to the user and stop. This skill needs rudder-cli 0.26.0 or later, because older releases accept the webhook, GA4, Amplitude and Mixpanel specs only with experimental flags set, and step 5's validate fails without them. A build from source prints 0.0.0. Step 7 needs 0.29.0 or later, the first release with `sources listen`; with an older one, step 7 is skipped.
+- **rudder-cli**: check with `rudder-cli --version`. If missing, install with `d=$(mktemp -d) && curl -fsSL https://github.com/rudderlabs/rudder-iac/releases/latest/download/install.sh -o "$d/install.sh" && sh "$d/install.sh"`. The command downloads the installer into a new temporary folder, then runs that file; do not pipe it into a shell. It is the installer attached to the latest rudder-iac release. It installs that release's archive for this OS and CPU in `~/.local/bin`, after checking it against the release's checksums file. If a plain `rudder-cli` then runs another copy or none, follow the full-path rule under Rules that hold in every step. If the download of the installer prints `The requested URL returned error: 404`, a release came out in the last few minutes and its files are still uploading. Wait one minute and run the same command again, up to 10 times. Go by that message, not by curl's exit code, which is 22 or 56 for the same 404. If the last try also gets a 404, tell the user that a new rudder-cli release is being published and that they can try again in a few minutes, and stop. A line that starts with `rudder-cli install:` comes from the installer, which ran and failed; that is not the 404 above, even when a curl message comes before it, so do not retry. If curl cannot reach github.com, or the installer says it cannot write to `~/.local/bin`, the agent's sandbox is the likely cause. Ask the user to let the command run outside the sandbox or to run it in their own terminal, and never set `RUDDER_CLI_INSTALL_DIR` to a folder inside the project. For any other `rudder-cli install:` line, show it to the user and stop. This skill needs the first rudder-cli release that contains rudder-iac#989 (`docs destination`) and #990 (validate's `destination/secret-reference` warning). Step 1 checks for both features, not for a version, because a build from source reports 0.0.0 (fact cli-features). A rudder-cli that has them also has step 7's `sources listen`.
 - **git**: check with `git --version`.
 - **jq**: check with `jq --version`. Steps 3 and 7 run the jq programs shipped with this skill. If jq is missing, ask the user to install it, for example with `brew install jq` or `sudo apt-get install jq`.
 - **the rudderstack MCP server**: check that the tools list_sources, get_source and get_destination_event_metrics are available to you. It is the HTTP server at https://mcp.rudderstack.com/mcp. It signs in with the user's RudderStack login in the browser (OAuth), not with the access token. If no plugin added it, the user adds it, see step 1. An MCP server added during a session loads only after a restart. A server at https://mcp.rudderstack.com/bearer-auth-mcp, the access-token route for sessions that cannot open a browser, works too. It has no sign-in and no `user_details`: it sends the token in `RUDDERSTACK_ACCESS_TOKEN` and reads the workspace from its `X-Workspace-ID` header.
@@ -71,11 +71,7 @@ More than one step asks these. Ask them as written here.
 ### `what-sends`
 
 Ask the user: "What will send events to RudderStack?"
-  - A website or web app
-  - An iOS app
-  - An Android app
-  - A Flutter app
-  - A React Native app
+  - <one option per client type that `rudder-cli docs source --json` lists, in words, such as "A website or web app (javascript)">
   - A backend service
   - Something else
   - Not sure yet, show me an event arriving
@@ -83,11 +79,11 @@ Ask the user: "What will send events to RudderStack?"
 
 Then:
 
-- Map the answer to `source_type` (fact source-type): a website or web app is `javascript`, an iOS app `ios_swift`, an Android app `android_kotlin`, a Flutter app `flutter` and a React Native app `react_native`.
-- For a backend service, ask which language it is written in: `node`, `python`, `go`, `java`, `dotnet`, `php`, `ruby` or `rust`. A language not in that list follows the note for something else.
-- For something else, ask what it is. A platform with a source type of its own, such as Unity (`unity`), takes that type. A language with no source type, such as Elixir, has no RudderStack SDK either. Say so, and use the server type the user picks, or `node` if they have no preference, because every server type connects as `cloud` (fact connection-mode). Set `sender` to `curl`: the HTTP API takes events for any source (fact http-api-any-source).
+- Build the options before asking: run `rudder-cli docs source --json`. Each entry's `type` is a value a source spec's `type` accepts, and `token` is how it connects to a destination. A type whose `token` is `cloud` is a backend language; every other type is a client. Offer one option per client type, described in words (fact source-type), except the legacy `android` and `ios` and the `cordova` type that fact advises against, then the last three options. A client answer's type is `source_type`.
+- For a backend service, ask which language it is written in, offering the types whose `token` is `cloud`. A language not among them follows the note for something else.
+- For something else, ask what it is. A platform with a type of its own in that list, such as Unity (`unity`), takes that type. A language with no source type, such as Elixir, has no RudderStack SDK either. Say so, and use the server type the user picks, or `node` if they have no preference, because every server type connects as `cloud` (fact connection-mode). Set `sender` to `curl`: the HTTP API takes events for any source (fact http-api-any-source).
 - For not sure yet, `source_type` is `javascript` and `sender` is `curl`. Step 6 then installs no SDK, and step 8 sends the first planned event with curl.
-- If a free-text answer fits none of these, write the type you think fits. Step 5's validate lists the valid types if it is wrong.
+- If a free-text answer fits none of these, use the type from that list you think fits.
 
 ## The steps
 
@@ -96,7 +92,7 @@ Then:
 | 1 | Start | you, cli, skill, mcp | start |
 | 2 | Explore | you, skill, mcp, cli | 1 |
 | 3 | Goal and plan | you, skill | 2 |
-| 4 | Destination and secrets | you, skill | 2 |
+| 4 | Destination and secrets | you, skill, cli | 2 |
 | 5 | Plan and apply | cli, you | 4 |
 | 6 | Instrument | skill, mcp | 3, 5 |
 | 7 | Verify locally | cli, you | 6 |
@@ -109,6 +105,7 @@ Keep these values as you go, and restate them in the wrap-up:
 
 - `dir_kind`: what the folder you were started in is: app, resume, empty, home, repos or other, from step 1's first probe
 - `git_state`: clean, dirty or none (not in git), from step 1's second probe
+- `cli_features`: ok, missing, no-docs or no-secret-check, from step 1's third probe
 - `work_dir`: the folder you work in: the one you were started in, or `./rudderstack-first-event` when step 1 creates it
 - `sender`: app when the app's code sends the events; curl when there is no app here, or no SDK for it, and step 8 sends the first planned event with curl
 - `workspace_id`: from `rudder-cli workspace info --json`, field workspaceID
@@ -120,7 +117,8 @@ Keep these values as you go, and restate them in the wrap-up:
 - `source_id`: the spec id of the event stream source, for example storefront
 - `events`: `rudder/plan.events.json`, the agreed event names with their property types; the only place either is written
 - `plan`: `rudder/plan.md`, the question and where each event fires, keyed by event name, committed with the specs
-- `destination_id`: the spec id of the destination
+- `destination_type`: the destination's `type`, as `rudder-cli docs destination` lists it
+- `destination_id`: the spec id of the destination, lowercase kebab-case starting with a letter
 - `specs_commit`: the commit that added the specs
 - `remote_source_id`: the source's id in RudderStack, from MCP list_sources
 - `remote_destination_id`: the destination's id in RudderStack, from MCP list_destinations
@@ -157,7 +155,17 @@ elif changes | grep -q .; then echo dirty
 else echo clean; fi
 ```
 
-1. Check `rudder-cli --version`. If it is missing or older than 0.29.0, also check `"$HOME/.local/bin/rudder-cli" --version`, because an earlier install may have left a copy there that PATH misses. If that copy runs and nothing on PATH runs a newer one, follow the full-path rule under Rules that hold in every step and use it. If neither runs, or the copy you would use is older than 0.26.0, the first release that accepts this skill's destination specs without experimental flags, install rudder-cli with the two-step command under Before you start, follow the same rule, and check the version again. Count 0.0.0, a build from source, as newer than every release. If the copy you use is older than 0.29.0, say that step 7's local check will be skipped (fact sources-listen-gate).
+`cli_features`: whether the installed rudder-cli has what step 4 needs (fact cli-features): `ok`; `missing` (no rudder-cli or no jq); `no-docs` (no `docs destination`, rudder-iac#989); `no-secret-check` (validate has no `destination/secret-reference` warning, rudder-iac#990). It validates a throwaway destination spec with a literal secret in a temporary folder, which needs no token, with telemetry off so the check does not count as a use, and then deletes it.
+
+```sh
+d=$(mktemp -d); f="$d/check.yaml"
+if ! command -v rudder-cli >/dev/null || ! command -v jq >/dev/null; then echo missing
+elif RUDDERSTACK_CLI_TELEMETRY_DISABLED=true rudder-cli docs destination am --source javascript --id cli-check --json 2>/dev/null | jq -r '.specTemplate // empty' 2>/dev/null | sed "s/'{{ .*}}'/not-a-reference/" > "$f"; ! grep -q not-a-reference "$f"; then echo no-docs
+elif RUDDERSTACK_CLI_TELEMETRY_DISABLED=true rudder-cli validate -l "$d" 2>&1 | grep -q '\[destination/secret-reference\]'; then echo ok; else echo no-secret-check; fi
+rm -f "$f"; rmdir "$d"
+```
+
+1. Act on `cli_features`, and go on only on `ok`. If it is not `ok` and `$HOME/.local/bin/rudder-cli` exists, an earlier install may have left that copy off PATH or behind another one, so first run the probe again with that full path. If it then prints `ok`, follow the full-path rule under Rules that hold in every step and go on. Otherwise go on with the plain probe's result. On `missing`, install what `command -v` does not find (rudder-cli with the two-step command under Before you start, jq as it says there). On `no-docs` or `no-secret-check`, say that this rudder-cli lacks `docs destination` or validate's `destination/secret-reference` warning, which this skill needs: the first release with rudder-iac#989 and #990. Show `rudder-cli --version` and `command -v rudder-cli`, and ask the user to install the latest release with the two-step command (or run it on a yes). After an install, follow that rule, then run the probe again, with the full path when the rule calls for it. If it prints `no-docs` or `no-secret-check` after you installed rudder-cli, the latest release does not have these features yet; say so and stop. Never write a destination spec from memory, a README, another skill or an older version of this one.
 2. Run `rudder-cli workspace info --json`. It finds the token in `RUDDERSTACK_ACCESS_TOKEN` or in the config that `rudder-cli auth login` writes, and never prints it. Tell the user the workspace name you are about to change. If `dataPlaneURL` is empty, ask the user for the data plane URL shown in the RudderStack dashboard and keep it as `data_plane_url`.
 3. Call the MCP tool `user_details`. It answers only when the rudderstack server is connected and signed in. A server at `/bearer-auth-mcp` has no `user_details`: when your RudderStack tools include `list_sources` but not `user_details`, call `get_workspace_settings` instead, which answers only when that server's token reaches its workspace.
 4. Make MCP read the CLI's workspace. If the MCP workspace tools take a `workspace_id` argument, pass the CLI's `workspaceID` in it on every call. Otherwise compare `selectedWorkspace.id` from `user_details` with `workspaceID` from `workspace info`. If they differ, call `user_switch_workspace` with the CLI's workspace id and tell the user which workspace MCP now reads. On a `/bearer-auth-mcp` server the `X-Workspace-ID` header picks the workspace, and the tools take no `workspace_id`. If `id` from `get_workspace_settings` is not the CLI's `workspaceID`, ask the user to set that header to the CLI's `workspaceID` and start you again, and stop.
@@ -212,7 +220,7 @@ If the CLI's workspace is not among the workspaces `user_details` lists, or `use
 
 - The RudderStack login MCP signed in with cannot see the token's workspace. Ask the user to sign in to MCP with a login that belongs to that workspace, or to create the token in the workspace they mean. Stop.
 
-Facts that apply here (`references/facts.md`): **first-commit-adds-whole-files**, **source-type**, **source-type-fixed**, **http-api-any-source**.
+Facts that apply here (`references/facts.md`): **cli-features**, **first-commit-adds-whole-files**, **source-type**, **source-type-fixed**, **http-api-any-source**.
 
 Done when:
 
@@ -225,10 +233,6 @@ Record: `work_dir`, `sender`, `workspace_id`, `workspace_name`, `data_plane_url`
 If it fails:
 
 - `workspace info` exits 1 with `access token is required`: this shell has no RUDDERSTACK_ACCESS_TOKEN and `rudder-cli auth login` was never run.
-
-Not in scope yet, mention as a next step if relevant:
-
-- Generate the "What will send events" options from `rudder-cli docs source` once it ships, so they cannot drift from the CLI's source types.
 
 ## 2. Explore
 
@@ -344,7 +348,7 @@ Not in scope yet, mention as a next step if relevant:
 
 ## 4. Destination and secrets
 
-Visible choices, a free-text fallback, and no secrets typed into chat.
+Visible choices, a spec built from what the installed rudder-cli accepts, and no secrets typed into chat.
 
 1. Ask the user: "Where should the events go?"
      - Webhook, a URL you control. Fastest for a first test.
@@ -352,22 +356,23 @@ Visible choices, a free-text fallback, and no secrets typed into chat.
      - Amplitude
      - Mixpanel
      - Something else. Type its name.
-2. For a webhook, ask for the URL. It must be a public http(s) domain (fact webhook-public-url). If the user has none, ask whether to use a request bin, such as webhook.site, which shows each request it receives. Say that it is a third party that sees every payload, and use one only on a yes. Items 3 and 4 are for a webhook only, and not for a request bin, which needs no header.
-3. Ask the user: "Does the endpoint need an authentication header?"
-     - No
-     - Yes, a header, such as `Authorization: Bearer <token>`
-4. On yes, ask for the header's name only, `Authorization` unless the user names another; its value goes in the var file, never in chat. Add the header as the destination reference shows, with its value, a secret, as `'{{ .WEBHOOK_AUTH }}'`. In the var file, `WEBHOOK_AUTH` holds the header's whole value, such as `Bearer <token>` for `Authorization`, or the key alone for a header such as `X-Api-Key`; say so when you ask the user to fill it.
-5. Write `rudder/destinations/<id>.yaml` from the destination reference: `definition_version: 1`, `enabled: true`, and the `connection_mode` entry for `source_type`, `{web: cloud}` for a `javascript` source (fact connection-mode).
-6. For every secret the destination needs (the destination reference lists them per type), reference it as `'{{ .NAME }}'` and add the line `NAME:`, with no value, to `rudder/secrets.vars.yaml` (fact unfilled-secret).
-7. If you created a var file, ask the user to fill every line in it in their editor, written as the destination reference's Secrets part says, and say continue. Do not read the values back.
+2. Resolve the answer to `destination_type`: `webhook`, `ga4`, `am` or `mp` for the four named options. For something else, run `rudder-cli docs destination --source <source_type> --json`, which lists only the types that take events from this source, and match the user's words against each entry's `type` and `displayName`; ask when more than one matches. If none matches, say this workflow cannot connect that destination yet, and offer a webhook for the first event.
+3. Set `destination_id` to `<source_id>-<destination_type>` with every `_` turned into `-`, such as `storefront-webhook`. Run `rudder-cli docs destination <destination_type> --source <source_type> --id <destination_id> --json` and keep its output for this step. It is the only place to read keys, allowed values, defaults, patterns, connection modes and secret keys (fact cli-features); write no key it does not list, and read it as the destination reference's "Reading the docs output" says. If it prints an `error`, act on `error.code` as that section says. If `docs` itself is unknown, go back to step 1's `cli_features`. If `fields` has a required `rudder_account_id`, the destination connects through a sign-in in the RudderStack dashboard (OAuth), which this workflow cannot do yet; say so and offer a webhook for the first event. If `verified` is false, say RudderStack has not finished verifying this destination in rudder-cli, so validate and apply accept it only with the variables under `enable` set. Ask whether to use it anyway or pick a verified type; if they keep it, set the `enable` variables on every validate and apply.
+4. Write its `specTemplate` unchanged to `rudder/destinations/<destination_id>.yaml`. It holds `enabled: true`, every top-level key this type always requires, with a secret as its slot and any other key as `null`, the keys its connection mode requires, and the `connection_mode` entry, cloud when the source can use it. If it has no `connection_mode` entry, ask the user to pick one of the modes under `connectionModes`, add `connection_mode: {<token>: <mode>}` with the token named there, and add that mode's `requiredKeys`. If the template's entry, or the mode the user picks, is `device`, the app's SDK sends to this destination itself, so RudderStack reports no delivery for it and step 8 cannot confirm the first event; say so and offer a destination that takes `cloud` for the first event.
+5. Replace each `null`, one question at a time, reading the key's entry in `fields` as the destination reference's "Reading the docs output" says: offer only its `enum` values, and check a typed value against its pattern, bounds and type. For a webhook with no public URL, offer the destination reference's options: a quick tunnel to this machine, only where background processes outlive a shell call (fact background-processes), or a request bin. Say that either one passes every payload through a third party, Cloudflare or the bin's owner, and use the one the user picks. On a resume, a quick tunnel's URL in the spec no longer answers; start a new tunnel as the reference says and write its URL into the spec. If you stop before step 9, stop the tunnel first, as the reference says. For GA4, `client_type` follows the source type: on `android_kotlin`, `ios_swift`, `flutter`, `react_native`, `unity`, `android` or `ios` it is `firebase` with that app's Firebase App ID, because an app's events belong in its app data stream; on any other source it is `gtag`, a web data stream. Validate accepts either on any source, so it cannot catch a wrong one.
+6. When `fields` has secret keys that nothing requires and the spec does not hold yet, ones with no `required`, `requiredIf`, `requiredUnless`, `requiredWith` or `checkedBy`, such as a webhook's header value, ask one question before writing any of them. Skip it for a webhook to a quick tunnel or a request bin, which needs no header. Name each in plain words, and offer "No" first, then one option per key, and let the user pick several. Add only the keys the user picks, as item 8 says. For a key inside a list item, write one item with the secret key's slot, and ask for the item's other key only, such as the header's name, `Authorization` unless the user names another; the secret's value goes in the var file, never in chat. A header's line in the var file holds the header's whole value, such as `Bearer <token>` for `Authorization`, or the key alone for a header such as `X-Api-Key`; say so when you ask the user to fill it.
+7. Add the keys only a condition requires, because the template leaves them out, and never one a condition rules out, as the destination reference's "Reading the docs output" says. Leave out a key with a `default` unless the user wants another value.
+8. A key is a secret only when its entry in `fields` says `secret: true`. Its value is the field's `slot`, unchanged; under a list, `<N>` in `slot` and `var` is the item's zero-based index. Never write a value, a default (`{{ .NAME | value }}`) or a variable name of your own. Add an optional secret the user wants the same way. Add each `var` the spec references to `rudder/secrets.vars.yaml` as `NAME:` with no value (fact unfilled-secret), and keep the lines already there.
+9. Check the slots: `rudder-cli validate -l rudder 2>&1 | grep -E '^warning\[destination/secret-reference(-unique)?\]|^Found |configuration is valid'`, with the variables under `enable` set when `verified` is false. It needs no `--var-file`, and its lines name keys and variables, never values. Without the var file, the `Found` line also counts each variable as undefined, which is expected here. If it prints neither a `Found` line nor `Project configuration is valid`, validate did not run; fix that first. For each warning, write that key's `slot` from the docs output, with its own `var` in the var file. Then ask the user to fill every line of the var file in their editor and say continue; the destination reference says how to write a value, a `'`, a JSON value, a value that spans lines and a key file. Do not read the file back.
 
-Facts that apply here (`references/facts.md`): **webhook-public-url**, **connection-mode**, **destination-disabled**, **unfilled-secret**.
+Facts that apply here (`references/facts.md`): **cli-features**, **connection-mode**, **destination-disabled**, **unfilled-secret**, **background-processes**.
 
 Done when:
 
 - a destination spec exists (check: `ls rudder/destinations/*.yaml`)
+- validate ran and finds no secret key holding a value, with the variables under `enable` set when `verified` is false (check: `out=$(rudder-cli validate -l rudder 2>&1); printf '%s\n' "$out" | grep -qE '^Found |configuration is valid' && ! printf '%s\n' "$out" | grep -qE '\[destination/secret-reference(-unique)?\]'`)
 
-Record: `destination_id`.
+Record: `destination_id`, `destination_type`.
 
 ## 5. Plan and apply
 
@@ -376,20 +381,20 @@ Files first, then a dry run that says exactly what changes, then apply and commi
 Needs: `source_type`, `source_id`, `destination_id`.
 
 1. Write `rudder/sources/<source_id>.yaml` with `type` set to `source_type`, and `rudder/connections.yaml`, from the destination reference.
-2. Validate: run `rudder-cli validate -l rudder --var-file rudder/secrets.vars.yaml`, without `--var-file` when the file does not exist, through the rule's filter, and add `| grep -E '^(error|warning)\[|^ *--> |^Found [0-9]+ error|^Error: |^exit [0-9]+$'` at its end, so only the error lines and the exit status print. The source lines validate prints under each error show values after substitution, secrets included, so never show its output unfiltered.
+2. Validate: run `rudder-cli validate -l rudder --var-file rudder/secrets.vars.yaml`, without `--var-file` when the file does not exist, through the rule's filter, and add `| grep -E '^(error|warning)\[|^ *--> |^Found [0-9]+ error|^Error: |^exit [0-9]+$'` at its end, so only the error lines and the exit status print. Validate masks the values of secret keys in the source lines it prints under each error (fact cli-features); show only these lines anyway, because the fix needs nothing else. For an error on a destination key, read the key's field in step 4's docs output, running the command again if you no longer have it; a custom validator named in its `checkedBy` says what it needs only in the error. When a secret key is missing, or validate warns `destination/secret-reference` or `destination/secret-reference-unique`, write the key's `slot`, add its `var` to the var file as `NAME:` and ask the user to fill it; never ask for the value in chat. Validate exits 0 with either warning, so read its lines, not only its exit status.
 3. Dry run: `rudder-cli apply -l rudder --dry-run` with the same `--var-file`, its output filtered (rule). Show the plan as N to create, N to change, N to delete.
 4. Before the apply, record the workspace it changes, for step 9's undo: `sh '<skill folder>/references/run-record.sh' workspace "$(rudder-cli workspace info --json | jq -r '.workspaceID // empty')"`. If it says this run applied to another workspace, stop and tell the user both. Then apply: `rudder-cli apply -l rudder --confirm=false` with the same `--var-file`, its output filtered. Expect exit 0 and the created resources listed.
 5. If `git status --porcelain -- rudder` prints nothing, as on a resume that kept every spec and the plan, there is nothing to commit: make no commit and leave `specs_commit` unset. Otherwise commit `rudder/` by its path alone: `git add rudder && git commit -m "Add RudderStack event delivery as specs" -- rudder`, and record it with `commit revert` (rule). Step 1 already committed `.gitignore`, and `.mcp.json` stays out. Tell the user that step 9 gives the undo.
 
-**Loop.** Fix the reported file and line, then validate again until validate exits 0 with no errors, at most 5 attempts. When the bound is hit, show the remaining errors and their files to the user and stop.
+**Loop.** Fix the reported file and line, then validate again until validate exits 0 with no errors and no `destination/secret-reference` or `destination/secret-reference-unique` warning, at most 5 attempts. When the bound is hit, show the remaining errors and their files to the user and stop.
 
 **Gate.** Show the dry-run plan and ask "Apply these changes to <workspace_name>?" Do not continue without an explicit yes.
 
-Facts that apply here (`references/facts.md`): **silent-decline**, **apply-scope**, **unfilled-secret**.
+Facts that apply here (`references/facts.md`): **cli-features**, **silent-decline**, **apply-scope**, **unfilled-secret**.
 
 Done when:
 
-- the specs validate (check: `rudder-cli validate -l rudder $( [ -f rudder/secrets.vars.yaml ] && echo --var-file rudder/secrets.vars.yaml ) >/dev/null 2>&1`)
+- the specs validate, and no secret key holds a value (check: `out=$(rudder-cli validate -l rudder $( [ -f rudder/secrets.vars.yaml ] && echo --var-file rudder/secrets.vars.yaml ) 2>&1) && ! printf '%s\n' "$out" | grep -qE '\[destination/secret-reference(-unique)?\]'`)
 - everything in `rudder/` is committed (check: `git log --oneline -1 -- rudder | grep -q . && ! git status --porcelain -- rudder | grep -q .`)
 
 Record: `specs_commit`.
@@ -523,7 +528,8 @@ What changed, how to undo it, what to try next.
 Needs: `sender`.
 
 1. Summarise in a table: workspace resources (as specs in git), code changes (files and events), evidence (delivered and failed counts since started_at), the commits, and the undo, which you run only when the user asks for it. It reverts these commits and removes from the workspace what this run created. If step 1 added a source beside an old one of another type, say that the old source and its connection stay, and that the user can delete them by removing their specs from `rudder/` and applying once no build sends to the old source. If you ran rudder-cli by its full path (rule), end the summary with `export PATH="$HOME/.local/bin:$PATH"` and say that adding this line to their shell profile, such as `~/.zshrc`, lets a new terminal run `rudder-cli`. Then run `sh '<skill folder>/references/run-record.sh' close`, so a later setup here starts a run of its own.
-2. If the repository has a remote, offer to push a branch and open a pull request.
+2. If step 4 started a quick tunnel, stop its server and tunnel with `kill` and the two process ids its start command printed, never `pkill`. Say that the webhook's URL stops answering, so the destination fails each delivery until the user points it at a lasting endpoint and applies again.
+3. If the repository has a remote, offer to push a branch and open a pull request.
 
 If `sender` is `curl`:
 
@@ -552,7 +558,7 @@ Not in scope yet, mention as a next step if relevant:
 ## References
 
 - `references/facts.md`: the measured facts the steps cite
-- `references/destinations.md`: destination and connection specs
+- `references/destinations.md`: source and connection specs, webhook endpoints and the var file
 - `references/instrument-javascript.md`: browser instrumentation
 - `references/instrument-android.md`: Android instrumentation, Kotlin SDK
 - `references/instrument-ios.md`: iOS instrumentation, Swift SDK
