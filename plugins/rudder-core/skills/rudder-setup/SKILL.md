@@ -125,7 +125,7 @@ Keep these values as you go, and restate them in the wrap-up:
 - `write_key`: the source's write key. Show only its first 6 characters.
 - `code_commit`: the commit that added the instrumentation
 - `fix_commits`: the commits that fixed the instrumentation after `code_commit`, in any step, if any
-- `started_at`: RFC 3339 UTC time, rounded down to the minute, recorded just before the first live send
+- `started_at`: RFC 3339 UTC time, rounded down to the minute, recorded just before the first live send, and again before each retry in step 8
 
 ## 1. Start
 
@@ -146,11 +146,12 @@ elif find . -mindepth 1 -maxdepth 1 ! -name .git ! -name .gitignore ! -name .DS_
 else echo empty; fi
 ```
 
-`git_state`: `clean`, `dirty` (uncommitted changes outside `rudder/` and agent files) or `none` (not in git).
+`git_state`: `clean`, `dirty` or `none` (not in git). `dirty` means uncommitted changes in `work_dir` outside `rudder/` and agent files, or in a file that sits directly in a folder above `work_dir` or in that folder's `gradle/`. Those hold the lockfile that step 6's install changes in an npm, yarn or pnpm workspace, and a Gradle build's version catalog.
 
 ```sh
+changes() { git status --porcelain -- . ':!rudder' ':!.claude' ':!.agents' ':!.cursor' ':!.codex' ':!.mcp.json' ':!AGENTS.md' ':!CLAUDE.md'; (while [ -n "$(git rev-parse --show-prefix)" ] && cd ..; do git status --porcelain -- ':(glob)*' ':(glob)gradle/*' ':!.mcp.json' ':!AGENTS.md' ':!CLAUDE.md'; done); }
 if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then echo none
-elif git status --porcelain -- . ':!rudder' ':!.claude' ':!.agents' ':!.cursor' ':!.codex' ':!.mcp.json' ':!AGENTS.md' ':!CLAUDE.md' | grep -q .; then echo dirty
+elif changes | grep -q .; then echo dirty
 else echo clean; fi
 ```
 
@@ -188,7 +189,7 @@ If `dir_kind` is `empty`, `home`, `repos` or `other`, so this folder is not an a
 
 If `git_state` is `dirty`:
 
-- Show the changes the `git_state` command found, with `git status --short -- . ':!rudder' ':!.claude' ':!.agents' ':!.cursor' ':!.codex' ':!.mcp.json' ':!AGENTS.md' ':!CLAUDE.md'`, and ask the user to commit or stash them and say continue, because this workflow commits its own changes and a `git revert` must undo only those. Run the `git_state` command again, and go on only when it prints `clean`.
+- Show the changes the `git_state` command found: run its first line and then `changes`, in one shell call. It prints each path from the repository's top. Ask the user to commit or stash them and say continue, because this workflow commits its own changes, a workspace's lockfile above `work_dir` included, and a `git revert` must undo only those. Run the `git_state` command again, and go on only when it prints `clean`.
 
 If `git_state` is `none` and `dir_kind` is `app` or `resume`:
 
@@ -225,7 +226,7 @@ Done when:
 
 - the token reaches the workspace (check: `[ -n "$(rudder-cli workspace info --json | jq -r '.workspaceID // empty')" ]`)
 - `rudder/` exists, and its var files and `.env.local` are git-ignored (check: `test -d rudder && git check-ignore -q rudder/secrets.vars.yaml && git check-ignore -q rudder/first-event.vars.yaml && git check-ignore -q .env.local`)
-- the folder is in git, with nothing uncommitted outside `rudder/` and agent files (check: `git rev-parse --is-inside-work-tree >/dev/null 2>&1 && ! git status --porcelain -- . ':!rudder' ':!.claude' ':!.agents' ':!.cursor' ':!.codex' ':!.mcp.json' ':!AGENTS.md' ':!CLAUDE.md' | grep -q .`)
+- the folder is in git, with nothing uncommitted outside `rudder/` and agent files, or in the files above it that `git_state` reads (check: `git rev-parse --is-inside-work-tree >/dev/null 2>&1 && ! { git status --porcelain -- . ':!rudder' ':!.claude' ':!.agents' ':!.cursor' ':!.codex' ':!.mcp.json' ':!AGENTS.md' ':!CLAUDE.md'; (while [ -n "$(git rev-parse --show-prefix)" ] && cd ..; do git status --porcelain -- ':(glob)*' ':(glob)gradle/*' ':!.mcp.json' ':!AGENTS.md' ':!CLAUDE.md'; done); } | grep -q .`)
 
 Record: `work_dir`, `sender`, `workspace_id`, `workspace_name`, `data_plane_url`.
 
@@ -503,7 +504,7 @@ Needs: `write_key`, `data_plane_url`, `remote_destination_id`, `events`, `sender
 3. Start the app against the real data plane (`.env.local`) and ask the user to go through the flow once, then say done.
 4. Call MCP `get_destination_event_metrics` with the destination id and `start_time: started_at`. Delivered means each event the user sent from `rudder/plan.events.json` shows `deliveredCount` of at least 1 and `failedCount` 0.
 5. If anything failed, call `get_destinations_errors` for the destination and report the error.
-6. If the destination is a webhook the user can read, check the payload there, names, values and types against `rudder/plan.events.json`. If the app sent a name or a type that differs, fix the code, commit the fix as step 7's loop does and add it to `fix_commits`, then repeat items 3 to 6, at most 3 times.
+6. If the destination is a webhook the user can read, check the payload there, names, values and types against `rudder/plan.events.json`. If the app sent a name or a type that differs, fix the code, commit the fix as step 7's loop does and add it to `fix_commits`. Then wait for the next minute to start and record `started_at` again as item 1 does, so items 4 and 5 count only the next attempt (fact metrics-minute-buckets), and repeat items 3 to 6, at most 3 times.
 
 If `sender` is `curl`:
 
