@@ -29,18 +29,20 @@ recorded as `keep`: step 1's commits of `.gitignore` lines and of the specs it f
    `exit 0`. Before any revert, every removal is unexpected. If it prints an `unexpected:` line, stop and show those
    lines: the dry run failed, or the workspace holds CLI-managed resources that `rudder/` does not, such as another
    project's, and an apply from here would delete them (fact apply-scope). After an earlier attempt's reverts, it
-   expects what those reverts took out, and what a commit the user reverted by hand took out, but nothing another
-   later commit removed, so asking again continues where that attempt stopped.
+   expects what those reverts took out while the branch still holds them, and what a commit the user reverted by
+   hand took out, but nothing another later commit removed, so asking again continues where that attempt stopped.
 3. Revert the run's commits: `<record> revert`. It reverts each commit recorded for the undo, newest first, and
-   skips the ones an earlier attempt reverted. If `git revert` stops on uncommitted changes, staged ones included,
-   ask the user to commit or stash them and say continue, then run it again. If reverting a commit conflicts, as when
-   the user changed the same lines since, it gives the revert up and names the commit. Tell the user, who can revert
-   it by hand (`git revert <sha>`, resolve the conflict, `git revert --continue`) and ask again: a commit that a later
-   commit reverts counts as reverted. While a `git revert` is in progress, it stops and changes nothing: ask the user
-   to finish it or stop it (`git revert --abort`) first. If a commit is no longer on the branch, as after a squash
-   merge or a rebase, say that the undo cannot run on this branch, and stop. If the user would rather keep things as
-   they are now than finish the undo, run `<record> undone`, so a later undo or setup leaves this run alone, and say
-   which of its commits are still in place.
+   skips each one the branch holds a revert of, made by an earlier attempt or by the user. If the user reset the
+   branch to before the undo, it says that the earlier revert is gone and reverts that commit again. If `git revert`
+   stops on uncommitted changes, staged ones included, ask the user to commit or stash them and say continue, then
+   run it again. If reverting a commit conflicts, as when the user changed the same lines since, it gives the revert
+   up and names the commit. Tell the user, who can revert it by hand (`git revert <sha>`, resolve the conflict,
+   `git revert --continue`) and ask again: a commit that a later commit reverts counts as reverted. While a
+   `git revert` is in progress, it stops and changes nothing: ask the user to finish it or stop it
+   (`git revert --abort`) first. If a commit is no longer on the branch, as after a squash merge or a rebase, say
+   that the undo cannot run on this branch, and stop. If the user would rather keep things as they are now than
+   finish the undo, run `<record> undone`, so a later undo or setup leaves this run alone, and say which of its
+   commits are still in place.
 4. Put back the key files: `<record> restore`. It puts back each file that still holds what step 6 wrote, or that a
    session saved and stopped before recording, deletes the ones step 6 created, and names each file that changed
    since. For a named file, ask whether to put back the copy from before step 6, which drops those edits
