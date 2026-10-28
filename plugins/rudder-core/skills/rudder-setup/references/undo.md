@@ -31,12 +31,13 @@ recorded as `keep`: step 1's commits of `.gitignore` lines and of the specs it f
    project's, and an apply from here would delete them (fact apply-scope). After an earlier attempt's reverts, it
    expects what those reverts took out while the branch still holds them, and what a commit the user reverted by
    hand took out, but nothing another later commit removed, so asking again continues where that attempt stopped.
-3. Revert the run's commits: `<record> revert`. It reverts each commit recorded for the undo, newest first, and
-   skips each one the branch holds a revert of, made by an earlier attempt or by the user. If the user reset the
-   branch to before the undo, it says that the earlier revert is gone and reverts that commit again. If `git revert`
-   stops on uncommitted changes, staged ones included, ask the user to commit or stash them and say continue, then
-   run it again. If reverting a commit conflicts, as when the user changed the same lines since, it gives the revert
-   up and names the commit. Tell the user, who can revert it by hand (`git revert <sha>`, resolve the conflict,
+3. Revert the run's commits: `<record> revert`. It reverts each commit recorded for the undo, newest first, and skips
+   each one the branch holds a revert of, made by an earlier attempt or by the user. If the user reset the branch to
+   before the undo, it says that the earlier revert is gone and reverts that commit again. If a later commit reverted
+   that revert, as when the user brought the commit back, it says so and reverts it again. If `git revert` stops on
+   uncommitted changes, staged ones included, ask the user to commit or stash them and say continue, then run it
+   again. If reverting a commit conflicts, as when the user changed the same lines since, it gives the revert up and
+   names the commit. Tell the user, who can revert it by hand (`git revert <sha>`, resolve the conflict,
    `git revert --continue`) and ask again: a commit that a later commit reverts counts as reverted. While a
    `git revert` is in progress, it stops and changes nothing: ask the user to finish it or stop it
    (`git revert --abort`) first. If a commit is no longer on the branch, as after a squash merge or a rebase, say

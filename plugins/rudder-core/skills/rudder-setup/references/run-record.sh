@@ -19,10 +19,11 @@
 #                       each removal that no revert of the run's commits on this branch took out of rudder/, and
 #                       one when the dry run did not end with `exit 0`; exits 1 when it printed one
 #   revert              revert the run's commits that are not reverted yet, newest first. A commit counts as
-#                       reverted while the branch holds a commit that reverts it: the one an earlier attempt made, or
-#                       one with git's `This reverts commit <sha>.` line, as the user's revert by hand. After a reset
-#                       to before the undo, it reverts them again. It stops, changing nothing, while a git revert is in
-#                       progress
+#                       reverted while the branch holds a commit that reverts it and nothing that reverts that one:
+#                       the revert an earlier attempt made, or one whose message says it reverts the commit (git's
+#                       `This reverts commit <sha>.` line, with an abbreviated sha under revert.reference), as the
+#                       user's revert by hand. After a reset to before the undo, or a revert of its revert, it reverts
+#                       the commit again. It stops, changing nothing, while a git revert is in progress
 #   restore [<file>]    put back the key files the run saved that still hold what it wrote; with a file, put back
 #                       that one as it was before step 6 whatever it holds now. It writes the saved bytes into the
 #                       file, so a key file that is a symbolic link stays one and its target gets them back. A file
@@ -40,13 +41,23 @@ has() { grep -qs ' revert$' "$B/runs/$1/commits" || [ -d "$B/runs/$1/undo" ] || 
 # the run an undo takes: one whose undo is halfway, or else the newest one not undone that has a commit to revert or
 # a file to put back
 target() { r=$(halfway); [ -z "$r" ] || { echo "$r"; return; }; for r in $(runs | sort -r); do [ ! -e "$B/runs/$r/undone" ] || continue; has "$r" && { echo "$r"; return; }; done; }
-# a commit of the run that the branch holds a revert of: the one an earlier attempt of the undo made (undo/reverted
-# keeps `<commit> <its revert>`), or one with git's `This reverts commit <sha>.` line, as the user's revert by hand
-reverted() {
-  v=$(sed -n "s/^$1 //p" "$R/undo/reverted" 2>/dev/null | tail -n 1)
-  { [ -n "$v" ] && git merge-base --is-ancestor "$v" HEAD 2>/dev/null; } ||
-    git log --format=%B "$1..HEAD" 2>/dev/null | grep -qx "This reverts commit $1\."
+# the commits after $1 on the branch whose message says they revert it: git's `This reverts commit <sha>.` line, or
+# with revert.reference set, `This reverts commit <abbreviated sha> (<subject>, <date>).`
+revs() {
+  for y in $(git log --format=%H -F --grep='This reverts commit ' "$1..HEAD" 2>/dev/null); do
+    for h in $(git log -1 --format=%B "$y" | sed -n 's/^This reverts commit \([0-9a-f]\{4,\}\)[ .,].*/\1/p'); do
+      [ "$(git rev-parse -q --verify "$h^{commit}" 2>/dev/null)" != "$1" ] || echo "$y"
+    done
+  done
 }
+# a commit that the branch holds a revert of, where that revert is not reverted in turn, as when the user brings the
+# commit back by reverting the undo's revert. The revert is the one an earlier attempt of the undo made
+# (undo/reverted keeps `<commit> <its revert>`), or one revs finds, as the user's revert by hand
+reverted() (
+  v=$(sed -n "s/^$1 //p" "$R/undo/reverted" 2>/dev/null | tail -n 1)
+  { [ -z "$v" ] || ! git merge-base --is-ancestor "$v" HEAD 2>/dev/null || echo "$v"; revs "$1"; } | sort -u | {
+    while read -r y; do reverted "$y" </dev/null || exit 0; done; exit 1; }
+)
 # the run's commits that count as reverted
 reverts() { for c in $(sed -n 's/ revert$//p' "$R/commits" 2>/dev/null); do ! reverted "$c" || echo "$c"; done; }
 list() { [ ! -s "$1/commits" ] || while read -r c how; do
@@ -125,10 +136,18 @@ show|revert|restore|unexpected|undone)
     mkdir -p "$R/undo"; [ -e "$R/undo/from" ] || git rev-parse HEAD > "$R/undo/from"; touch "$R/undo/reverted"
     for c in $(sed -n 's/ revert$//p' "$R/commits" 2>/dev/null | sed '1!G;h;$!d'); do
       if reverted "$c"; then grep -q "^$c" "$R/undo/reverted" || echo "$c" >> "$R/undo/reverted"; continue; fi
-      # an earlier attempt reverted it, and the branch no longer holds that revert, as after a reset
-      ! grep -q "^$c" "$R/undo/reverted" || echo "$c: its revert is not on this branch any more; reverting it again"
+      # an earlier attempt or the user reverted it, and the branch no longer holds that revert, as after a reset, or a
+      # later commit reverts that revert, as when the user brought the commit back
+      if grep -q "^$c" "$R/undo/reverted"; then
+        v=$(sed -n "s/^$c //p" "$R/undo/reverted" | tail -n 1)
+        if { [ -n "$v" ] && git merge-base --is-ancestor "$v" HEAD 2>/dev/null; } || [ -n "$(revs "$c")" ]; then
+          echo "$c: a later commit reverted its revert; reverting it again"
+        else echo "$c: its revert is not on this branch any more; reverting it again"; fi
+      fi
       git merge-base --is-ancestor "$c" HEAD 2>/dev/null || die "$c is not on this branch any more (rebased or reset?); not reverting"
-      if ! git revert --no-edit "$c"; then
+      # git's full message, `Revert "<subject>"` and `This reverts commit <sha>.`: under revert.reference, --no-edit
+      # would leave its `# *** SAY WHY WE ARE REVERTING ON THE TITLE LINE ***` placeholder as the title
+      if ! git -c revert.reference=false revert --no-edit "$c"; then
         ! git rev-parse -q --verify REVERT_HEAD >/dev/null || git revert --abort
         die "git revert stopped on $c"
       fi
