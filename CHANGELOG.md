@@ -39,8 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   applies in Phase 6 first check that `rudder-cli workspace info --json` shows
   the target workspace, and the prod step switches the CLI to the prod
   workspace before it applies.
-- **Versions.** `rudder-cli` 0.0.3 to 0.0.4, `rudder-mcp` 0.0.2 to 0.0.3,
-  `rudder-core` 0.0.6 to 0.0.7.
+- **Versions.** `rudder-cli` 0.0.3 to 0.0.5, `rudder-mcp` 0.0.2 to 0.0.3,
+  `rudder-core` 0.0.6 to 0.0.8.
 
 - **Breaking (repo layout):** renamed the top-level `skills/` directory back to
   `plugins/` (reverting the earlier `plugins/` → `skills/` rename). Each plugin
@@ -56,18 +56,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`rudder-cli` / `rudder-cli-setup`, `rudder-typer-workflow`; `docs/installation.md`;
   `examples/typer-workflow`.** The rudder-cli install instructions now point at
   files that exist. rudder-cli-setup named raw binaries such as
-  `rudder-cli_darwin_arm64` that no release has. It now downloads rudder-iac's
-  `install.sh` from `main` into a new temporary folder and runs it, and while
-  that answers 404, it installs the latest release's archive (the arm64 build
-  under Rosetta) after checking it against the release's checksums file.
-  Both put `rudder-cli` in `~/.local/bin`. When that folder is not on PATH, the
+  `rudder-cli_darwin_arm64` that no release has. It now downloads the
+  `install.sh` attached to the latest rudder-iac release into a new temporary
+  folder and runs it. The script installs that release's archive (the arm64
+  build under Rosetta) after checking it against the release's checksums file,
+  and puts `rudder-cli` in `~/.local/bin`. When the download of the script gets
+  a 404 because a release that just came out is still uploading its files, the
+  agent waits a minute and tries again, up to 10 times. It does not retry an
+  error the script itself prints, and when a sandbox keeps the script from
+  writing to `~/.local/bin` or reaching github.com, it asks the user to run the
+  install outside the sandbox instead of installing into the project. When
+  `~/.local/bin` is not on PATH, the
   agent runs `"$HOME/.local/bin/rudder-cli"` for the rest of the session, gives
   the user that path for any rudder-cli command they run, and shows the
   `export PATH` line in its closing summary, or when it stops earlier. The
   installation guide named a Homebrew tap that does not exist, the typer example installed
   `@rudderlabs/rudder-cli` from npm, which does not exist, and
   rudder-typer-workflow's CI reference used a `rudderstack/setup-rudder-cli`
-  action that does not exist. The guide now gives the same two installs, and
+  action that does not exist. The guide now gives the same install, and
   both CI examples download the release archive and check its checksum.
 - **`rudder-cli` / `rudder-cli-setup`, `rudder-cli-workflow`, `rudder-transformations`.**
   Replaced `RUDDER_ACCESS_TOKEN` with `RUDDERSTACK_ACCESS_TOKEN`, the variable
@@ -142,6 +148,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   token that expired or was revoked, and `401`
   `bearer token authorization failed` to a token refused during the workspace
   lookup.
+- **`rudder-core` / `rudder-setup`.** New skill that takes an app from no analytics to one real
+  event delivered to a destination the user picks, in nine steps: start, explore, goal,
+  destination and secrets, plan and apply, instrument, verify locally, verify live, wrap up. The
+  pipeline is rudder-cli specs in `rudder/`, and each change is a commit of its own.
+  - It sets up web apps (Capacitor and Cordova included), Android (Kotlin or Java), iOS (Swift
+    or Objective-C), Flutter, React Native (Expo through a development build), Unity and server
+    apps. In a repository with several apps it asks which one sends events. With no app, or an
+    app the user will not upgrade or cannot run, the first event goes out with curl.
+  - Step 1 stops on uncommitted changes and commits an app that is not in git before it changes
+    anything. When rudder-cli is missing or older than 0.26.0, it installs the latest release
+    with the installer attached to it, and it uses a RudderStack MCP server that is already set
+    up instead of adding a second one.
+  - The user approves the event plan, picks the destination, and says yes to every apply after
+    seeing its dry run. A dry run that would delete a resource this project did not create, such
+    as another project's, stops the skill.
+  - Secrets and the write key go in git-ignored files, and the skill drops the spec lines
+    rudder-cli prints with secrets filled in.
+  - An app that already uses a RudderStack SDK keeps its source unless the user agrees to move
+    it. Run in a folder whose `rudder/` came from an earlier run, the skill adds a source of the
+    app's type beside the old one.
+  - Step 7 checks the app's events against the plan on this machine with `rudder-cli sources
+    listen` (rudder-cli 0.29.0 or later; an emulator or simulator for a mobile app). Step 8 sends
+    a real event and confirms that the destination received it.
+  - When the user asks, in the same session or a later one, step 9 undoes a run from the record
+    it keeps in the git directory: it reverts the commits that run made, puts back the key files
+    it changed, and applies, after checking that rudder-cli points at the workspace the run
+    changed and that the apply removes only what the run created.
+
 - **`rudder-ai-events`** — new plugin that onboards an existing app to RudderStack AI events
   (spec v0.3) with the `@rudderstack/ai` (Node.js), `rudderstack-ai` (Python) and `ai-sdk-go` (Go)
   SDKs. Versions are resolved at run time (0.7.0 / v0.3.0 or later); all three install from public

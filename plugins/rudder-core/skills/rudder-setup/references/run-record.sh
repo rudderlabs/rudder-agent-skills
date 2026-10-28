@@ -1,0 +1,190 @@
+#!/bin/sh
+# The run record behind step 9's undo. Run it unchanged with sh from work_dir, by its path in the skill's folder.
+# It keeps one folder per run in the git directory, under rudderstack-backup/<work_dir's path in the repository>/runs/,
+# which git never commits: the workspace the run applied to, the commits it made, its copies of the key files, and
+# how far an undo of it got. A run lasts from step 1 to step 9's summary; a later session continues a run that has not
+# reached step 9, and starts a new one otherwise.
+#
+#   begin               step 1: continue the open run or start one; prints `continued <id>`, with the workspace and
+#                       the commits that run recorded, or `started <id>`
+#   workspace <id>      step 5, before the apply: the workspace this run changes; fails if it recorded another
+#   commit revert|keep  after each commit: HEAD, for the undo to revert, or to leave alone
+#   save <file>         step 6, before the first write to a git-ignored key file; fails, saving nothing, when the
+#                       file is a symbolic link to a missing file, as the undo would delete the link and keep the
+#                       target the write created
+#   record <file>       step 6, after the last write to it
+#   forget <file>       drop the copies of a file the user keeps as it is now
+#   close               step 9, after the summary
+#   show [<id>]         the run an undo takes (the newest with something to undo), and whether <id> is its workspace;
+#                       with no such run, the other folders of the repository whose runs it keeps
+#   unexpected          read a filtered dry run on stdin and print it, then an `unexpected: <kind>:<id>` line for
+#                       each removal that no revert of the run's commits on this branch took out of rudder/, and
+#                       one when the dry run did not end with `exit 0`; exits 1 when it printed one
+#   revert              revert the run's commits that are not reverted yet, newest first. A commit counts as
+#                       reverted while the branch holds a commit that reverts it and nothing that reverts that one:
+#                       the revert an earlier attempt made, or one whose message says it reverts the commit (git's
+#                       `This reverts commit <sha>.` line, with an abbreviated sha under revert.reference), as the
+#                       user's revert by hand. After a reset to before the undo, or a revert of its revert, it reverts
+#                       the commit again. It stops, changing nothing, while a git revert is in progress
+#   restore [<file>]    put back the key files the run saved that still hold what it wrote; with a file, put back
+#                       that one as it was before step 6 whatever it holds now. It writes the saved bytes into the
+#                       file, so a key file that is a symbolic link stays one and its target gets them back. A file
+#                       it cannot write or delete keeps its copies, and it exits 1
+#   undone              after the undo's apply, or when the user ends an undo where it stopped: mark the run undone
+#                       and drop its copies
+set -u
+N=rudderstack-backup; B=$(git rev-parse --git-path "$N/$(git rev-parse --show-prefix)") || exit 2
+die() { echo "$*" >&2; exit 1; }
+runs() { [ ! -d "$B/runs" ] || ls "$B/runs" | sort; }
+newest() { runs | tail -n 1; }
+# an undo that started (it reverted or put back something) and has not finished
+halfway() { for r in $(runs); do { [ -s "$B/runs/$r/undo/reverted" ] || [ -e "$B/runs/$r/undo/restored" ]; } && [ ! -e "$B/runs/$r/undone" ] && { echo "$r"; return; }; done; }
+has() { grep -qs ' revert$' "$B/runs/$1/commits" || [ -d "$B/runs/$1/undo" ] || [ -n "$(find "$B/runs/$1/files" "$B/runs/$1/created" -type f 2>/dev/null)" ]; }
+# the run an undo takes: one whose undo is halfway, or else the newest one not undone that has a commit to revert or
+# a file to put back
+target() { r=$(halfway); [ -z "$r" ] || { echo "$r"; return; }; for r in $(runs | sort -r); do [ ! -e "$B/runs/$r/undone" ] || continue; has "$r" && { echo "$r"; return; }; done; }
+# the commits after $1 on the branch whose message says they revert it: git's `This reverts commit <sha>.` line, or
+# with revert.reference set, `This reverts commit <abbreviated sha> (<subject>, <date>).`
+revs() {
+  for y in $(git log --format=%H -F --grep='This reverts commit ' "$1..HEAD" 2>/dev/null); do
+    for h in $(git log -1 --format=%B "$y" | sed -n 's/^This reverts commit \([0-9a-f]\{4,\}\)[ .,].*/\1/p'); do
+      [ "$(git rev-parse -q --verify "$h^{commit}" 2>/dev/null)" != "$1" ] || echo "$y"
+    done
+  done
+}
+# a commit that the branch holds a revert of, where that revert is not reverted in turn, as when the user brings the
+# commit back by reverting the undo's revert. The revert is the one an earlier attempt of the undo made
+# (undo/reverted keeps `<commit> <its revert>`), or one revs finds, as the user's revert by hand
+reverted() (
+  v=$(sed -n "s/^$1 //p" "$R/undo/reverted" 2>/dev/null | tail -n 1)
+  { [ -z "$v" ] || ! git merge-base --is-ancestor "$v" HEAD 2>/dev/null || echo "$v"; revs "$1"; } | sort -u | {
+    while read -r y; do reverted "$y" </dev/null || exit 0; done; exit 1; }
+)
+# the run's commits that count as reverted
+reverts() { for c in $(sed -n 's/ revert$//p' "$R/commits" 2>/dev/null); do ! reverted "$c" || echo "$c"; done; }
+list() { [ ! -s "$1/commits" ] || while read -r c how; do
+  echo "$how $(git log -1 --format='%h %s' "$c" 2>/dev/null || echo "$c, not in this repository")"; done < "$1/commits"; }
+# the folders, by full path, whose runs another record of this repository keeps: another folder of this worktree, or
+# a folder of another worktree
+elsewhere() {
+  c=$(cd "$(git rev-parse --git-common-dir)" && pwd -P) || return; me=$(cd "$B/runs" 2>/dev/null && pwd -P)
+  find "$c/$N" "$c"/worktrees/*/"$N" -type d -name runs 2>/dev/null | while IFS= read -r p; do
+    p=$(cd "$p" && pwd -P); [ "$p" != "$me" ] && ls "$p" | grep -q '^[0-9][0-9][0-9]-' || continue
+    case $p in
+    "$c"/worktrees/*) n=${p#"$c"/worktrees/}; n=${n%%/*}; top=$(dirname "$(cat "$c/worktrees/$n/gitdir")"); rest=${p#"$c"/worktrees/"$n"/"$N"} ;;
+    *) top=$(dirname "$c"); rest=${p#"$c"/"$N"} ;;
+    esac
+    rest=${rest%/runs}; echo "$top$rest"
+  done; }
+cmd=${1-}; [ $# -eq 0 ] || shift
+case $cmd in
+begin)
+  r=$(halfway); [ -z "$r" ] || die "an undo of run $r is not finished; finish it (step 9) before setting up again"
+  r=$(newest)
+  if [ -z "$r" ] || [ -e "$B/runs/$r/closed" ] || [ -e "$B/runs/$r/undone" ]; then
+    r=$(printf '%03d-%s' $(($(runs | wc -l) + 1)) "$(date -u +%Y%m%dT%H%M%SZ)")
+    mkdir -p "$B/runs/$r" && date +%s > "$B/runs/$r/began" || exit 2
+    echo "started $r"
+  else
+    echo "continued $r"; [ ! -s "$B/runs/$r/workspace_id" ] || echo "workspace $(cat "$B/runs/$r/workspace_id")"; list "$B/runs/$r"
+  fi ;;
+workspace|commit|save|record|forget|close)
+  r=$(newest); [ -n "$r" ] || die "no run: run begin first"; R=$B/runs/$r
+  case $cmd in
+  workspace)
+    [ -n "${1-}" ] || die "no workspace id; nothing recorded"
+    if [ -s "$R/workspace_id" ] && [ "$(cat "$R/workspace_id")" != "$1" ]; then
+      die "this run applied to $(cat "$R/workspace_id"); rudder-cli now reaches $1"
+    fi
+    echo "$1" > "$R/workspace_id" ;;
+  commit)
+    case ${1-} in revert|keep) ;; *) die "commit takes revert or keep" ;; esac
+    h=$(git rev-parse HEAD) || exit 2
+    ! cat "$B"/runs/*/commits 2>/dev/null | grep -q "^$h " || die "HEAD $h is recorded already; record a commit right after making it"
+    [ "$(git log -1 --format=%ct HEAD)" -ge "$(cat "$R/began")" ] || die "HEAD $h is older than this run; record a commit right after making it"
+    echo "$h $1" >> "$R/commits" ;;
+  save)
+    f=${1-}; [ -n "$f" ] || die "save takes a file"; d=$(dirname "$f"); mkdir -p "$R/files/$d" "$R/after/$d" "$R/created/$d"
+    if [ -e "$R/files/$f" ] || [ -e "$R/created/$f" ]; then
+      # no copy in after/ when a session stopped between save and record: the file is still the run's
+    if [ -e "$R/after/$f" ] && ! cmp -s "$f" "$R/after/$f" && { [ -e "$f" ] || [ -e "$R/files/$f" ]; }; then echo "changed since step 6: $f"; fi
+    elif [ -e "$f" ]; then cp "$f" "$R/files/$f"
+    # a link to a missing file: a write through it creates the target, and the undo would delete the link instead
+    elif [ -L "$f" ]; then die "$f is a symbolic link to $(readlink "$f"), which does not exist; nothing saved"
+    else touch "$R/created/$f"; fi ;;
+  record) [ -n "${1-}" ] || die "record takes a file"; cp "$1" "$R/after/$1" ;;
+  forget) [ -n "${1-}" ] || die "forget takes a file"; rm -f "$R/files/$1" "$R/after/$1" "$R/created/$1" ;;
+  close) touch "$R/closed" ;;
+  esac ;;
+show|revert|restore|unexpected|undone)
+  r=$(target)
+  if [ -z "$r" ] && [ "$cmd" != unexpected ]; then
+    echo "nothing to undo"; o=; [ "$cmd" != show ] || o=$(elsewhere)
+    [ -z "$o" ] || printf 'runs started from other folders of this repository:\n%s\n' "$o"
+    exit 3
+  fi
+  R=$B/runs/$r
+  case $cmd in
+  show)
+    echo "run $r$([ -e "$R/closed" ] || echo ', stopped before step 9')"
+    w=$(cat "$R/workspace_id" 2>/dev/null)
+    list "$R"
+    for s in files created; do [ ! -d "$R/$s" ] || (cd "$R/$s" && find . -type f | sed "s|^\./|$s: |"); done
+    [ ! -e "$R/undo/from" ] || echo "undo started: $(reverts | grep -c .) reverted$([ ! -e "$R/undo/restored" ] || echo ', key files put back')"
+    # an unchanged resume applies what no commit of its own holds, so its undo takes nothing out of that workspace
+    [ -z "$w" ] || grep -qs ' revert$' "$R/commits" || echo "no commit of this run holds what it applied to $w, so the undo removes nothing there"
+    if [ -n "$w" ] && [ "$w" = "${1-}" ]; then echo same; else echo "recorded ${w:-none}, now ${1:-none}"; exit 1; fi ;;
+  revert)
+    # a revert the user is resolving by hand: leave it as it is
+    ! git rev-parse -q --verify REVERT_HEAD >/dev/null || die "a git revert is in progress; finish it with git revert --continue, or stop it with git revert --abort, then ask again"
+    mkdir -p "$R/undo"; [ -e "$R/undo/from" ] || git rev-parse HEAD > "$R/undo/from"; touch "$R/undo/reverted"
+    for c in $(sed -n 's/ revert$//p' "$R/commits" 2>/dev/null | sed '1!G;h;$!d'); do
+      if reverted "$c"; then grep -q "^$c" "$R/undo/reverted" || echo "$c" >> "$R/undo/reverted"; continue; fi
+      # an earlier attempt or the user reverted it, and the branch no longer holds that revert, as after a reset, or a
+      # later commit reverts that revert, as when the user brought the commit back
+      if grep -q "^$c" "$R/undo/reverted"; then
+        v=$(sed -n "s/^$c //p" "$R/undo/reverted" | tail -n 1)
+        if { [ -n "$v" ] && git merge-base --is-ancestor "$v" HEAD 2>/dev/null; } || [ -n "$(revs "$c")" ]; then
+          echo "$c: a later commit reverted its revert; reverting it again"
+        else echo "$c: its revert is not on this branch any more; reverting it again"; fi
+      fi
+      git merge-base --is-ancestor "$c" HEAD 2>/dev/null || die "$c is not on this branch any more (rebased or reset?); not reverting"
+      # git's full message, `Revert "<subject>"` and `This reverts commit <sha>.`: under revert.reference, --no-edit
+      # would leave its `# *** SAY WHY WE ARE REVERTING ON THE TITLE LINE ***` placeholder as the title
+      if ! git -c revert.reference=false revert --no-edit "$c"; then
+        ! git rev-parse -q --verify REVERT_HEAD >/dev/null || git revert --abort
+        die "git revert stopped on $c"
+      fi
+      echo "$c $(git rev-parse HEAD)" >> "$R/undo/reverted"
+    done ;;
+  restore)
+    mkdir -p "$R/undo"
+    if [ -n "${1-}" ]; then
+      # one file the restore named as changed, which the user wants back as it was before step 6
+      f=$1; if [ -e "$R/files/$f" ]; then cat "$R/files/$f" > "$f" || die "could not write $f; its copy is kept"
+      elif [ -e "$R/created/$f" ]; then rm -f "$f" && [ ! -e "$f" ] || die "could not delete $f; its copy is kept"
+      else die "no copy of $f"; fi
+      rm -f "$R/files/$f" "$R/after/$f" "$R/created/$f"; exit 0
+    fi
+    # a file it cannot write or delete keeps its copies, and the restore then fails, so asking again retries it
+    for s in files created; do [ ! -d "$R/$s" ] || (cd "$R/$s" && find . -type f | sed 's|^\./||'); done | { bad=0; while IFS= read -r f; do
+      if [ ! -e "$R/after/$f" ] || cmp -s "$f" "$R/after/$f"; then
+        # still what step 6 wrote, or a file a session saved and stopped before recording, which is the run's too
+        if [ -e "$R/files/$f" ]; then cat "$R/files/$f" > "$f" || { echo "could not write $f; its copy is kept" >&2; bad=1; continue; }
+        elif [ -e "$f" ]; then rm "$f" || { echo "could not delete $f; its copy is kept" >&2; bad=1; continue; }; fi
+        [ -e "$R/after/$f" ] || echo "step 6 stopped before recording $f; put back as it was before the run"
+      elif [ -e "$f" ] || [ -e "$R/files/$f" ]; then echo "changed since step 6: $f"; continue; fi
+      rm -f "$R/files/$f" "$R/after/$f" "$R/created/$f"
+    done; exit $bad; } || exit 1
+    touch "$R/undo/restored" ;;
+  unexpected)
+    # what the reverts of this run's commits that the branch holds took out of rudder/, as kind:id lines: what each
+    # reverted commit added, so a commit made since cannot widen it. A commit the user reverted by hand counts, though
+    # revert has not recorded it yet. Plain diff output, whatever the user's diff settings say
+    ours=$(for c in $(reverts); do p=$(git rev-parse -q --verify "$c^" || git hash-object -t tree /dev/null); git diff --no-ext-diff --no-color --no-textconv -U100000 "$c" "$p" -- rudder; done | awk 'function v(s) {sub(/[ \t]+#.*/, "", s); sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); q = substr(s, 1, 1); if ((q == "\"" || q == sprintf("%c", 39)) && substr(s, length(s)) == q) s = substr(s, 2, length(s) - 2); return s} /^diff --git /{k=""} /^[ -]kind:/{k=v(substr($0, 7)); if (k=="event-stream-connections") k="event-stream-connection"} /^- +(- )?id:/{sub(/^- +(- )?id:/,""); print k ":" v($0)}')
+    O=$ours awk 'BEGIN { n = split(ENVIRON["O"], o, "\n"); for (i = 1; i <= n; i++) ok[o[i]] = 1 } { print } /^exit [0-9]+$/ { s = $2 } /^Removed resources:/ { r = 1; next } r && /^ / { if (/^  - /) { u = substr($0, 5); if (!(u in ok)) x[++m] = u } next } { r = 0 } END { for (i = 1; i <= m; i++) print "unexpected: " x[i]; if (s == "") { print "unexpected: no exit status; run the dry run through the rule'"'"'s filter"; m++ } else if (s != "0") { print "unexpected: the dry run ended with exit " s; m++ } exit m > 0 }' ;;
+  undone)
+    rm -rf "$R/files" "$R/after" "$R/created"; touch "$R/undone" ;;
+  esac ;;
+*) die "usage: run-record.sh begin|workspace <id>|commit revert|keep|save <file>|record <file>|forget <file>|close|show [<id>]|unexpected|revert|restore [<file>]|undone" ;;
+esac
