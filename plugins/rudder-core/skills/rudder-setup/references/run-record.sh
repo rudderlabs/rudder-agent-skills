@@ -105,12 +105,13 @@ workspace|commit|save|record|forget|close)
     echo "$h $1" >> "$R/commits" ;;
   save)
     f=${1-}; [ -n "$f" ] || die "save takes a file"; d=$(dirname "$f"); mkdir -p "$R/files/$d" "$R/after/$d" "$R/created/$d"
-    if [ -e "$R/files/$f" ] || [ -e "$R/created/$f" ]; then
+    # a link to a missing file, at the first save or a later one: a write through it creates the target, and the undo
+    # would delete the link instead
+    if [ -L "$f" ] && [ ! -e "$f" ]; then die "$f is a symbolic link to $(readlink "$f"), which does not exist; nothing saved"
+    elif [ -e "$R/files/$f" ] || [ -e "$R/created/$f" ]; then
       # no copy in after/ when a session stopped between save and record: the file is still the run's
     if [ -e "$R/after/$f" ] && ! cmp -s "$f" "$R/after/$f" && { [ -e "$f" ] || [ -e "$R/files/$f" ]; }; then echo "changed since step 6: $f"; fi
     elif [ -e "$f" ]; then cp "$f" "$R/files/$f"
-    # a link to a missing file: a write through it creates the target, and the undo would delete the link instead
-    elif [ -L "$f" ]; then die "$f is a symbolic link to $(readlink "$f"), which does not exist; nothing saved"
     else touch "$R/created/$f"; fi ;;
   record) [ -n "${1-}" ] || die "record takes a file"; cp "$1" "$R/after/$1" ;;
   forget) [ -n "${1-}" ] || die "forget takes a file"; rm -f "$R/files/$1" "$R/after/$1" "$R/created/$1" ;;

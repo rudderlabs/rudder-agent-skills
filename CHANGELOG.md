@@ -40,7 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the target workspace, and the prod step switches the CLI to the prod
   workspace before it applies.
 - **Versions.** `rudder-cli` 0.0.3 to 0.0.5, `rudder-mcp` 0.0.2 to 0.0.3,
-  `rudder-core` 0.0.6 to 0.0.8.
+  `rudder-core` 0.0.6 to 0.0.9.
 
 - **Breaking (repo layout):** renamed the top-level `skills/` directory back to
   `plugins/` (reverting the earlier `plugins/` → `skills/` rename). Each plugin
@@ -148,6 +148,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   token that expired or was revoked, and `401`
   `bearer token authorization failed` to a token refused during the workspace
   lookup.
+- **`rudder-core` carries the RudderStack MCP server** — `plugins/rudder-core/.mcp.json`
+  declares `rudderstack`, an HTTP server at `https://mcp.rudderstack.com/mcp` with no headers.
+  Installing the plugin connects MCP; the client asks the user to sign in to RudderStack in the
+  browser (OAuth) the first time a tool runs. Claude Code lists it as
+  `plugin:rudder-core:rudderstack`, and cursor.directory picks up the same file.
+  When the MCP tools are missing, `rudder-destination-debugging` and `rudder-environment-check`
+  connect the server that is there before adding one. They find it by its URL under any name with
+  `claude mcp list`, keep an access-token entry at `/bearer-auth-mcp` with the plugin's entry
+  disabled, and have the user enable that entry in `/mcp` without `Authenticate` if it is
+  disabled, or approve it at Claude Code's next start if it is pending approval. They have the user
+  authenticate an entry at `/mcp`, and give the `claude mcp add` command,
+  and a line for other agents, only when there is none. The environment check also looks for
+  `list_sources` and `get_source`, which both routes have. Claude Code skips the
+  plugin's entry when a hand-added HTTP server has the same URL, but keeps both beside a hand-added
+  `npx -y mcp-remote` entry, so remove that one with `claude mcp remove rudderstack`. It also
+  keeps both beside an access-token entry at `https://mcp.rudderstack.com/bearer-auth-mcp`, a
+  different URL, so in that folder disable the plugin's entry in `/mcp`. The README says the
+  server comes with plugin installs only, and how to add it after `npx skills add`.
 - **`rudder-core` / `rudder-setup`.** New skill that takes an app from no analytics to one real
   event delivered to a destination the user picks, in nine steps: start, explore, goal,
   destination and secrets, plan and apply, instrument, verify locally, verify live, wrap up. The
