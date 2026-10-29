@@ -238,6 +238,18 @@ Skills can be installed to any of these agents via the Skills CLI:
 
 See the [Skills CLI documentation](https://github.com/vercel-labs/skills#supported-agents) for the full list of 40+ supported agents.
 
+### Codex CLI and access tokens
+
+`rudder-cli` reads `RUDDERSTACK_ACCESS_TOKEN`, not `RUDDER_ACCESS_TOKEN`. Export it in the terminal that starts Codex, then ask Codex to run `test -n "$RUDDERSTACK_ACCESS_TOKEN"` without printing the value. If the check succeeds, no environment override is needed. If it fails while the variable is set in that terminal, start Codex with a fresh process and shell environment inheritance:
+
+```bash
+codex --no-daemon -c shell_environment_policy.inherit=all
+```
+
+After installing the plugin or signing in to MCP, resume from the same terminal with `codex --no-daemon -c shell_environment_policy.inherit=all resume --last`. Run the check again after resuming. A saved `rudder-cli auth login` also works without this override. `inherit=all` passes every environment variable to Codex shell commands, so use it for this session only when the token check needs it.
+
+If `rudder-cli --version` fails because it cannot open `~/.rudder/cli.log`, the Codex sandbox has denied the CLI's home log write. Restart with `codex --no-daemon --add-dir "$HOME/.rudder" resume --last`, adding `-c shell_environment_policy.inherit=all` before `resume --last` only if the token check also failed. This grants the CLI write access to its log and saved login directory. Do not copy CLI credentials into the project or ask the agent to read that directory.
+
 ## Optional: Claude Code Settings
 
 You can add project-specific Claude Code settings in `.claude/settings.local.json`:

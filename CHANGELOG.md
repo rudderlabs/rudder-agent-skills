@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`rudder-core` / `rudder-setup`; `docs/installation.md`.** Added a Codex CLI
+  token check and a restart command for sessions that hide an exported
+  `RUDDERSTACK_ACCESS_TOKEN` from shell tools. The command starts a fresh process
+  and inherits the terminal environment. Documented how to give Codex CLI access
+  to the CLI home log when the sandbox blocks even `rudder-cli --version`.
+  `rudder-core` is now 0.0.11.
 - **`rudder-cli` / `rudder-cli-setup`, `rudder-cli-workflow`, `rudder-transformations`,
   `rudder-import-and-evolve`; `rudder-core` / `rudder-instrumentation-debugging`.**
   Agents now check auth with `rudder-cli workspace info --json` and read the token
