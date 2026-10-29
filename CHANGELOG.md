@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`rudder-ai-events` / `rudder-ai-events-setup`, `rudder-ai-events-instrument`.**
+  Discovery plans one-shot features (generate, suggest, autofill, summarize,
+  rewrite, translate, fix, structured-output routes) as user turns with
+  `input_method: button` and `conversation_id` set to the interaction ID, with
+  their accept, edit and reject actions. It finds human-in-the-loop pauses
+  (LangGraph `interrupt(`, Claude Agent SDK permission callbacks, OpenAI Agents
+  SDK approvals) and plans `paused` with `pause_reason`, searches wider legacy
+  event names and schema-generated emitters, estimates events per turn and run,
+  lists legacy fields that carry raw text, emails or file names, and records
+  mobile, Java, Ruby, PHP and raw HTTP senders as `unsupported` with the
+  tracking plan offered as their spec-only path. `ai-events-md.md` adds mapping
+  rows (start/success/fail triplets, per-confidence events, handoffs, guardrail
+  refusals as `error_type: guardrail_trip`, credit and per-call events kept
+  legacy), a field alias table, and known limits `hitl_multi_pause`,
+  `no_sampling`, `credits_legacy`, `llm_call_detail_legacy` and
+  `no_blocked_status`.
 - **`rudder-cli` / `rudder-cli-setup`, `rudder-cli-workflow`, `rudder-transformations`,
   `rudder-import-and-evolve`; `rudder-core` / `rudder-instrumentation-debugging`.**
   Agents now check auth with `rudder-cli workspace info --json` and read the token
