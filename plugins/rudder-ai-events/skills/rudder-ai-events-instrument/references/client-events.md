@@ -94,6 +94,8 @@ if (conversationId) trackAi('ai_response_received', {
 
 Fit this into the app's existing submit handler; do not restructure it. With `interaction_id_source: sdk` or `app` the browser learns the ID only from the response: send the prompt copy then, just before the answer copy. An error reported inside a successful HTTP response or stream is `client_error_kind: 'agent_error'`. The server returns `conversationId` and `interactionId` on its error responses too, once the interaction has opened (a failed answer has a server row to join): extend the route's error path if it returns neither. When the first message of a new thread fails before the server returns a `conversation_id` (the request never reached it, or failed before the interaction opened), skip the answer copy: both schemas require `conversation_id` on `ai_response_received`, and there is no server answer to join.
 
+One-shot features (generate, suggest, autofill, rewrite, fix; `conversation_id_source: interaction_id`): the browser uses the interaction ID (minted in the click handler and sent with the request, or read from the response) as both `interaction_id` and `conversation_id` on the copies and on the `accepted`, `edited`, `rejected` or `regenerated` action; omit `prompt_source` (no value fits a button).
+
 A chat API on another origin needs `credentials: 'include'` (and CORS that allows credentials) for the cookies to arrive.
 
 Chat-response switch: replace the helper's `AI_EVENTS_ON` declaration with `let AI_EVENTS_ON = false` and use this submit variant. Buffer only the prompt properties; read the effective switch on success and error responses. A missing switch sends neither copy. Each turn gates its copies with its own response value; later actions use the latest known switch.

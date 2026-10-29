@@ -18,7 +18,7 @@ The customer-facing summary: first in the file, a screen or less, plain language
 2. **Code touched**: one line per file or entry point.
 3. **Identity**: where `userId` / `anonymousId` come from per entry point; the account (`account_id`, and `context.groupId` if legacy carried it); `ai_system` plus `on_behalf_of` for background work.
 4. **Data that leaves the app**: the property groups sent; prompt and answer text not sent unless content capture is on, and what masking covers when it is. With capture on and a client surface, the browser sends prompt and feedback text too, masked the same way; say so.
-5. **Impact**: extra events per turn or job, extra model calls (classifier), flush points and their time bounds.
+5. **Impact**: estimated AI events per turn and per job run, with the high-volume sources named (MCP servers, fan-out, per-call events, tools called in loops) and no sampling (`no_sampling`), extra model calls (classifier), flush points and their time bounds.
 6. **Switch off and roll back**: the switch that stops the AI events, the legacy-events switch, and the revert path. With MCP servers (or SDK tracing), say that turning the AI switch off stops their events only after a restart.
 
 ## Example
@@ -325,6 +325,8 @@ Values not shown in the example:
 - `surfaces[].type`: `chat | background | client | mcp`, also used for Kind in the Surfaces section. `status`: `instrument | skipped | blocked | unsupported`; `reason` required unless `instrument`.
 - `surfaces[].surface`: `web | mobile | slack | teams | email | chatgpt_app | claude_app | ide | api | other`, or `per request: <expression>`.
 - `surfaces[].integration`: `wrapOpenAI | wrapAnthropic | wrapGoogleGenAI | wrapBedrock | rudderstackMiddleware | RudderStackCallbackHandler | trackMessages | trackedQuery | trackedRun | recordCall | instrument_litellm` (Python: snake_case names, except `trackMessages` -> `tracked_messages`); Go: `rudderopenai | rudderanthropic | ruddergenai | rudderbedrock | RecordCall`.
+- `surfaces[].input_method`: `text` (default) `| voice | button`; one-shot features (generate, suggest, autofill, summarize, rewrite, translate, fix) use `button` with `conversation_id_source: interaction_id`: the ID minted before the interaction opens is passed as both `interactionId` and `conversationId`.
+- `surfaces[].pauses[]`: `{ path, symbol, pause_reason, reported_by: integration | app, resume_interaction_id_source }` for each human-in-the-loop stop; `app` ends the answer `paused` with that `pause_reason`, and the resume passes the same `interaction_id`. Known limit `hitl_multi_pause`.
 - `surfaces[].unit`: `interaction` (one per user turn) `| task` (one per run). `flush`: `shutdown | task | per-run`. `client_disconnect`: `middleware | bound-stream | none` (Django/Flask: known limit). `attachments: true` passes `attachment_count` / `attachment_types` (kinds only).
 - `surfaces[].response_changes[]`: `{ path, symbol, fields }` for returned conversation/interaction IDs or the effective switch value, including error responses after the interaction opens; name the contract change under Breaking and semantic changes.
 - `surfaces[].usage_baseline_source`: `{ mode: persist | resumed_no_cost | memory, session_id_source, resume_source, path, symbol }` for Claude Agent SDK session resume. `persist` stores the result usage snapshot per session durably and passes it back as the baseline (recommended); `resumed_no_cost` means no durable baseline: mark resumed turns; a cached in-process baseline can still supply per-turn reported cost. Without either baseline, the fallback omits cost without registered prices and can undercount subagent usage. `memory` keeps snapshots only in-process and must mark turns resumed when a snapshot is missing. Name the choice under Cost and record `claude_resume_cost_omitted` or `claude_resume_baseline_memory` under Known limits when that choice applies.
@@ -386,6 +388,11 @@ Ids for Config `known_limits`; the plan's Known limits section names each one th
 | `argument_keys_unordered` | `argument_keys` order is unspecified: compare as a set. |
 | `large_events_trimmed` | Properties are capped at 30,000 bytes: captured text goes first, then `tool_breakdown` / `usage_breakdown` entries. |
 | `masking_fixed_shapes` | With capture on, emails, phones, cards, IPs, US SSNs, IBANs, keys, tokens, PEM keys and passwords are masked in captured text; names and postal addresses are not. |
+| `hitl_multi_pause` | Each pause sends an `ai_response_received` with `response_status: paused`, and a resume joins the same turn only when it passes the same `interaction_id`. No `pause_count` or `total_paused_ms`, and no event when a run starts: a run that asks a person several times shows one paused answer per pause, and a run that never resumes stays `paused`. |
+| `no_sampling` | The SDKs send every event; there is no per-event sampling. Plan per-call events and MCP servers with their volume in mind, and keep `emit_llm_calls` off unless per-call rows are needed. |
+| `credits_legacy` | Cost is in USD only: app credits, spend caps and credits-exhausted events have no AI event field and stay on their legacy events. |
+| `llm_call_detail_legacy` | `ai_llm_response_received` carries no per-call latency, purpose, fallback or BYOK flag: legacy per-call events with those fields keep sending beside the `ai_response_received` totals. |
+| `no_blocked_status` | There is no `blocked` status: an answer the app refuses (guardrail, policy) is `response_status: error` with `error_type: guardrail_trip`, so refusals count among failures; the reason rides as an extra property. |
 
 ## Field rules
 
@@ -400,7 +407,7 @@ Ids for Config `known_limits`; the plan's Known limits section names each one th
   - `app`: an ID the app already mints per answer and the client already holds (a turn or message ID). Prefer it when it exists: a legacy per-answer ID (`messageId`, `turnId`) then maps to `interaction_id`.
   - In every case the server returns the ID it used (response field or `x-interaction-id` header).
 - `surfaces[].feedback[].request_changes`: `trackAction` needs `interaction_id` and `conversation_id`; list them when the endpoint does not receive them today, and name the request change under Breaking and semantic changes.
-- `surfaces[].status`: `skipped` (user chose not to, no browser SDK, or dev-only CLI/REPL with no user identity recommended in the batched questions, override any), `blocked` (runtime or library version, or an unsupported MCP SDK), `unsupported` (no SDK for the language or framework).
+- `surfaces[].status`: `skipped` (user chose not to, no browser SDK, or dev-only CLI/REPL with no user identity recommended in the batched questions, override any), `blocked` (runtime or library version, or an unsupported MCP SDK), `unsupported` (no SDK for the language or framework: AI events sent from Java, Ruby, PHP or raw HTTP, and mobile RudderStack SDKs; the reason names which, and setup offers the spec-only tracking-plan path).
 - `surfaces[]` with `type: mcp` carry only `id`, `type`, `status`, `reason`, `feature` and `entry_points`; the rest is under `mcp.servers[]` with the same `surface_id`.
 - `mcp.servers[].request_context.intents`: drafted like chat intents from tool names and descriptions, ending with `other`; instrumentation passes the list without `other`. It is published in every tool's schema: keep it short and free of sensitive categories.
 - `mcp.servers[].identify`: expressions over the verified token, never a token value. Without auth the server's events go out as `ai_system`.
@@ -429,7 +436,8 @@ Compare each legacy field by meaning, not by name. A row is "Same" only when val
 | App error codes | legacy `status` or error fields carry app-only codes; pass them with `end({ extraProperties })` (Python `extra_properties`) |
 | Early failures | turns that fail before the interaction opens (auth, validation, rate limit) send no AI event |
 | Privacy doc | the repo's privacy or data-handling doc lists analytics fields; it must list the new ones |
-| Volume | extra events per turn or run (browser copies, background runs, MCP calls); state the increase in `## What changes` |
+| Legacy content | legacy fields carry raw prompts, answers, feedback text, emails or file names: list each `event.field`; the AI events do not carry them while capture is off, and the legacy event keeps sending them until it is removed |
+| Volume | extra events per turn or run (browser copies, background runs, MCP calls, fan-out, per-call events); state the estimate and the high-volume sources in `## What changes` |
 
 ## Mapping hand-built events
 
@@ -446,8 +454,46 @@ Compare each legacy field by meaning, not by name. A row is "Same" only when val
 | a card, resource or doc opened from an answer | browser `ai_user_action` with `action_type: clicked_through` (`card_kind`, `target_type`; never the URL) |
 | tool-specific product events ("ticket created by bot") | a declared tool event in `config.event_rules` |
 | chat opened/closed, new/switched/renamed/deleted conversation | client events (`ai_assistant_opened`, ...) |
+| start / success / failure triplets (`*_started` or `*_submitted`, `*_completed` or `*_success`, `*_failed` or `*_error`) for one answer, run or tool call | one `ai_response_received` with `response_status` and `error_type` (a tool call: one declared tool event with `tool_status`); the start event has no counterpart and stays legacy; a run that never ends is closed `incomplete` by the SDK's TTL or `shutdown()` |
+| one event per confidence level (`low_confidence_reply`, `medium_confidence_reply`) | one `ai_response_received` with the level as an extra property (`confidence`) |
+| a one-shot generate, suggest, autofill, rewrite or fix click and its accept, edit or reject | one interaction per click (`input_method: button`, `conversation_id` = the interaction ID) and `ai_user_action` `accepted`, `edited`, `rejected`, `regenerated` |
+| HITL request, ask-human or approval-requested events | `ai_response_received` with `response_status: paused` and `pause_reason` (`surfaces[].pauses`; known limit `hitl_multi_pause`) |
+| handoff to a person (suggested, requested, performed, rejected, ticket created) | `outcome: escalated` on the answer (`setOutcome` when known before it ends) plus a declared tool event per handoff tool the model calls (`config.event_rules`); handoff steps outside a tool call stay app product events |
+| guardrail, policy or legal refusal; a gate that denies the request | `ai_response_received` with `response_status: error`, `error_type: guardrail_trip` (`surfaces[].app_detected_failures`; the OpenAI Agents SDK reports its own tripwires), the app's reason as an extra property; known limit `no_blocked_status` |
+| credits charged, credit balance, credits exhausted, billing usage | stays legacy (known limit `credits_legacy`) |
+| one event per model call with latency, purpose, fallback or BYOK | stays legacy beside the `ai_response_received` totals (known limit `llm_call_detail_legacy`) |
 
 Properties with no standard counterpart ride on `ai_response_received` as extra properties (`extraProperties` / `extra_properties` on `end()`) by default; list them under `unmapped`. Drop one only when it is free text or duplicates a standard field.
+
+## Field aliases
+
+Legacy property names seen for each AI event field. Match by meaning and unit, then run the breaking-change checks on each pair.
+
+| AI event field | Legacy names seen |
+|---|---|
+| `conversation_id` | `thread_id`, `chat_id`, `chat_thread_id`, `conversationId` / `ConversationID`, `agent_conversation_id`, `memory_id` |
+| `interaction_id` | `message_id`, `prompt_id`, `request_id`, `runId`, `agent_run_id` (one per turn or run; a thread ID never is) |
+| `trace_id` | `traceId`, `external_request_id`, `llm_request_log_id` |
+| `primary_model`, `model` | `model_name`, `selected_model`, `billable_model`, `model` |
+| `provider` | `llm_provider`, `used_provider`, `provider` |
+| `input_tokens`, `output_tokens` (totals: `total_input_tokens`, `total_output_tokens`) | `prompt_tokens`, `completion_tokens` |
+| `cached_input_tokens`, `cache_write_tokens` | `cached_tokens`, `cache_write_tokens` |
+| `total_cost_usd` | `total_cost_usd`, the sum of per-category costs |
+| `latency_ms` | `duration_ms`, `execution_time_ms`, `elapsedTime`, `inference_duration_seconds` (x1000) |
+| `time_to_first_token_ms` | `time_to_first_token_seconds` (x1000) |
+| `finish_reason` | `stop_reason` |
+| `response_status`, `error_type` | `status`, `*_failed` event names, `error_category`, `error_code` |
+| `intent` | `prompt_intent`, `content_intent`, `message_intent`, `auditIntent` |
+| `feature` | `widget_id`, `product_id`, event-name prefixes |
+| `surface` | `surface`, `launch_surface`, `aiassistant_surface` |
+| `prompt_length` | `message_length`, `promptLength` |
+| `prompt_source` (client copy) | `prompt_source`, `origin`, `from` |
+| `client_error_kind` (client copy) | `failure_reason`, `FailReason` |
+| `agent_name` (usage and tool entries, set by the integration) | `agentSlug`, `current_agent`, `skill_name`; a per-answer value rides as an extra property |
+| `tool_name`, `tool_status`, `tool_duration_ms` | `toolName`, `tool_name`, `outcome`, `mcp_outcome`, `error_codes`, `duration_ms` |
+| `action_details.feedback_value` | `rating`, `rating_value`, `is_positive`, `thumbs_up_down`, `sentiment`, `feedback_sentiment` |
+| `action_details.feedback_text` (capture on only) | `additional_feedback`, `feedback_response_text`, `feedback_comment`, `free_text`, `thoughts_text` |
+| `argument_keys` | `params` (names only: the values are dropped) |
 
 ## Config names in code
 
