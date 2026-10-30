@@ -4,11 +4,11 @@ Plan values below (surfaces, `capture_content`, `switches`, legacy events, event
 
 Everything runs locally, without provider keys and without sending anything to RudderStack. Work in a scratch directory outside the repo (for example `$TMPDIR/ai-events-verify/`), never in the user's source tree.
 
-The checker, the recorders and both schemas ship with the SDKs (`@rudderstack/ai` / `rudderstack-ai` 0.8.0 or later, `ai-sdk-go` v0.4.0 or later); this skill ships only `scripts/mock_server.py`, the mock data plane and model server for option B (Python 3, standard library only; copy it into the scratch directory).
+The checker, the recorders and both schemas ship with the SDKs (`@rudderstack/ai` / `rudderstack-ai` 0.8.0 or later, `ai-sdk-go` v0.4.0 or later); 0.8.0 checkers accept 0.3.0 and 0.4.0 captures. For an app on an older SDK, run the latest checker from scratch and import `Recorder` from that scratch install in tests. This skill ships only `scripts/mock_server.py`, the mock data plane and model server for option B (Python 3, standard library only; copy it into the scratch directory).
 
 ## 1. Checker
 
-Three equivalent commands: the same flags, the same output lines, the same exit codes (0 pass, 1 a check failed, 2 bad usage or an unreadable file). The released checkers accept 0.3.0 and 0.4.0 captures; this plan expects v0.4 server events and the v0.2 client schema. Each validates against the spec schema and the browser-event schema it ships, so no schema download is needed. They read any capture, whatever language the app is written in: use the one matching the app's runtime, and pin it to the plan's SDK version (or the latest when the app has no SDK of that language).
+Three equivalent commands: the same flags, the same output lines, the same exit codes (0 pass, 1 a check failed, 2 bad usage or an unreadable file). The released checkers accept 0.3.0 and 0.4.0 captures; v0.4 events must carry 0.4.0 fields only when the plan pins a v0.4 SDK. Each validates against the spec schema and the browser-event schema it ships, so no schema download is needed. They read any capture, whatever language the app is written in: use the one matching the app's runtime, at the plan's SDK version or latest from scratch for an older SDK.
 
 | Runtime | Check | What changes |
 |---|---|---|
@@ -47,7 +47,9 @@ Browser-only plans drive the backend named in `server_dependency`, combine its s
 
 Make the recorder the app's own RudderStack client before the app wires it: replace the client where the app builds it (its factory, module or dependency injection; in tests, the existing mock or override for that client), so the app's `configure()`, its switches and its legacy calls all go through the recorder. Calling `configure()` with a recorder after the app starts would replace the AI switch's no-op client and miss legacy calls. Drive the surfaces, then flush. The recorders write each message as it arrives, so a crash still leaves a capture. The model still needs a stand-in: the app's existing test doubles, or the mock model in option B through the provider's base URL variable.
 
-The recorders ship with the SDK the app already installs (0.8.0 / v0.4.0 or later), so the harness needs nothing from this skill:
+If the test runner's global setup requires Docker or a database, use a config that skips it for the capture run.
+
+The recorders ship with SDKs 0.8.0 / v0.4.0 or later; for an older app SDK, install the latest SDK in scratch and import its recorder in the test harness:
 
 - Node.js: `import { Recorder } from '@rudderstack/ai/testing'`; `new Recorder('<scratch>/events.jsonl')` where the app builds its `new Analytics(...)`; `await flush()` at the end.
 - Python: `from rudderstack.ai.testing import Recorder`; `Recorder("<scratch>/events.jsonl")` where the app builds its `rudderstack.analytics` client (same method signatures and `(success, message)` results); run the harness with the app's environment (`uv --directory <repo> run python <scratch>/harness.py`); `rudderstack.ai.flush()` at the end.
@@ -124,6 +126,8 @@ window.rudderanalytics = {
 
 With generated tracking, stub the existing analytics transport beneath the generated client so catalog types and generated calls are exercised. Drive the page against the server that answers it (including a separate backend from `server_dependency`), so the browser's actions use the interaction ID the server returned. A stubbed `fetch` that invents IDs hides join bugs; use one only for pages with no server turn. In Node.js the page's `fetch` sends no browser cookies: wrap it to add the test `cookie` header so turns pass `--expect-session`, or check sessions on the curl turns only.
 
+When client events go through an app helper such as `trackAi` and no page can be driven, record the app's reporter or unit test to JSONL and use the server's `interaction_id` as the join key; pass `--client-surface <feature>:<surface>` with `--expect-joins`.
+
 ## 3. Validate
 
 ```text
@@ -169,7 +173,7 @@ const ids: [string, string][] = [['aws.bedrock', 'us.anthropic.claude-haiku-4-5-
 for (const [provider, model] of ids) console.log(provider, model, estimateCost(provider, model, 1000, 100) ?? 'UNPRICED');
 ```
 
-Python: `register_price(model, input_per_mtok=1, output_per_mtok=1)`, then `estimate_cost(provider, model, 1000, 100)` returns `None` when unpriced; Go: `WithPrices` on `Configure`, then `EstimateCost(provider, model, 1000, 100, 0, 0)` returns `ok == false`. Any `UNPRICED` ID is a FAIL. For `aws.bedrock` the SDKs strip the cross-region inference profile prefix (`us.`, `us-gov.`, `eu.`, `apac.`, `jp.`, `au.`, `in.`, `global.`) and then the vendor prefix before matching; 0.7.0 / v0.3.0 and later strip them all.
+Python: `register_price(model, input_per_mtok=1, output_per_mtok=1)`, then `estimate_cost(provider, model, 1000, 100)` returns `None` when unpriced; Go: `WithPrices` on `Configure`, then `EstimateCost(provider, model, 1000, 100, 0, 0)` returns `ok == false`. Any `UNPRICED` ID is a FAIL unless the plan lists it as a known limit (for example an unpriced regional Bedrock ID). For `aws.bedrock` the SDKs strip the cross-region inference profile prefix (`us.`, `us-gov.`, `eu.`, `apac.`, `jp.`, `au.`, `in.`, `global.`) and then the vendor prefix before matching; 0.7.0 / v0.3.0 and later strip them all.
 
 ## 5. What changes
 
@@ -187,7 +191,7 @@ npx -y @rudderstack/ai@<VERSION> what-changes before.jsonl events.jsonl
 
 | Check | Pass when |
 |---|---|
-| Schema | every AI and MCP event passes its v0.4 definition (`ai-events-v0.4.schema.json`) and carries `specVersion: 0.4.0` (tracing spans, `integration: tracing` or `tracing/vercel-ai-sdk`, carry none) and a `context.wrapperLibrary.name` of `@rudderstack/ai`, `rudderstack-ai` or `ai-sdk-go`; client events also pass the client schema |
+| Schema | every AI and MCP event passes its v0.4 definition (`ai-events-v0.4.schema.json`) and, when the plan pins a v0.4 SDK, v0.4 events carry `specVersion: 0.4.0` (tracing spans, `integration: tracing` or `tracing/vercel-ai-sdk`, carry none); events carry a `context.wrapperLibrary.name` of `@rudderstack/ai`, `rudderstack-ai` or `ai-sdk-go`; client events also pass the client schema |
 | One final answer per turn | each completed `interaction_id` has exactly one final server `ai_response_received`, plus one `paused` response per pause; a run still waiting has only paused responses; every turn has at most one server `ai_user_prompt_created`; with a client surface, at most one client prompt copy and one client answer copy per server answer, paused or final |
 | Joins | prompt, answer, actions and declared tool events of a turn share `interaction_id`, `conversation_id`, `feature` and `surface`; the browser, driven with the server's returned ID, uses it for its copies and actions (`--expect-joins`) |
 | Identity | chat events carry the planned `userId` and, with cookies, `anonymousId` and `context.sessionId`; background events have no `userId` and carry `account_id` / `on_behalf_of` where planned |
