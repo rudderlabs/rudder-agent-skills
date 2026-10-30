@@ -6,7 +6,7 @@ allowed-tools: "Bash(npx -y @rudderstack/ai@*), Bash(uv run --no-project *), Bas
 
 # RudderStack AI Events Verification
 
-Proves the instrumentation sends what `ai-events.md` promises, before any real traffic. Runs offline: a recorder or mock RudderStack client, a mock model, no provider keys. Verification is not optional: it runs, and passes, before a commit or PR is proposed. If the user commits first, say plainly that verify has not run.
+Proves the instrumentation sends what `ai-events.md` promises, before any real traffic. Default checks run offline: a recorder or mock RudderStack client, a mock model, no provider keys. Verification is not optional: it runs, and passes, before a commit or PR is proposed. If the user commits first, say plainly that verify has not run.
 
 The checker (`check`, `what-changes`), the recorders and both schemas ship with the SDKs, `@rudderstack/ai` / `rudderstack-ai` 0.8.0 or later and `ai-sdk-go` v0.4.0 or later (`cmd/aicheck` v0.2.0); this skill adds the mock data plane and model server (`scripts/mock_server.py`, Python 3) and the procedures and checklist in `references/verification.md`. The 0.8.0 checkers accept 0.3.0 and 0.4.0 captures; v0.4 events must carry 0.4.0 fields only when the plan pins a v0.4 SDK. For an app on an older SDK, run the latest checker from scratch and, in tests, import its `Recorder` from that scratch install.
 
@@ -26,7 +26,7 @@ The checker (`check`, `what-changes`), the recorders and both schemas ship with 
    - **D. MCP servers**: a real MCP client driving the server in its production transport and session mode, stateless included.
    - Browser events: a recorder in place of `rudderanalytics`, driven with the interaction ID the server returned, appended to the same capture.
    - Always drive one app-detected failure per surface that has one, and capture the same traffic, browser included, with each switch off. The AI events switch is required: an instrumentation without one fails verify and goes back to `rudder-ai-events-instrument`. Only when checking an older instrumentation that predates the switch, take the "before" capture with `configure()` given a no-op client instead, and say so in the report.
-5. **Run the app's own tests** too: instrumentation must not break them, and the new server-side tests that assert the captured AI events must exist and pass. Deno runs the repo's own `deno test`; browser-only plans require browser tests for client events, returned-ID joins and `client_events.switch_source` instead of local server tests. Missing tests are a FAIL that goes back to `rudder-ai-events-instrument`.
+5. **Run the app's own tests** too (including CI-wired real-SDK integration tests and, for a planned Agent SDK upgrade, the real-API smoke in `references/verification.md`, section 2): instrumentation must not break them, and the new server-side tests that assert the captured AI events must exist and pass. Deno runs the repo's own `deno test`; browser-only plans require browser tests for client events, returned-ID joins and `client_events.switch_source` instead of local server tests. Missing tests are a FAIL that goes back to `rudder-ai-events-instrument`.
 6. **Validate** with the checker's `check` and the flags that match the plan (section 3): schema, SDK and `specVersion` per event, one final server answer per completed `interaction_id`, plus paused segments, client copies, joins, feature, surface, identity, content, background runs, MCP, legacy events, app-detected failures, switches. A `requested_model` on Anthropic models served through Bedrock or Vertex AI IDs, no `requested_model` from Bedrock, LangChain, the OpenAI Agents SDK or the Claude Agent SDK, and `argument_keys` in any order are not failures. Then the plan checks:
    - **v0.4:** drive planned blocked answers, confidence, credits / limits, per-call details, agent versions / variants, compactions and denied tools. For `surfaces[].pauses`, repeat pauses and resume in process or from JSON on a fresh worker; check segment totals and final `pause_count` / `total_paused_ms`. Use unsampled coverage capture, then exercise planned `sample_rates` separately.
    - **Extra properties:** expected `surfaces[].extra_properties` values on successful and failed answers, including app-detected failures.
@@ -60,7 +60,7 @@ Finding-to-cause table: `references/verification.md`, section 7. Two that read o
 
 ## Credential Security
 
-- Use placeholder values (`local-test`, `test`) for write keys and provider keys in the verification shell only; never real keys, and never write them to `.env` or any file.
+- Offline captures use placeholder values (`local-test`, `test`) for write keys and provider keys in the verification shell only. A planned Agent SDK upgrade smoke uses the app's approved development credential mechanism; never read or print keys, or write them to `.env` or any file.
 - Never print environment variables or app config that may hold secrets.
 - Option C uses a development source only, never a production write key.
 

@@ -28,7 +28,7 @@ Each side reports what it saw: never forward model, provider, tokens, cost, tool
 
 `interaction_id`: the browser mints one per prompt (`crypto.randomUUID()`), sends it with the chat request (`x-interaction-id` header or a body field), and uses it for later actions on that answer. The server validates it is a UUID and passes it as `interactionId` / `interaction_id`; if invalid it lets the SDK mint one and returns that. When the plan says `interaction_id_source: sdk` or `app`, the browser instead reads the ID from the chat response.
 
-Identity: the JavaScript SDK supplies `userId` / `anonymousId` itself; `userId` only after the page calls `rudderanalytics.identify(userId)`. Without it, browser events carry only `anonymousId` and join the server's events through that and the cookies; adding `identify()` on login is a separate change, out of scope here. Its cookies (`rl_anonymous_id`, `rl_session`) reach same-origin server routes, which is how the server's events join the same profile and session. Cross-origin chat APIs need `credentials: 'include'` and a cookie domain the API can read.
+Identity: the JavaScript SDK supplies `userId` / `anonymousId` itself; `userId` only after the page calls `rudderanalytics.identify(userId)`. Without it, browser events carry only `anonymousId` and join the server's events through that and the cookies; adding `identify()` on login is a separate change, out of scope here. Use the answer's account/workspace and group context for browser copies too; take `feature` and `surface` from the active context for a UI serving several features or channels. Its cookies (`rl_anonymous_id`, `rl_session`) reach same-origin server routes, which is how the server's events join the same profile and session. Cross-origin chat APIs need `credentials: 'include'` and a cookie domain the API can read.
 
 ## Code
 
@@ -37,15 +37,13 @@ Without tracking-plan codegen, use the raw helper below. When the repo generates
 One helper, so every client AI event carries `source`, `feature` and `surface`, unknown IDs are left out rather than sent as `null`, and nothing is sent when the AI events switch is off. This example uses configuration loaded before submission. Put it in the app's browser analytics module (exported), or at the top of the page script when there is none:
 
 ```js
-const AI_FEATURE = 'support_bot'; // the surface's feature from the plan's ## Config
-const AI_SURFACE = 'web'; // the surface's channel from the plan's ## Config (web | mobile | ...)
 // effective backend AI switch from client_events.switch_source, or the app's existing config/flags channel
 const AI_EVENTS_ON = appConfig.aiEventsEnabled === true;
 
-function trackAi(event, properties = {}, enabled = AI_EVENTS_ON) {
+function trackAi(event, properties = {}, enabled = AI_EVENTS_ON, context = appContext) {
   if (!enabled) return; // configure() never reaches the browser, so the switch must
   const defined = Object.fromEntries(Object.entries(properties).filter(([, v]) => v != null));
-  window.rudderanalytics?.track(event, { source: 'client', feature: AI_FEATURE, surface: AI_SURFACE, ...defined });
+  window.rudderanalytics?.track(event, { source: 'client', feature: context.aiFeature, surface: context.aiSurface, ...defined });
 }
 
 function clientResponseStatus(status) {
@@ -57,7 +55,7 @@ function clientResponseStatus(status) {
     case 'blocked': return 'blocked';
     case 'paused': return 'paused';
     case 'incomplete': return 'error'; // the client enum has no incomplete status
-    default: return 'error'; // unknown server-only statuses must not reach the client event
+    default: return undefined; // omit unavailable or unknown statuses from the client event
   }
 }
 ```
@@ -77,7 +75,7 @@ trackAi('ai_user_prompt_created', {
   prompt_source: 'composer', // composer | starter_suggestion | follow_up_action | retry
   prompt_length: message.length,
 });
-let status = 'success';
+let status; // no success default when the backend supplies no final status
 let errorKind;
 try {
   const response = await fetch('/api/chat', {
@@ -89,6 +87,7 @@ try {
   const data = response.ok ? await response.json() : await response.json().catch(() => ({}));
   conversationId = data.conversationId ?? conversationId;
   interactionId = data.interactionId ?? interactionId;
+  status = data.responseStatus; // final backend status mapped to the client schema, or omitted
   if (!response.ok) {
     status = 'error';
     errorKind = response.status >= 500 ? 'http_5xx' : 'http_4xx';
@@ -103,7 +102,7 @@ try {
 if (conversationId) trackAi('ai_response_received', {
   interaction_id: interactionId,
   conversation_id: conversationId,
-  response_status: status, // success | error | cancelled | paused | blocked; use the state rendered
+  response_status: status, // rendered success | error | timeout | cancelled | paused | blocked; unknown omitted by trackAi
   client_error_kind: errorKind, // offline | interrupted | http_4xx | http_5xx | agent_error | unknown
   time_to_first_render_ms: Math.round(performance.now() - submittedAt), // streams: at the first chunk shown
 });
@@ -115,7 +114,7 @@ One-shot features (generate, suggest, autofill, rewrite, fix; `conversation_id_s
 
 A chat API on another origin needs `credentials: 'include'` (and CORS that allows credentials) for the cookies to arrive.
 
-Chat-response switch: replace the helper's `AI_EVENTS_ON` declaration with `let AI_EVENTS_ON = false` and use this submit variant. Buffer only the prompt properties; read the effective switch on success and error responses. A missing switch sends neither copy. Each turn gates its copies with its own response value; later actions use the latest known switch.
+Chat-response switch: replace the helper's `AI_EVENTS_ON` declaration with `let AI_EVENTS_ON = false` and use this submit variant. Buffer prompt, panel and action events until the first switch value arrives; replay them if enabled and discard them if disabled, preserving their originating turn and context. The minimal submit example below buffers the prompt; extend the queue to the existing engagement and action handlers. Read the effective switch on success and error responses. A missing switch sends neither copy. Each turn gates its copies with its own response value; later actions use the latest known switch.
 
 ```js
 let interactionId = crypto.randomUUID();
@@ -126,7 +125,7 @@ const promptCopy = {
   prompt_length: message.length,
 };
 let aiEventsOn = false;
-let status = 'success';
+let status; // no success default when the backend supplies no final status
 let errorKind;
 try {
   const response = await fetch('/api/chat', {
@@ -139,6 +138,7 @@ try {
   AI_EVENTS_ON = aiEventsOn;
   conversationId = data.conversationId ?? conversationId;
   interactionId = data.interactionId ?? interactionId;
+  status = data.responseStatus; // final backend status mapped to the client schema, or omitted
   trackAi('ai_user_prompt_created', { ...promptCopy, conversation_id: conversationId, interaction_id: interactionId }, aiEventsOn);
   if (!response.ok) {
     status = 'error';
@@ -159,6 +159,10 @@ if (conversationId) trackAi('ai_response_received', {
   time_to_first_render_ms: Math.round(performance.now() - submittedAt),
 }, aiEventsOn);
 ```
+
+For streamed and hydrated answers, send the answer copy after the final state is rendered on screen, including a turn completed before the stream listener attached. Send one copy per rendered paused or final segment under the same IDs. Measure first render at the first visible response, including a question or approval card. Propagate final server status to the browser (a non-throwing failed result is still failed); if the response contract has no status, omit `response_status` rather than defaulting to success. The submit examples normalise `data.response_status` or `data.responseStatus` through `clientResponseStatus` for that contract; send the copy after the app's render commit, including its error or stopped state.
+
+Stamp cards with the live turn's ID before the done frame, and restore that ID for running turns hydrated after refresh. Gate feedback on the AI-backed reply marker, so guards, greetings and pre-model errors emit no `ai_user_action`. A retraction requires confirmed removal of a stored rating. Capture the session generation and answer context when starting async work; discard stale completions after a workspace/session switch so they cannot overwrite gates, IDs or account context. Normalise app enum spellings (e.g. `trackingPlan` to the catalog's value) at the analytics boundary. Track external answer links as click-throughs too, with kinds only, never URLs.
 
 Actions the browser sends (those listed in the plan's `client_events`):
 
