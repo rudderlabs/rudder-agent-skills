@@ -1,15 +1,15 @@
-# Go recipes (`github.com/rudderlabs/ai-sdk-go`, spec v0.3)
+# Go recipes (`github.com/rudderlabs/ai-sdk-go`, spec v0.4)
 
 Events carry `context.wrapperLibrary.name: ai-sdk-go`. The root module (package `rudderstackai`) holds the interaction API, the `net/http` middleware and MCP support (`ruddermcpgo` included) and pulls no provider SDK. Each provider integration, and `rudderotel`, is its own module, so an MCP-only service never pulls provider SDKs.
 
 | Needs | |
 |---|---|
-| Go | the `go` line of the pinned version's `go.mod` (v0.3.0: `go 1.26.10`), for the root module and every integration module |
+| Go | the `go` line of the pinned version's `go.mod` (v0.4.0: `go 1.26.10`), for the root module and every integration module |
 | RudderStack client | `github.com/rudderlabs/analytics-go/v4` v4.3.1+, the app's existing one or a new one |
 | Model clients | `github.com/openai/openai-go/v3` v3.70.0+, `github.com/anthropics/anthropic-sdk-go` v1.78.0+, `google.golang.org/genai` v1.72.0+, `github.com/aws/aws-sdk-go-v2/service/bedrockruntime` v1.63.1+; anything else through `RecordCall` |
 | MCP servers | `github.com/modelcontextprotocol/go-sdk` v1.8.0 (`rudderstackai.WrapMCPServer`) or `github.com/mark3labs/mcp-go` v0.55.1+, tested through v1.2.1 (`ruddermcpgo.WrapServer`) |
 
-`<VERSION>` is the plan's `sdks[].version`: v0.3.0 or later for the root module. Each integration module is tagged on its own (`rudderopenai/v0.2.0`, `rudderotel/v0.1.1`, ...): install each at the exact version the plan records in `sdks[].extras` (`rudderopenai@v0.2.0`), never a newer one resolved here; a plan without versions there goes back to setup. The modules are public on proxy.golang.org. Never pin a branch or pseudo-version.
+`<VERSION>` is the plan's `sdks[].version`: v0.4.0 or later for the root module. Each integration module is tagged on its own (`rudderopenai/v0.3.0`, `rudderanthropic/v0.3.0`, `ruddergenai/v0.3.0`, `rudderbedrock/v0.3.0`, `rudderotel/v0.1.1`): install each at the exact version the plan records in `sdks[].extras` (`rudderopenai@v0.3.0`), never a newer one resolved here; a plan without versions there goes back to setup. The modules are public on proxy.golang.org. Never pin a branch or pseudo-version.
 
 Runnable references in the SDK repository's `examples/`: `openai`, `anthropic`, `google-genai`, `bedrock-converse`, `background-agent`, `manual`, `mcp-server`, `mcp-server-mcpgo`, `mcp-stateless-http`, `mcp-auth`.
 
@@ -90,7 +90,23 @@ func (lazyClient) Flush(ctx context.Context) error {
 // rudderstackai.WithAnalytics(lazyClient{})
 ```
 
-`Configure` changes only the options passed and returns an error for an invalid one (changing nothing). `WrapMCPServer` / `ruddermcpgo.WrapServer` take their own options; `Configure` does not apply to them.
+`Configure` changes only the options passed and returns an error for an invalid one (changing nothing). `WrapMCPServer` / `ruddermcpgo.WrapServer` take their own options; `WithSampleRates` applies to their events; other `Configure` options do not apply to them.
+
+Only the v0.4 options the plan enables (check the returned error):
+
+```go
+err := rudderstackai.Configure(
+	rudderstackai.WithLLMCallEvents(true),
+	rudderstackai.WithSampleRates(map[string]float64{"ai_llm_response_received": 0.1, "mcp_tool_called": 0.05}),
+	rudderstackai.WithCredits(func(call rudderstackai.CreditCall) (*float64, error) {
+		if call.CostUSD == nil { return nil, nil }
+		return rudderstackai.Ptr(*call.CostUSD * 1000), nil // app's rate
+	}),
+	rudderstackai.WithTaskStartedEvents(true), // optional ai_task_started on new tasks, never resume
+)
+```
+
+Unlisted events are unsampled; leave answers out for exact counts and cost. Kept sampled events carry `sample_rate`. The hook runs after USD pricing for successful calls with known usage; `LLMCall.Credits` overrides it. `total_credits` is absent if any successful call has unknown credits. `WithSampleRates` also applies to MCP events; keep the existing wrapper configuration (section 11).
 
 ## 3. Wrap the model client
 
@@ -137,6 +153,8 @@ if json.Unmarshal(out.Body, &body) == nil {
 ```
 
 Pass the interaction's `ctx` to every model call: a call made with a context that carries no interaction is reported as its own answer. Retries inside openai-go and anthropic-sdk-go count as one call with the final attempt's outcome (as in Node.js and Python), except connection-error retries outside an interaction, which are recorded per attempt; genai retries are recorded per attempt; a Bedrock operation is recorded once. The last call decides the status. `requested_model` is sent whenever another model served the call, by the openai-go, anthropic-sdk-go and genai integrations (not Bedrock) and on `RecordCall` with `RequestedModel`; a dated snapshot of the requested model (`gpt-4o-2024-08-06` for `gpt-4o`) counts as the same model.
+
+Per-call metadata: `rudderopenai.WithTracking(rudderopenai.WithCallPurpose("summarize"), rudderopenai.WithFallbackUsed(false), rudderopenai.WithBYOK(true))`; every provider integration offers these options. Or scope calls with `rudderstackai.WithCallDetails(ctx, rudderstackai.CallDetails{CallPurpose: "summarize", FallbackUsed: rudderstackai.Ptr(false), BYOK: rudderstackai.Ptr(true)})`. Manual `LLMCall` accepts `CallPurpose`, `FallbackUsed`, `BYOK`, `StartedAt`, `EndedAt`, `FirstTokenAt` (`time.Time`). Observed boundaries supply `latency_ms` and streaming `time_to_first_token_ms`; unknown ones stay absent.
 
 ## 4. Chat surface: one `RunInteraction` per user turn
 
@@ -200,6 +218,11 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
 - Statuses from the integrations: an Anthropic `max_tokens` or OpenAI/Gemini/Bedrock length stop on the last call makes the answer `incomplete` with `error_type: length`; a content filter is an `error`.
 - Attachments: `AttachmentCount` (`*int`, `rudderstackai.Ptr(n)`) and `AttachmentTypes`; never names or content. Evaluate planned `surfaces[].extra_properties` on successful and failed turns and pass `in.End(rudderstackai.EndOptions{ExtraProperties: ...})` inside the function at finalization, before the automatic end; preserve failure status and error type. SDK-owned names are ignored.
 
+- One-shot: `InteractionOptions{OneShot: true, InputMethod: "button"}` defaults `conversation_id` to the interaction ID when no explicit or context conversation ID exists; return that ID for copies and actions.
+- Agent release / experiment: `AgentVersion` and `Variant` on `ContextValues`, `InteractionOptions`, `TaskOptions`, actions or scores.
+- Refusal: `in.End(rudderstackai.EndOptions{Status: rudderstackai.StatusBlocked, BlockReason: rudderstackai.BlockPolicy})`, without `ErrorType`; reasons are `guardrail`, `policy`, `unsupported`, `skipped`, `other`. Context overflow is `context_limit`.
+- Confidence / compaction: `in.SetConfidence(rudderstackai.ConfidenceHigh)` (`ConfidenceLow`, `ConfidenceMedium` too), `in.RecordCompaction()`; standard fields, not extras. Declared tool events carry observed `mcp_server` and `result_size_bytes`; a tool result with `Error: rudderstackai.Ptr(true), ErrorType: "denied"` emits `tool_status: denied`.
+
 ## 5. Feedback (server copy)
 
 ```go
@@ -214,6 +237,8 @@ rudderstackai.TrackAction(ctx, rudderstackai.TrackActionOptions{
 ```
 
 `InteractionID` and `ConversationID` are required; skip the call when they are missing or not UUIDs. With `client_events.opt_out: [server_feedback]`, keep the call and set `WithServerFeedback(false)` once.
+
+App-enforced limits: `rudderstackai.TrackLimitReached(ctx, rudderstackai.TrackLimitReachedOptions{LimitType: "credits", Feature: "support_bot"})`; provider rate limits remain answer errors. Preset feedback choices go in `ActionDetails["feedback_reasons"]`, scope in `ActionDetails["feedback_scope"]` (`interaction`, `conversation`, `feature`).
 
 ## 6. Background surface: one `RunTask` per run
 
@@ -233,6 +258,24 @@ err := rudderstackai.RunTask(ctx, "nightly-digest", rudderstackai.TaskOptions{ /
 - A `RunTask` inside another interaction or task is a child: `parent_interaction_id`, `conversation_id` and `trigger_source: agent` default from it (example `background-agent`).
 - A run started by an MCP Events update: `TriggerSource: "mcp_event"`, `TriggerEventID` set to the update's `event_id`.
 - A top-level task waits for its own classification and score and flushes its client, within `TaskOptions.FlushTimeout` (default 2 s). An analytics-go client without `Flush(ctx)` (v4.3.1 has none) cannot be flushed, so `client.Close()` before exit is still needed (section 7).
+
+Repeated approvals, with the app's own run store (configure each worker with the same sampling rates):
+
+```go
+err := rudderstackai.RunTask(ctx, "refund-approval", rudderstackai.TaskOptions{TriggerSource: "queue", Resume: saved},
+	func(ctx context.Context, task *rudderstackai.Interaction) error {
+		if _, err := claude.Messages.New(ctx, params); err != nil { return err }
+		if needsApproval {
+			paused, ok := task.Pause(rudderstackai.PauseOptions{Reason: rudderstackai.PauseApproval})
+			if ok { return db.SaveRun(job.ID, paused) } // JSON; decode into *PausedInteraction as saved
+		}
+		return nil
+	})
+```
+
+In process: `task.Pause(...)`, then `task.Resume()`, repeated as needed. Each pause emits segment totals; returning nil leaves it paused. Restore `PausedInteraction` through `InteractionOptions.Resume` or `TaskOptions.Resume`: IDs and identity continue, without a new prompt or task-started event; the final answer adds `pause_count` and `total_paused_ms`. Paused runs survive TTL and shutdown.
+
+A paused run keeps its `Limits.MaxOpenInteractions` slot until it ends; resuming it in process, or restoring its snapshot in the process that paused it, always succeeds, while a snapshot from another process goes through normal admission. End abandoned waits (e.g. on approval timeout) rather than leaving them paused.
 
 ## 7. Flush
 

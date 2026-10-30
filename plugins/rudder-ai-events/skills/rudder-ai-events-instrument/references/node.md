@@ -1,8 +1,8 @@
-# Node.js recipes (`@rudderstack/ai`, spec v0.3)
+# Node.js recipes (`@rudderstack/ai`, spec v0.4)
 
 Node.js 24+, or Deno with npm compatibility. The SDK relies on `AsyncLocalStorage` and `node:` builtins, which Deno supports; the first instrumented PR must prove context propagation and captured events under the repo's own `deno test`. ESM shown; CommonJS works the same with `require('@rudderstack/ai')` and `require('@rudderstack/ai/openai')`. Every entry point: `@rudderstack/ai`, `/openai`, `/anthropic`, `/google-genai`, `/bedrock`, `/vercel-ai-sdk`, `/langchain`, `/claude-agent-sdk`, `/openai-agents`, `/middleware`, `/mcp`, `/tracing` and `/tracing/vercel-ai-sdk` (advanced OpenTelemetry export, not needed for AI events).
 
-`<VERSION>` below is the plan's `sdks[].version`: 0.7.0 or later.
+`<VERSION>` below is the plan's `sdks[].version`: 0.8.0 or later.
 
 Full API reference: the package README, shipped at `node_modules/@rudderstack/ai/README.md` and shown on npmjs.com.
 
@@ -60,6 +60,19 @@ const lazyAnalytics: AnalyticsClient = {
 configure({ analytics: lazyAnalytics });
 ```
 
+Only the v0.4 options the plan enables:
+
+```ts
+configure({
+  emitLlmCalls: true, // per-call rows
+  sampleRates: { ai_llm_response_received: 0.1, mcp_tool_called: 0.05 },
+  credits: (call) => call.costUsd === undefined ? undefined : call.costUsd * 1000, // app's rate
+  emitTaskStarted: true, // optional ai_task_started on new tasks, never resume
+});
+```
+
+Unlisted events are unsampled; leave answers out for exact counts and cost. Kept sampled events carry `sample_rate`. The credits hook runs after USD pricing for successful calls with known usage; `recordCall({ credits })` overrides it. `total_credits` is absent if any successful call is unpriced in credits.
+
 ## 3. Wrap the model client (or add the framework integration)
 
 Wrap where the client is constructed; the wrapped object has the same type and API, so call sites do not change:
@@ -108,6 +121,8 @@ interaction.recordCall({ // the aiInteraction / aiTask callback's interaction, o
 Claude Agent SDK: construct `query()` inside the `aiInteraction` / `aiTask` callback, not before it, or in-process MCP tools and hooks are counted outside the interaction. A loop the app starts without awaiting: section 4.
 
 `requested_model` needs no code: the OpenAI, Anthropic, Google Gen AI and Vercel AI SDK integrations send it, streamed or not, when a router or fallback served another model than the one requested; a dated snapshot of the requested model (`claude-haiku-4-5` served as `claude-haiku-4-5-20251001`) is the same model and sends none.
+
+Per-call metadata: `wrapOpenAI(client, { callPurpose: 'summarize', fallbackUsed: false, byok: true })` (also `wrapAnthropic`, `wrapGoogleGenAI`, `wrapBedrock`), or the same fields on `interaction.recordCall(...)`. Wrappers measure `latency_ms` and streaming `time_to_first_token_ms`; manual calls pass `startedAt`, `endedAt`, `firstTokenAt` (epoch ms). Unknown boundaries stay absent.
 
 ## 4. Chat surface: one `aiInteraction` per user turn
 
@@ -227,6 +242,11 @@ res.end();
 
 Claude Agent SDK with resumed sessions: follow `surfaces[].usage_baseline_source`. A session already seen in-process uses its cached baseline for per-turn usage and reported cost, even with `resumed: true`. Across pods/restarts, persist `usageSnapshot(resultMessage)` per session and pass it back as `usageBaseline`. Without either baseline, the resumed fallback uses per-turn main-loop usage and subagent messages, ignores cumulative SDK cost and uses only registered prices (section 10); it can undercount subagent usage. `trackedQuery` detects resume/continue itself; for `trackMessages`, pass `resumed: !!options.resume || options.continue === true`.
 
+- One-shot: `aiInteraction({ oneShot: true, inputMethod: 'button', feature }, fn)` defaults `conversation_id` to the interaction ID when no explicit or context conversation ID exists; return that ID for copies and actions.
+- Agent release / experiment: pass `agentVersion` and `variant` on `aiContext`, `aiInteraction` or `aiTask` options (actions and scores accept them too).
+- Refusal: `interaction.end({ status: 'blocked', blockReason: 'policy' })` (`guardrail`, `unsupported`, `skipped`, `other` too), without `errorType`. OpenAI Agents SDK tripwire failures still report `guardrail_trip`; context overflow is `context_limit`.
+- Confidence / compaction: `interaction.setConfidence('high')` (`low`, `medium`, `high`), `interaction.recordCompaction()`; standard fields, not extra properties. Declared tool events carry observed `mcp_server` and `result_size_bytes`; a denied tool uses `tool_status: denied`.
+
 ## 5. Feedback and other actions (server copy)
 
 The server copy of each action in `surfaces[].feedback`. By default the browser sends its own copy of feedback too (`references/client-events.md`); dashboards use the client row per `interaction_id` and fall back to this one.
@@ -251,6 +271,8 @@ app.post('/api/feedback', (req, res) => {
 
 `interactionId` and `conversationId` are required (else dropped with a warning). When the endpoint does not receive them today (`request_changes` in the plan), add them to the client's request body and read them here; skip `trackAction` when they are missing or the ID is not a UUID, and keep the endpoint's existing response. Pass the real user ID or nothing, never a legacy placeholder such as `'anonymous'`. Cookies come from the middleware's context; without middleware, wrap the call in `aiContext({ cookies: req.headers.cookie }, () => trackAction(...))`. When the plan opts the server copy out (`client_events.opt_out: [server_feedback]`), do not remove the endpoint's `trackAction`: set `configure({ serverFeedback: false })` once instead.
 
+App-enforced limits: `trackLimitReached` from `@rudderstack/ai` emits `ai_limit_reached` with required `limit_type` and planned `feature`; provider rate limits remain answer errors. Preset feedback choices go in `actionDetails.feedback_reasons`, scope in `actionDetails.feedback_scope` (`interaction`, `conversation`, `feature`).
+
 ## 6. Background surface: one `aiTask` per run
 
 ```ts
@@ -273,6 +295,19 @@ await aiContext({ accountId: job.workspaceId, onBehalfOf: job.requestedBy }, () 
 - A top-level `aiTask` flushes when it ends, so a cron script or Lambda can exit. A nested `aiTask` (a sub-step inside another task) chains with `parent_interaction_id` and does not flush.
 - Long-running workers that run many tasks: pass `flush: false` and flush at shutdown (section 7) so a slow data plane never stalls the job loop.
 - A run started by an MCP Events update: `triggerSource: 'mcp_event'` and `triggerEventId` set to the update's `event_id`.
+
+Repeated approvals, with the app's own run store (configure each worker with the same sampling rates):
+
+```ts
+await aiTask('refund-approval', { triggerSource: 'queue', resume: await db.loadRun(job.id) }, async (task) => {
+  await anthropic.messages.create(params);
+  if (needsApproval) await db.saveRun(job.id, task.pause({ reason: 'approval' })); // JSON snapshot
+});
+```
+
+In process: `task.pause({ reason: 'approval' })`, then `task.resume()`, repeated as needed. Each pause emits a segment's totals; a normal callback return leaves it paused. JSON restore keeps IDs and identity, sends no new prompt or task-started event; the final answer adds `pause_count` and `total_paused_ms`. Paused runs survive TTL and shutdown.
+
+A paused run keeps its `limits.maxOpenInteractions` slot until it ends; resuming it in process, or restoring its snapshot in the process that paused it, always succeeds, while a snapshot from another process goes through normal admission. End abandoned waits (e.g. on approval timeout) rather than leaving them paused.
 
 ## 7. Flush
 
