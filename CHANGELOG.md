@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`rudder-ai-events` / `rudder-ai-events-setup`, `rudder-ai-events-instrument`,
+  `rudder-ai-events-verify`.** Update the unreleased 0.0.6 plugin to spec v0.4:
+  `@rudderstack/ai` and `rudderstack-ai` 0.8.0, `ai-sdk-go` v0.4.0,
+  provider integrations v0.3.0 and `cmd/aicheck` v0.2.0. Discovery plans
+  one-shot buttons with the SDK's conversation-ID default, repeated HITL
+  pauses with in-process or JSON snapshot resume, and per-event sampling for
+  high-volume MCP and per-call sources. Legacy mappings and recipes now use
+  blocked answers and denied tools, confidence, credits and usage limits,
+  per-call timing, purpose, fallback and BYOK, agent versions, variants,
+  compactions and context-limit errors, declared-tool MCP names and result
+  sizes, and the added client controls and feedback fields. Verification
+  checks v0.4 server events, v0.2 client events, segment totals and final pause
+  metrics; SDK checkers accept 0.3.0 and 0.4.0 captures. Removes the five known
+  limits these APIs resolve; plugin version stays 0.0.6.
 - **`rudder-cli` / `rudder-cli-setup`, `rudder-cli-workflow`, `rudder-transformations`,
   `rudder-import-and-evolve`; `rudder-core` / `rudder-instrumentation-debugging`.**
   Agents now check auth with `rudder-cli workspace info --json` and read the token
