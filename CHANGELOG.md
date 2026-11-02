@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`rudder-ai-events` 0.0.7** — tightened setup, instrumentation and verification
+  with rollout lessons: install and Agent SDK upgrade preflight, durable usage
+  snapshot cleanup, feedback eligibility, browser render/context handling,
+  result-aware write rules, tracking-plan coverage and CI integration checks.
+
 - **`rudder-ai-events` / `rudder-ai-events-setup`, `rudder-ai-events-instrument`,
   `rudder-ai-events-verify`.** Update the unreleased 0.0.6 plugin to spec v0.4:
   `@rudderstack/ai` and `rudderstack-ai` 0.8.0, `ai-sdk-go` v0.4.0,

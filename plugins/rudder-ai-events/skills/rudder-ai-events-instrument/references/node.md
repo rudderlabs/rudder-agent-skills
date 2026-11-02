@@ -35,6 +35,8 @@ configure({
 });
 ```
 
+A separate transport client created for AI events must use the same `errorHandler` as the app's existing client, so delivery failures reach its logs; the transport may swallow failures in `flush()`. SDK `onError` does not replace the transport's delivery handler.
+
 No existing client (`client: new`):
 
 ```ts
@@ -242,6 +244,10 @@ res.end();
 
 Claude Agent SDK with resumed sessions: follow `surfaces[].usage_baseline_source`. A session already seen in-process uses its cached baseline for per-turn usage and reported cost, even with `resumed: true`. Across pods/restarts, persist `usageSnapshot(resultMessage)` per session and pass it back as `usageBaseline`. Without either baseline, the resumed fallback uses per-turn main-loop usage and subagent messages, ignores cumulative SDK cost and uses only registered prices (section 10); it can undercount subagent usage. `trackedQuery` detects resume/continue itself; for `trackMessages`, pass `resumed: !!options.resume || options.continue === true`.
 
+For persisted usage snapshots, acquire the session's execution slot before reading the baseline and hold it through snapshot save or cleanup. Use `try/finally` with a flag set only after a fresh result snapshot was durably saved: clear the persisted snapshot in `finally` if the run threw, stopped, had no result or the snapshot write failed. Clear it too when crash recovery settles a dangling turn. Apply the lifecycle to every channel using that session store. Keep cleanup failures in the app's existing logging/recovery path so tracking does not change request behaviour; do not release a session for reuse with a known stale baseline.
+
+`CLAUDE_CODE_TERMINAL_MCP_TOOLS` matches tool names, not actions inside a tool. Give each visible-output action its own tool; a tool serving both cards and title changes can make a title-only turn look answered. Where splitting is outside the plan, guard zero-card turns in the app and end them with the planned failure status.
+
 - One-shot: `aiInteraction({ oneShot: true, inputMethod: 'button', feature }, fn)` defaults `conversation_id` to the interaction ID when no explicit or context conversation ID exists; return that ID for copies and actions.
 - Agent release / experiment: pass `agentVersion` and `variant` on `aiContext`, `aiInteraction` or `aiTask` options (actions and scores accept them too).
 - Refusal: `interaction.end({ status: 'blocked', blockReason: 'policy' })` (`guardrail`, `unsupported`, `skipped`, `other` too), without `errorType`. OpenAI Agents SDK tripwire failures still report `guardrail_trip`; context overflow is `context_limit`.
@@ -249,7 +255,7 @@ Claude Agent SDK with resumed sessions: follow `surfaces[].usage_baseline_source
 
 ## 5. Feedback and other actions (server copy)
 
-The server copy of each action in `surfaces[].feedback`. By default the browser sends its own copy of feedback too (`references/client-events.md`); dashboards use the client row per `interaction_id` and fall back to this one.
+The server copy of each action in `surfaces[].feedback`. Gate it on a stored AI-backed reply marker, and emit retractions only when deletion removed a stored rating. Slack button payloads carry the answer's workspace (`team.id`); in Slack Connect the rater's home team can differ. For an error reply sent by an outer catch after the interaction unwinds, use a turn-local marker set inside the callback rather than `currentInteraction()`. By default the browser sends its own copy of feedback too (`references/client-events.md`); dashboards use the client row per `interaction_id` and fall back to this one.
 
 ```ts
 import { trackAction } from '@rudderstack/ai';
