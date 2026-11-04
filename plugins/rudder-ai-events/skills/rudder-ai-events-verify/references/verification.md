@@ -4,7 +4,7 @@ Plan values below (surfaces, `capture_content`, `switches`, legacy events, event
 
 Pre-deploy checks run locally, without provider keys and without sending anything to RudderStack; section 8 is a read-only warehouse audit after deploy. Work in a scratch directory outside the repo (for example `$TMPDIR/ai-events-verify/`), never in the user's source tree.
 
-The checker, the recorders and both schemas ship with the SDKs (`@rudderstack/ai` / `rudderstack-ai` 0.8.0 or later, `ai-sdk-go` v0.4.0 or later); 0.8.0 checkers accept 0.3.0 and 0.4.0 captures. For an app on an older SDK, run the latest checker from scratch and import `Recorder` from that scratch install in tests. This skill ships only `scripts/mock_server.py`, the mock data plane and model server for option B (Python 3, standard library only; copy it into the scratch directory).
+The checker, the recorders and both schemas ship with the SDKs (`@rudderstack/ai` / `rudderstack-ai` 0.9.0 or later, `ai-sdk-go` v0.5.1 or later); 0.9.0 checkers accept 0.3.0 and 0.4.0 captures. For an app on an older SDK, run the latest checker from scratch and import `Recorder` from that scratch install in tests. This skill ships only `scripts/mock_server.py`, the mock data plane and model server for option B (Python 3, standard library only; copy it into the scratch directory).
 
 ## 1. Checker
 
@@ -51,7 +51,7 @@ Make the recorder the app's own RudderStack client before the app wires it: repl
 
 If the test runner's global setup requires Docker or a database, use a config that skips it for the capture run.
 
-The recorders ship with SDKs 0.8.0 / v0.4.0 or later; for an older app SDK, install the latest SDK in scratch and import its recorder in the test harness:
+The recorders ship with SDKs 0.9.0 / v0.5.1 or later; for an older app SDK, install the latest SDK in scratch and import its recorder in the test harness:
 
 - Node.js: `import { Recorder } from '@rudderstack/ai/testing'`; `new Recorder('<scratch>/events.jsonl')` where the app builds its `new Analytics(...)`; `await flush()` at the end.
 - Python: `from rudderstack.ai.testing import Recorder`; `Recorder("<scratch>/events.jsonl")` where the app builds its `rudderstack.analytics` client (same method signatures and `(success, message)` results); run the harness with the app's environment (`uv --directory <repo> run python <scratch>/harness.py`); `rudderstack.ai.flush()` at the end.
@@ -265,17 +265,20 @@ A row is `n/a` only when the app has no surface it applies to. Page-load is `n/a
 
 - Query the warehouse; never infer field coverage from SDK docs or schema PASS. Optional fields can be absent in every valid event.
 - Group by surface: `server_name` for MCP, source/endpoint for chat. Measure identity (`user_id`, `account_id`), client (`client_name`, `client_version`), session (`mcp_session_id`, `call_index`, `trace_id`), `server_version`, the `tool_status` / `error_type` mix and `request_context` (`intent`, `user_sentiment`). Treat null/empty strings as missing; `call_index: 0` is populated. Record the window, counts and percentages; split success and failure traffic.
-- Compare AI and legacy coverage side by side for the same calls, including legacy `workspace_id` from tool arguments. A legacy value present with new `account_id` absent is an identity gap. Join on an existing shared request/call key; do not equate unrelated aggregate traffic. Check unmatched calls and deduplicate retries before comparing. Note planned sampling and fields that do not apply (e.g. sessions on stateless endpoints).
-- Example MCP SQL (adapt warehouse syntax, time column, legacy table, tool argument column and shared `request_id` key; use one legacy row per call). Percentages below are per server/status/error bucket; `calls` gives the error mix. Add the equivalent chat query by source/endpoint.
+- Compare AI and legacy coverage side by side for the same calls, including legacy `workspace_id` from tool arguments. A legacy value present with new `account_id` absent is an identity gap. Join on a shared unique call key, or a composite scoped to endpoint, client/session and request; a JSON-RPC request ID alone is not unique. Deduplicate retries and verify non-null key uniqueness on both sides within the audit window before aggregating; check unmatched calls. Do not equate unrelated aggregate traffic. Note planned sampling and fields that do not apply (e.g. sessions on stateless endpoints).
+- Example MCP SQL (adapt warehouse syntax, time column, legacy table, tool argument column and shared unique `call_key`; verify one row per key on both sides first). Percentages below are per server/status/error bucket; `calls` gives the error mix. Add the equivalent chat query by source/endpoint.
 
 ```sql
 WITH paired AS (
   SELECT n.*, l.tool_arguments_workspace_id AS legacy_workspace_id
   FROM mcp_tool_called n
-  LEFT JOIN legacy_mcp_tool_called l ON n.request_id = l.request_id
+  LEFT JOIN legacy_mcp_tool_called l ON n.call_key = l.call_key
+    AND l.received_at >= :deployed_at AND l.received_at < :audit_end
   WHERE n.received_at >= :deployed_at AND n.received_at < :audit_end
 )
 SELECT server_name, tool_status, error_type, COUNT(*) AS calls,
+  SUM(CASE WHEN NULLIF(legacy_workspace_id, '') IS NOT NULL
+    AND NULLIF(account_id, '') IS NULL THEN 1 ELSE 0 END) AS lost_workspace_calls,
   100.0 * COUNT(NULLIF(account_id, '')) / COUNT(*) AS account_id_pct,
   100.0 * COUNT(NULLIF(legacy_workspace_id, '')) / COUNT(*) AS legacy_workspace_id_pct,
   100.0 * COUNT(NULLIF(user_id, '')) / COUNT(*) AS user_id_pct,

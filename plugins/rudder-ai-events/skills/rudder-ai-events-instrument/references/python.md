@@ -2,7 +2,7 @@
 
 Python 3.12+. The package has no dependencies of its own; the extra for each library the app uses (`openai`, `anthropic`, `google-genai`, `bedrock`, `langchain`, `openai-agents`, `claude-agent-sdk`, `litellm`, `mcp`, `tracing`) only declares the supported version of that library, which the app already has. `tracing` is only for exporting OpenTelemetry spans; AI events do not need it.
 
-`<VERSION>` below is the plan's `sdks[].version`: 0.8.0 or later.
+`<VERSION>` below is the plan's `sdks[].version`: 0.9.0 or later.
 
 Full API reference: the package README on the `rudderstack-ai` PyPI page.
 

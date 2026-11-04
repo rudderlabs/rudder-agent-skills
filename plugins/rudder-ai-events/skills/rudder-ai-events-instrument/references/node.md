@@ -2,7 +2,7 @@
 
 Node.js 24+, or Deno with npm compatibility. The SDK relies on `AsyncLocalStorage` and `node:` builtins, which Deno supports; the first instrumented PR must prove context propagation and captured events under the repo's own `deno test`. ESM shown; CommonJS works the same with `require('@rudderstack/ai')` and `require('@rudderstack/ai/openai')`. Every entry point: `@rudderstack/ai`, `/openai`, `/anthropic`, `/google-genai`, `/bedrock`, `/vercel-ai-sdk`, `/langchain`, `/claude-agent-sdk`, `/openai-agents`, `/middleware`, `/mcp`, `/tracing` and `/tracing/vercel-ai-sdk` (advanced OpenTelemetry export, not needed for AI events).
 
-`<VERSION>` below is the plan's `sdks[].version`: 0.8.0 or later.
+`<VERSION>` below is the plan's `sdks[].version`: 0.9.0 or later.
 
 Full API reference: the package README, shipped at `node_modules/@rudderstack/ai/README.md` and shown on npmjs.com.
 

@@ -12,7 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`rudder-ai-events` 0.0.8** — added production fill-rate audits against legacy
   calls, stateless MCP per-call account and client-info planning, follow-up
   tickets for accepted trade-offs, tool-result error classification and
-  server-version coverage.
+  server-version coverage. Review fixes require MCP-capable SDK pins
+  (`@rudderstack/ai` / `rudderstack-ai` 0.9.0, `ai-sdk-go` v0.5.1),
+  retain verified user identity with per-call workspace mapping, and audit
+  unique call pairs and lost workspace identity.
 
 - **`rudder-ai-events` 0.0.7** — tightened setup, instrumentation and verification
   with rollout lessons: install and Agent SDK upgrade preflight, durable usage

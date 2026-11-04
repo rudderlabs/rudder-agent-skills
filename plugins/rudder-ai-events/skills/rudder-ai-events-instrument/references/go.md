@@ -4,12 +4,12 @@ Events carry `context.wrapperLibrary.name: ai-sdk-go`. The root module (package 
 
 | Needs | |
 |---|---|
-| Go | the `go` line of the pinned version's `go.mod` (v0.4.0: `go 1.26.10`), for the root module and every integration module |
+| Go | the `go` line of the pinned version's `go.mod` (v0.5.1: `go 1.26.10`), for the root module and every integration module |
 | RudderStack client | `github.com/rudderlabs/analytics-go/v4` v4.3.1+, the app's existing one or a new one |
 | Model clients | `github.com/openai/openai-go/v3` v3.70.0+, `github.com/anthropics/anthropic-sdk-go` v1.78.0+, `google.golang.org/genai` v1.72.0+, `github.com/aws/aws-sdk-go-v2/service/bedrockruntime` v1.63.1+; anything else through `RecordCall` |
 | MCP servers | `github.com/modelcontextprotocol/go-sdk` v1.8.0 (`rudderstackai.WrapMCPServer`) or `github.com/mark3labs/mcp-go` v0.55.1+, tested through v1.2.1 (`ruddermcpgo.WrapServer`) |
 
-`<VERSION>` is the plan's `sdks[].version`: v0.4.0 or later for the root module. Each integration module is tagged on its own (`rudderopenai/v0.3.0`, `rudderanthropic/v0.3.0`, `ruddergenai/v0.3.0`, `rudderbedrock/v0.3.0`, `rudderotel/v0.1.1`): install each at the exact version the plan records in `sdks[].extras` (`rudderopenai@v0.3.0`), never a newer one resolved here; a plan without versions there goes back to setup. The modules are public on proxy.golang.org. Never pin a branch or pseudo-version.
+`<VERSION>` is the plan's `sdks[].version`: v0.5.1 or later for the root module. Each integration module is tagged on its own (`rudderopenai/v0.3.0`, `rudderanthropic/v0.3.0`, `ruddergenai/v0.3.0`, `rudderbedrock/v0.3.0`, `rudderotel/v0.1.1`): install each at the exact version the plan records in `sdks[].extras` (`rudderopenai@v0.3.0`), never a newer one resolved here; a plan without versions there goes back to setup. The modules are public on proxy.golang.org. Never pin a branch or pseudo-version.
 
 Runnable references in the SDK repository's `examples/`: `openai`, `anthropic`, `google-genai`, `bedrock-converse`, `background-agent`, `manual`, `mcp-server`, `mcp-server-mcpgo`, `mcp-stateless-http`, `mcp-auth`.
 
