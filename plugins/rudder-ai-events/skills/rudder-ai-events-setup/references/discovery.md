@@ -168,9 +168,10 @@ For a tracing tool, find how the current trace ID is read (`langfuse.getCurrentT
 For each server record, as `path` plus `symbol`:
 
 - every endpoint that serves it (`/mcp`, `/mcp/admin`, a stdio binary), each with its own wrap and a distinct server name; name and version (the `Implementation` / constructor arguments), file, and where it connects (`server.connect(`, `server.run(`, `server.Run(`, `NewStreamableHTTPHandler`).
-- session mode per endpoint: stateful (session IDs: `sessionIdGenerator`, an `Mcp-Session-Id` store) or stateless (`sessionIdGenerator: undefined`, `stateless_http=True`, go-sdk `StreamableHTTPOptions{Stateless: true}`, mcp-go `WithStateLess(true)`, or a server built per request). Stateless endpoints lose client details (Known limits).
+- session mode per endpoint: stateful (session IDs: `sessionIdGenerator`, an `Mcp-Session-Id` store) or stateless (`sessionIdGenerator: undefined`, `stateless_http=True`, go-sdk `StreamableHTTPOptions{Stateless: true}`, mcp-go `WithStateLess(true)`, or a server built per request). Record the client-info strategy: initialize `clientInfo` when available to that server instance, per-call `_meta` clientInfo, or `resolveClient` / `resolve_client` / `ClientInfo` (e.g. from a User-Agent the app trusts); note which clients supply it and the remaining gaps (Known limits).
 - transport: `stdio` (`StdioServerTransport`, `run("stdio")`, `mcp.StdioTransport`), `streamable_http` (`StreamableHTTPServerTransport`, `streamable-http`, `NewStreamableHTTPHandler`), or `sse` (deprecated HTTP+SSE). Several processes or replicas behind a load balancer: note it (per-process state, see Known limits). Several distinct servers built with the same name in one process: note it; each needs a unique name (state is per server name).
 - auth: the OAuth or API-key verifier (`requireBearerAuth`, `authInfo`, `TokenVerifier`, `auth.RequireBearerToken`; mcp-go: the app's own check, often `server.WithHTTPContextFunc`), which claim holds the user (usually `sub`) and which the workspace or tenant. No auth (typical for stdio): events go out as `ai_system`.
+- workspace/account tool arguments, including the legacy argument column that carries them: on stateless endpoints plan `identify` to resolve `account_id` per call from the argument for that tool name, not only from auth; `identify` receives the tool name and arguments. Keep the authenticated user source.
 - tool, resource and prompt names, and their descriptions (inputs for the server's intent list).
 - tools whose call changes data (creates, updates, sends; no `readOnlyHint: true` annotation): the default declared tool events.
 - hand-built analytics already sent from handlers (`mcp_<method>_success`, raw request or result properties): legacy events to map and flag.
@@ -185,7 +186,7 @@ Build this table for every entry point and endpoint, and show it before asking a
 | Entry point | Caller | Auth | `userId` today (`path:line`) | Proposed source | Tradeoff |
 |---|---|---|---|---|---|
 | `POST /api/chat` | web app user | session cookie | `req.user.id` (`src/middleware/auth.ts:42`) | same | none |
-| `/mcp` | MCP client (IDE agent) | OAuth bearer | none: legacy sends `'anonymous'` | token `sub` | needs `identify`; stateless: no `client_name` |
+| `/mcp` | MCP client (IDE agent) | OAuth bearer | none: legacy sends `'anonymous'` | token `sub` | needs per-call `identify` for workspace; stateless: record client-info source or gap |
 
 Where to look:
 

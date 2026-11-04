@@ -35,7 +35,8 @@ The checker (`check`, `what-changes`), the recorders and both schemas ship with 
    - **Page-load calls:** with any UI-triggered surface, load the page without typing: a call that fires sends `trigger: system` and no `ai_user_prompt_created`. `n/a` only when no surface is UI-triggered.
 7. **Fix and repeat.** A failure in app wiring goes back to `rudder-ai-events-instrument`; a wrong plan assumption goes back to `rudder-ai-events-setup` (plan `status` back to `draft`). A gap that matches a known limit in the plan is reported, not fixed.
 8. **Regenerate `## What changes`.** After the first PASS, run the checker's `what-changes` on the switch-off and switch-on captures (section 5) and complete the six parts. Output it as a block ready for the PR body; update the plan's section only where the capture contradicts it.
-9. **Report.**
+9. **After deploy, audit production.** Query warehouse fill rates per surface (`server_name` for MCP; source/endpoint for chat): identity (`user_id`, `account_id`), client (`client_name`, `client_version`), session (`mcp_session_id`, `call_index`, `trace_id`), `server_version`, the `error_type` mix and `request_context` (`intent`, `user_sentiment`). Compare side by side with legacy fields for the same calls, including workspace IDs from tool arguments (section 8). Schema validation misses absent optional fields. Never state field coverage from SDK docs; query the warehouse. No production access or deployment yet: report the audit as not verified, with the follow-up ticket.
+10. **Report.**
 
 ## Report
 
