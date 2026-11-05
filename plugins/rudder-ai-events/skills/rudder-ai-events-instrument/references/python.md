@@ -2,7 +2,7 @@
 
 Python 3.12+. The package has no dependencies of its own; the extra for each library the app uses (`openai`, `anthropic`, `google-genai`, `bedrock`, `langchain`, `openai-agents`, `claude-agent-sdk`, `litellm`, `mcp`, `tracing`) only declares the supported version of that library, which the app already has. `tracing` is only for exporting OpenTelemetry spans; AI events do not need it.
 
-`<VERSION>` below is the plan's `sdks[].version`: 0.8.0 or later.
+`<VERSION>` below is the plan's `sdks[].version`: 0.10.0 or later.
 
 Full API reference: the package README on the `rudderstack-ai` PyPI page.
 
@@ -383,7 +383,8 @@ wrap_mcp_server(
     server,
     analytics=rudder_client,
     identify=identify,
-    request_context={"intents": ["debug_delivery", "build_audience"]},  # without other; False turns it off
+    request_context=False,  # off by default when omitted
+    # request_context={"intents": ["debug_delivery", "build_audience"]},  # only when the plan enables it; without other
     # event_rules={"tools": {"create_audience": "audience_created"}},
     # capability_requests={"capabilities": ["bulk_export"]},
 )
@@ -391,7 +392,9 @@ server.run("stdio")
 rudder_client.flush()  # after run() returns; HTTP apps flush in the lifespan shutdown
 ```
 
-`identify` defaults to the token's `subject`, `client_id` and `scopes`; if it raises, the request goes out as `ai_system`. State (`mcp_client_seen` window, call counters, retry hashes, pending `input_required` items) is in memory per server name, per process: servers wrapped under one name share it, so give each distinct server a unique name; each replica reports its own `mcp_client_seen`. `call_reason` and `capability_detail` are sent only with `capture_content`. MCP Events helpers (`mcp_events=True`, `track_mcp_event_subscription`, `wrap_mcp_event_sender`) only when the plan turns them on: experimental. A delivery passed to the wrapped sender without `subscription_id` or `event_id` is dropped (the sender still runs) with one warning per process; one without `event_name` is sent as `unknown`.
+`request_context` is off when omitted; `request_context=True` or an options dict enables it. When off, no `request_context` is added to `tools/list`, and a client-sent `request_context` passes to the tool untouched. When enabled, it is added to every tool's input schema and stripped before the tool runs (a tool that declares its own argument keeps it), recording `intent` (from the list, plus `other`) and `user_sentiment`.
+
+`identify` defaults to the token's `subject`, `client_id` and `scopes`; if it raises, the request goes out as `ai_system`. State (`mcp_client_seen` window, call counters, retry hashes, pending `input_required` items) is in memory per server name, per process: servers wrapped under one name share it, so give each distinct server a unique name; each replica reports its own `mcp_client_seen`. `call_reason` is sent only with request context enabled and `capture_content`; `capability_detail` needs only `capability_requests` and `capture_content`, so it can be sent with request context off. MCP Events helpers (`mcp_events=True`, `track_mcp_event_subscription`, `wrap_mcp_event_sender`) only when the plan turns them on: experimental. A delivery passed to the wrapped sender without `subscription_id` or `event_id` is dropped (the sender still runs) with one warning per process; one without `event_name` is sent as `unknown`.
 
 - A declared tool event follows its `mcp_tool_called` with `tool_status` `success` or `error`, also when the call failed argument validation; analyses that count only completed actions filter on `tool_status: success`.
 - On 2026-07-28, an elicited call's `input_required` leg sends no `mcp_tool_called`; the retry that completes it does, keeping the leg's `call_index`.

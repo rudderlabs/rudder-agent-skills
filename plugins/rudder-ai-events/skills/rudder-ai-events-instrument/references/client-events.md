@@ -38,10 +38,10 @@ One helper, so every client AI event carries `source`, `feature` and `surface`, 
 
 ```js
 // effective backend AI switch from client_events.switch_source, or the app's existing config/flags channel
-const AI_EVENTS_ON = appConfig.aiEventsEnabled === true;
+const AI_EVENTS_ON = appConfig.aiEventsEnabled; // undefined: send while unknown
 
 function trackAi(event, properties = {}, enabled = AI_EVENTS_ON, context = appContext) {
-  if (!enabled) return; // configure() never reaches the browser, so the switch must
+  if (enabled === false) return; // drop only when the backend switch is known off
   const defined = Object.fromEntries(Object.entries(properties).filter(([, v]) => v != null));
   window.rudderanalytics?.track(event, { source: 'client', feature: context.aiFeature, surface: context.aiSurface, ...defined });
 }
@@ -62,7 +62,7 @@ function clientResponseStatus(status) {
 
 With `@rudderstack/analytics-js`, call `.track` on the app's existing `RudderAnalytics` instance instead of `window.rudderanalytics`. With the script-tag snippet, check its method stub list includes `track` (calls made before the SDK loads are queued only for stubbed methods).
 
-`appConfig.aiEventsEnabled` stands for the app's own channel: a server-rendered value, the config or flags endpoint the page already fetches, or the flags client it already uses. The server sets it from the same `ai_events_env` value it passes to `configure()`; the page's legacy `track` calls do not read it. With a reloadable switch, the page picks up a change on its next load. In a browser-only or cross-repo plan, `client_events.switch_source` can be a field on an existing backend API response (e.g. `response.aiEventsEnabled`); the named `server_dependency` supplies it from the same switch. Load it before sending client events; for a chat-response switch, use the buffered variant below. Server response/ID changes land in the backend PR first, then this browser PR; no server SDK or `configure()` is added to the browser repo.
+`appConfig.aiEventsEnabled` stands for the app's own channel: a server-rendered value, the config or flags endpoint the page already fetches, or the flags client it already uses. The server sets it from the same `ai_events_env` value it passes to `configure()`; the page's legacy `track` calls do not read it. With a reloadable switch, the page picks up a change on its next load. In a browser-only or cross-repo plan, `client_events.switch_source` can be a field on an existing backend API response (e.g. `response.aiEventsEnabled`); the named `server_dependency` supplies it from the same switch. Send while the switch is unknown and drop only when known off; for a chat-response switch, use the variant below. Server response/ID changes land in the backend PR first, then this browser PR; no server SDK or `configure()` is added to the browser repo.
 
 Chat submit with configuration loaded before submission: mint the ID, send the client prompt copy, send the request, then send the client answer copy when the turn reaches its final state on screen (completed, failed, or stopped by the user). From the response on, use the ID the server returns (it differs only if the server rejected yours).
 
@@ -114,7 +114,7 @@ One-shot features (generate, suggest, autofill, rewrite, fix; `conversation_id_s
 
 A chat API on another origin needs `credentials: 'include'` (and CORS that allows credentials) for the cookies to arrive.
 
-Chat-response switch: replace the helper's `AI_EVENTS_ON` declaration with `let AI_EVENTS_ON = false` and use this submit variant. Buffer prompt, panel and action events until the first switch value arrives; replay them if enabled and discard them if disabled, preserving their originating turn and context. The minimal submit example below buffers the prompt; extend the queue to the existing engagement and action handlers. Read the effective switch on success and error responses. A missing switch sends neither copy. Each turn gates its copies with its own response value; later actions use the latest known switch.
+Chat-response switch: replace the helper's `AI_EVENTS_ON` declaration with `let AI_EVENTS_ON` and use this submit variant. Send panel and action events immediately while unknown, preserving their originating turn and context; a panel-only visit may never receive the switch. Read it on success and error responses; an absent field retains the latest known value. Capture the switch at turn start and use it for both prompt and answer copies, including paused segments; response updates apply to later turns and panel/action events.
 
 ```js
 let interactionId = crypto.randomUUID();
@@ -124,7 +124,8 @@ const promptCopy = {
   prompt_source: 'composer',
   prompt_length: message.length,
 };
-let aiEventsOn = false;
+const aiEventsOn = AI_EVENTS_ON; // one switch snapshot for both copies of this turn
+trackAi('ai_user_prompt_created', { ...promptCopy, interaction_id: interactionId }, aiEventsOn);
 let status; // no success default when the backend supplies no final status
 let errorKind;
 try {
@@ -134,12 +135,10 @@ try {
     body: JSON.stringify({ message, conversationId }),
   });
   const data = response.ok ? await response.json() : await response.json().catch(() => ({}));
-  aiEventsOn = data.aiEventsEnabled === true; // effective backend switch, never default an absent field on
-  AI_EVENTS_ON = aiEventsOn;
+  AI_EVENTS_ON = data.aiEventsEnabled ?? AI_EVENTS_ON; // update future events; keep this turn's snapshot
   conversationId = data.conversationId ?? conversationId;
   interactionId = data.interactionId ?? interactionId;
   status = data.responseStatus; // final backend status mapped to the client schema, or omitted
-  trackAi('ai_user_prompt_created', { ...promptCopy, conversation_id: conversationId, interaction_id: interactionId }, aiEventsOn);
   if (!response.ok) {
     status = 'error';
     errorKind = response.status >= 500 ? 'http_5xx' : 'http_4xx';

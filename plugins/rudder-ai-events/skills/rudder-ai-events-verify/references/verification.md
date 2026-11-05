@@ -2,9 +2,9 @@
 
 Plan values below (surfaces, `capture_content`, `switches`, legacy events, event rules, MCP servers, `prices`, `unpriced_models`) come from the fenced `yaml` block under `## Config` in `ai-events.md`.
 
-Everything runs locally, without provider keys and without sending anything to RudderStack. Work in a scratch directory outside the repo (for example `$TMPDIR/ai-events-verify/`), never in the user's source tree.
+Pre-deploy checks run locally, without provider keys and without sending anything to RudderStack; section 8 is a read-only warehouse audit after deploy. Work in a scratch directory outside the repo (for example `$TMPDIR/ai-events-verify/`), never in the user's source tree.
 
-The checker, the recorders and both schemas ship with the SDKs (`@rudderstack/ai` / `rudderstack-ai` 0.8.0 or later, `ai-sdk-go` v0.4.0 or later); 0.8.0 checkers accept 0.3.0 and 0.4.0 captures. For an app on an older SDK, run the latest checker from scratch and import `Recorder` from that scratch install in tests. This skill ships only `scripts/mock_server.py`, the mock data plane and model server for option B (Python 3, standard library only; copy it into the scratch directory).
+The checker, the recorders and both schemas ship with the SDKs (`@rudderstack/ai` / `rudderstack-ai` 0.9.0 or later, `ai-sdk-go` v0.5.1 or later); 0.10.0 checkers accept 0.3.0 and 0.4.0 captures. For an app on an older SDK, run the latest checker from scratch and import `Recorder` from that scratch install in tests. This skill ships only `scripts/mock_server.py`, the mock data plane and model server for option B (Python 3, standard library only; copy it into the scratch directory).
 
 ## 1. Checker
 
@@ -14,7 +14,7 @@ Three equivalent commands: the same flags, the same output lines, the same exit 
 |---|---|---|
 | Node.js 24+ | `npx -y @rudderstack/ai@<VERSION> check events.jsonl [flags]` | `npx -y @rudderstack/ai@<VERSION> what-changes before.jsonl events.jsonl` |
 | Python 3.12+ | `uv run --no-project -p 3.12 --with "rudderstack-ai[check]==<VERSION>" python -m rudderstack.ai.check events.jsonl [flags]` (or `pip install "rudderstack-ai[check]==<VERSION>"` in a 3.12 virtualenv) | the same with `python -m rudderstack.ai.check what-changes before.jsonl events.jsonl` |
-| Go | `go run github.com/rudderlabs/ai-sdk-go/cmd/aicheck@v0.2.0 events.jsonl [flags]` | `go run github.com/rudderlabs/ai-sdk-go/cmd/aicheck@v0.2.0 what-changes before.jsonl events.jsonl` |
+| Go | `go run github.com/rudderlabs/ai-sdk-go/cmd/aicheck@v0.4.0 events.jsonl [flags]` | `go run github.com/rudderlabs/ai-sdk-go/cmd/aicheck@v0.4.0 what-changes before.jsonl events.jsonl` |
 
 Deno and browser-only repos use any available checker above at an exact published version; record it in the report and keep checker dependencies outside the browser repo. Deno recorder tests run under the repo's own `deno test`.
 
@@ -41,7 +41,9 @@ Drive, per planned surface (skip what the app does not have):
 - MCP servers: section D;
 - switches: the same traffic again with `spec.switches.ai_events_env` off (`before.jsonl`), and once with `legacy_events_env` off. Set them for that command only. The AI switch is required (instrument adds it): no `ai_events_env`, or one that does not stop the AI events, is a FAIL that goes back to `rudder-ai-events-instrument`. Only to check an older instrumentation that predates the switch, take `before.jsonl` with the app's `configure()` given a no-op client (Node.js `{ track() {} }`, Python an object whose `track` does nothing, Go a client whose `Enqueue` returns `nil`) while its legacy calls still reach the recorder or mock, and note the substitute in the report.
 
-Browser-only plans drive the backend named in `server_dependency`, combine its server capture with the browser capture, and check IDs and `client_events.switch_source`. Toggle the backend AI switch and observe the supplied value stop browser copies; toggle any local legacy switch separately. No local `ai_events_env` or server tests are required in that repo.
+For a chat-response switch, test unknown-state sending separately: panel/actions and both copies of a turn started while unknown are allowed, even when its response reveals `false`. Finish that turn (including rendered answer copies), confirm the browser knows `false`, and drain pending events before starting the switch-off capture (`before.jsonl`) for `--no-ai-events`. Drive new turns and panel/actions without reloading away the known switch state; none may send browser AI events.
+
+Browser-only plans drive the backend named in `server_dependency`, combine its server capture with the browser capture, and check IDs and `client_events.switch_source`. Toggle the backend AI switch and observe the supplied value stop browser copies on subsequent turns, using the capture boundary above; toggle any local legacy switch separately. No local `ai_events_env` or server tests are required in that repo.
 
 For a planned Claude Agent SDK upgrade, supplement the offline captures with a real-API smoke through a request-logging proxy using the app's approved development credential mechanism. If credentials or network are unavailable, report the upgrade smoke as not verified and keep the shipping check incomplete. Inspect a new session and a resumed turn for extra title calls, no-visible-output nudges, thinking defaults, new tools and system messages; reconcile actual requests, visible output, tokens and cost with captured events. Follow setup's Install preflight checklist; do not copy provider keys or raw request/response content into the report.
 
@@ -51,7 +53,7 @@ Make the recorder the app's own RudderStack client before the app wires it: repl
 
 If the test runner's global setup requires Docker or a database, use a config that skips it for the capture run.
 
-The recorders ship with SDKs 0.8.0 / v0.4.0 or later; for an older app SDK, install the latest SDK in scratch and import its recorder in the test harness:
+The recorders ship with SDKs 0.9.0 / v0.5.1 or later; for an older app SDK, install the latest SDK in scratch and import its recorder in the test harness:
 
 - Node.js: `import { Recorder } from '@rudderstack/ai/testing'`; `new Recorder('<scratch>/events.jsonl')` where the app builds its `new Analytics(...)`; `await flush()` at the end.
 - Python: `from rudderstack.ai.testing import Recorder`; `Recorder("<scratch>/events.jsonl")` where the app builds its `rudderstack.analytics` client (same method signatures and `(success, message)` results); run the harness with the app's environment (`uv --directory <repo> run python <scratch>/harness.py`); `rudderstack.ai.flush()` at the end.
@@ -91,15 +93,20 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 
 const client = new Client({ name: 'ai-events-verify', version: '0.0.0' });
 await client.connect(new StdioClientTransport({ command: 'node', args: ['<repo>/dist/mcp/server.js'], env: { ...process.env } }));
-const { tools } = await client.listTools(); // request_context must appear in each tool's input schema
+const requestContextEnabled = false; // plan mcp.servers[].request_context.enabled
+const { tools } = await client.listTools(); // injected request_context must appear only when enabled
 await client.callTool({
   name: tools[0].name,
-  arguments: { /* valid arguments */ request_context: { intent: 'other', user_sentiment: 'neutral' } },
+  arguments: { /* valid arguments */
+    ...(requestContextEnabled ? { request_context: { intent: 'other', user_sentiment: 'neutral' } } : {}),
+  },
   _meta: { 'com.rudderstack/interaction_id': '3b9e5d0a-7c2f-4e18-9a6b-2c4d6e8f0a1b' }, // joins a captured answer
 });
 await client.callTool({ name: tools[0].name, arguments: {} }); // invalid arguments: error, invalid_arguments names only
 await client.close();
 ```
+
+Check each listed schema against the plan: injected `request_context` only when enabled; a tool that declares its own argument keeps it in either mode. With request context off, also send a tool-supported `request_context` value and assert the tool receives it untouched, with no SDK-derived `intent` or `user_sentiment`.
 
 Python servers: the same with `mcp.ClientSession` over `stdio_client` / `streamablehttp_client`, passing `meta=` on `call_tool`. Go servers (go-sdk or mcp-go): either client against the built binary or the HTTP endpoint. Drive: one `tools/list`, one valid call per planned declared tool event, one invalid call, a second client name if the plan expects several, and (when planned) a `request_capability` call, a resource read, a prompt get and an elicitation. Stop the server so it flushes.
 
@@ -157,8 +164,8 @@ Pass only the flags that apply:
 | `--feedback-endpoint [[<feature>:]<surface>:]<action_type>` | per `action_type` in the plan's `surfaces[].feedback`, prefixed with that surface's `feature` and `surface` values when the capture has several: each browser copy of it on those turns needs a server copy. An action type the server sends on one feature's turns on one surface is checked the same way there; others (`clicked_through`, browser-only `copied_response`) need no server copy. With both copies expected, each turn needs as many client as server copies of each action |
 | `--failed-interaction <id>` | per app-detected failure driven: its server answer must report `error`, `timeout`, `cancelled` or `incomplete` with an `error_type`; do not pass refused interactions |
 | `--expect-legacy <event>` | per planned legacy event; also names a legacy event that uses an `ai_*` name |
-| `--mcp-server`, `--mcp-intent <server>:<intent>` | per planned server name, and per entry of that server's `request_context.intents` (without `other`), prefixed with its server name so one server's intents never pass on another; a bare `<intent>` is allowed on every server |
-| `--no-ai-events` | the capture with `ai_events_env` off: no AI SDK event and no browser AI event (`source: client`, names from the client schema) may appear (pair it with `--expect-legacy`) |
+| `--mcp-server`, `--mcp-intent <server>:<intent>` | per planned server name, and per entry of that server's `request_context.intents` (only when enabled, without `other`), prefixed with its server name so one server's intents never pass on another; a bare `<intent>` is allowed on every server |
+| `--no-ai-events` | the capture with `ai_events_env` off, started after the browser knows the switch is off and earlier turns/events have finished (section 2): no AI SDK event and no browser AI event (`source: client`, names from the client schema) may appear (pair it with `--expect-legacy`) |
 | `--absent <event>` | the capture with `legacy_events_env` off: per legacy event; counts only legacy sends (no `context.wrapperLibrary`, not a browser AI copy), so an AI event with the same name does not fail it |
 
 Server events without `context.wrapperLibrary` were not sent by the AI SDK: the checker skips them, counts them as legacy, and fails one that uses an AI event name unless `--expect-legacy` names it. An SDK-sent event with a customer name is checked as a declared tool event (`tool_name` and `tool_status` required); an SDK-sent `ai_*` or `mcp_*` name outside the spec fails as misspelled. The `run:` lines list each background answer; compare them with the plan's `task_name`, `trigger_source`, `conversation_id_source`, `account_id_source`, `on_behalf_of_source` and `child_tasks`. The `mcp call:` lines list each tool call, marked `joined` when its `interaction_id` matches a captured answer.
@@ -199,16 +206,16 @@ npx -y @rudderstack/ai@<VERSION> what-changes before.jsonl events.jsonl
 | Identity | browser/server copies share the planned account and group context; Slack Connect feedback retains the answer's `team.id`, not the rater's home team; chat events carry the planned `userId` and, with cookies, `anonymousId` and `context.sessionId`; background events have no `userId` and carry `account_id` / `on_behalf_of` where planned |
 | Content | no `prompt_text`, `response_text` or `feedback_text` unless the plan turns capture on; inspect tracking-plan declarations too: no `prompt_text` / `response_text` with capture off; `intent_summary` only when the plan's classifier sets `intent_summary: true` (the checker does not gate it on capture) |
 | Counted once | no call reported by two integrations (one final answer per turn, not one per model call; multiple `paused` answers may precede it under the same `interaction_id`, each with segment totals; the final answer adds `pause_count` and `total_paused_ms`); browser copies carry `source: client` and no generation details (model, tokens, cost, `trace_id`) |
-| Client copies | answer copies follow committed render, including hydrated history; first render includes question/approval cards; final status matches the server or is omitted when unavailable; live and refreshed cards retain the turn ID; pre-switch panel/actions are buffered and stale session completions discarded; external links and enum normalisation are exercised. Unless the plan opts out: each driven turn has a client prompt and answer copy (one per rendered paused or final segment, all under the same IDs), and each feedback click both a server and a client `ai_user_action`; a click-through is a client `ai_user_action` with `clicked_through` and no URL |
+| Client copies | answer copies follow committed render, including hydrated history; first render includes question/approval cards; final status matches the server or is omitted when unavailable; live and refreshed cards retain the turn ID; panel/actions send while the switch is unknown and stop only when known off; prompt and answer copies use the same switch snapshot from turn start; stale session completions are discarded; external links and enum normalisation are exercised. Unless the plan opts out: each driven turn started with the switch unknown or on has a client prompt and answer copy (one per rendered paused or final segment, all under the same IDs), and each feedback click while unknown or on both a server and a client `ai_user_action`; a click-through is a client `ai_user_action` with `clicked_through` and no URL |
 | Background | guards that skip model work open no task and send no answer; one final `ai_response_received` per run and per planned child task (plus paused segments), optional `ai_task_started` once on a new run and never on resume, with `trigger: system`, `task_name`, `trigger_source`; children carry the parent's ID as `parent_interaction_id`; a parent with zero tokens is expected when all calls happen in children |
 | Extra properties | each planned `surfaces[].extra_properties` value matches its source on successful and failed answers, including app-detected failures; finalized before the automatic end |
 | App-detected failures | drive every reachable non-success path through the real entry point (stop before commit, zero messages/cards, non-throwing failed result); a failure the app catches and returns from reports `error`, `timeout`, `cancelled` or `incomplete` with an `error_type`, never `success` (`--failed-interaction`) |
 | Refusals | manually check the captured server answer for each planned refusal: `response_status: blocked`, a `block_reason` and no `error_type`; the checker has no refusal-specific option |
 | Flush | a script or job run delivers its events before exit |
-| Switches | `ai_events_env` off: no AI event, server or browser, legacy events unchanged (`--no-ai-events`); `legacy_events_env` off: no legacy event, AI events unchanged (`--absent`) |
+| Switches | `ai_events_env` off: no AI event, server or browser, in the known-off capture after earlier turns/events finish (section 2), legacy events unchanged (`--no-ai-events`); unknown-state browser sending is checked separately; `legacy_events_env` off: no legacy event, AI events unchanged (`--absent`) |
 | Legacy | each legacy event still sends, unchanged unless `## Breaking and semantic changes` says otherwise, while its switch is on |
 | Scoping | `surface` on chat and client events matches the plan; `feature` too, except server `ai_user_action` |
-| MCP | driven by a real client in the production session mode; one `mcp_client_seen` per client per run; one `mcp_tool_called` per call with `server_name`, `tool_status` and, on errors, `error_type`; `client_name` present, or absent as known limit `mcp_stateless_no_client`; `call_index` from 0 with no gaps per `mcp_session_id`, else `interaction_id` (a 2026-07-28 elicitation retry keeps its leg's index); `request_context` in each listed tool schema but never in `argument_keys` of a call that records `intent`, `user_sentiment` or `call_reason` (a tool that declares its own `request_context` keeps it: a note), compared as a set; `intent` from the plan's list or `other`; no argument values, results, URIs or tokens; `identify` puts the authenticated subject in `userId` and the workspace in `account_id` (stdio without auth: no `userId`, `anonymousId: ai_system`); a call sent with `_meta` `com.rudderstack/interaction_id` carries that ID; declared tool events per the server's `event_rules`, also for a call that failed validation (`tool_status: error`) |
+| MCP | driven by a real client in the production session mode; one `mcp_client_seen` per client per run; one `mcp_tool_called` per call with `server_name`, `tool_status` and, on errors, `error_type`; `server_version` on every MCP event when the server info has a version; `client_name` from the planned client-info source, or absent as known limit `mcp_stateless_no_client`; `call_index` from 0 with no gaps per `mcp_session_id`, else `interaction_id` (a 2026-07-28 elicitation retry keeps its leg's index); `request_context` injected into each listed tool schema only when the plan enables it, then absent from `argument_keys` of a call that records `intent`, `user_sentiment` or `call_reason` (a tool that declares its own `request_context` keeps it: a note), compared as a set; when off, a client-sent `request_context` reaches the tool untouched and no request-context fields are extracted; when enabled, `intent` from the plan's list or `other`; no argument values, results, URIs or tokens; `identify` puts the authenticated subject in `userId` and the workspace in `account_id` (stateless tools: drive different workspace/account arguments and assert the account changes per call) (stdio without auth: no `userId`, `anonymousId: ai_system`); a call sent with `_meta` `com.rudderstack/interaction_id` carries that ID; declared tool events per the server's `event_rules`, also for a call that failed validation (`tool_status: error`) |
 | Statuses | a stopped or cut-off run reports `cancelled`, `paused` with `pause_reason`, or `incomplete` with `error_type`, or `blocked` with `block_reason` as planned; a closed request reports `client_disconnected: true` where the plan's `client_disconnect` is not `none` |
 | Models | `primary_provider` and `usage_breakdown[].provider` use `openai`, `anthropic`, `aws.bedrock`, `gcp.gemini`, `gcp.vertex_ai`, `azure.ai.openai` or the gateway's vendor; `requested_model` only where the served model differs (a dated snapshot is the same model) and only from integrations that set it (OpenAI, Anthropic, Google Gen AI, the Vercel AI SDK, LiteLLM, manual calls); on Anthropic models through Bedrock or Vertex AI IDs it is a known false positive, not a failure |
 | Cost | every model ID the app can send is priced, `unpriced_models` with dummy prices (section 4); captured answers carry `total_cost_usd` where the plan has prices |
@@ -248,8 +255,8 @@ A row is `n/a` only when the app has no surface it applies to. Page-load is `n/a
 | `trace_id` missing | expected without a tracing source; with OpenTelemetry planned: the SDK's span processor is not registered, or registered without `linkTraceId: true` / `link_trace_id=True` (Node.js, Python), `WithTraceIDFrom(rudderotel.TraceID)` is missing (Go), or no span started inside the interaction |
 | `response_text` or breakdown entries missing on a large answer | the event exceeded 30,000 bytes of properties: the SDK drops captured text first, then `tool_breakdown` / `usage_breakdown` entries |
 | No `mcp_*` events | `wrapMcpServer` / `wrap_mcp_server` / `WrapMCPServer` / `ruddermcpgo.WrapServer` called after the server connected, a server factory returning unwrapped servers, a different server instance wrapped, or the process exited before its client flushed |
-| No `client_name` on MCP events | a stateless endpoint or per-request server on a handshake revision (known limit `mcp_stateless_no_client`); on 2026-07-28 each request carries its client |
-| `request_context` in `argument_keys`, or a tool fails on it | the tool already declares a `request_context` argument (the wrapper then leaves it alone), or the server is on an unsupported MCP SDK |
+| No `client_name` on MCP events | check initialize `clientInfo` available to the instance, per-call `_meta` clientInfo and the planned `resolveClient` / `resolve_client` / `ClientInfo`; `mcp_stateless_no_client` applies only with no usable source |
+| `request_context` in `argument_keys`, or a tool fails on it | with request context off, the wrapper passes a client-sent value untouched: expected in `argument_keys`, and the tool may reject it; when enabled, the tool already declares its own argument (the wrapper leaves it alone), or the server is on an unsupported MCP SDK |
 | `tool_breakdown` MCP entries without `mcp_server` | OpenAI Agents SDK tracing is off: the server name comes from its function spans |
 | No `mcp_event_delivered` | the delivery had no `subscription_id` or `event_id` and was dropped (one warning per process); Node.js and Python send a missing `event_name` as `unknown`, Go drops it too |
 | `mcp_tool_called` not joined to an answer | the calling agent sends no `_meta` `com.rudderstack/interaction_id` (expected for hosted MCP tools) |
@@ -260,3 +267,45 @@ A row is `n/a` only when the app has no surface it applies to. Page-load is `n/a
 | `feature None not in [...]` (or `surface None`) on an `ai_response_received` | an answer that escaped its interaction: a model call ran after the interaction ended or without its context (a stream read after the callback returned, a thread or goroutine without the interaction's context, a detached loop), and the SDK reported it as an answer of its own: no `ai_user_prompt_created`, no `feature` or `surface`, its own `interaction_id` (Python adds a `parent_interaction_id` naming the turn it escaped), and a warning in the app log ("model call ran after its ... ended"). Keep the call inside the interaction: return or `bind()` the stream, `propagate()` threads, pass the interaction's `ctx` (Go), or open the interaction around a detached loop (instrument recipes, section 4) |
 | `what-changes` shows more new `ai_response_received` than the turns and runs driven | stray answers, counted as ordinary new answers: escaped calls (the row above) or a call outside any interaction or task (`check` notes those as `system answer without task_name`). Count the final and paused segments of the turns and runs you drove against the answer count, find the extras in the capture (an answer with no prompt copy and no `feature`, or `trigger: system` without `task_name`), and fix them before regenerating `## What changes` |
 | No `anonymousId` / `context.sessionId` from test cookies | cookie values not in the JavaScript SDK's encoding (`RUDDERSTACK_AI_DEBUG=1` logs "unreadable cookie"); Go: the request not passed to `WithValues` / `InteractionOptions.Request` |
+
+## 8. Production audit (after deploy)
+
+- Query the warehouse; never infer field coverage from SDK docs or schema PASS. Optional fields can be absent in every valid event. Use aligned AI/legacy windows starting at the first production AI event per surface, not the merge or deploy date.
+- Check that `primary_provider` agrees with the provider for `primary_model` in `usage_breakdown`, and that each model has one `primary_model` form across adapters; distinguish aliases from genuinely different models.
+- Before comparing cost, trace legacy cost semantics: the Claude Agent SDK result's `total_cost_usd` is a running session total; legacy per-turn cost built on it overstates spend. Compare trustworthy per-turn deltas, not session totals.
+- For background answers, check `surface` and user attribution (`user_id` / `on_behalf_of`): system tasks use `on_behalf_of` when acting for a user; per-user usage/cost queries must include it.
+- Compare browser panel-event counts against legacy per user as well as in total, including users who opened the panel without chatting.
+- Before any legacy turn-off, list dashboards and queries that read legacy tables, with their affected panels and semantic gaps.
+- Recheck every SDK-attributed finding against the latest published SDK release before reporting it; reproduce on the production version first, then separate remaining behavior, fixes and unproven app-side causes.
+- Group by surface: `server_name` for MCP, source/endpoint for chat. Measure identity (`user_id`, `account_id`), client (`client_name`, `client_version`), session (`mcp_session_id`, `call_index`, `trace_id`), `server_version`, the `tool_status` / `error_type` mix and, when the plan enables `request_context`, `intent` and `user_sentiment`. Treat null/empty strings as missing; `call_index: 0` is populated. Record the window, counts and percentages; split success and failure traffic.
+- Compare AI and legacy coverage side by side for the same calls, including legacy `workspace_id` from tool arguments. A legacy value present with new `account_id` absent is an identity gap. Join on a shared unique call key, or a composite scoped to endpoint, client/session and request; a JSON-RPC request ID alone is not unique. Deduplicate retries and verify non-null key uniqueness on both sides within the audit window before aggregating; check unmatched calls. Do not equate unrelated aggregate traffic. Note planned sampling and fields that do not apply (e.g. sessions on stateless endpoints).
+- Example MCP SQL (adapt warehouse syntax, time column, legacy table, tool argument column and shared unique `call_key`; `:audit_start` is the first production AI event for the audited surface; verify one row per key on both sides first). Percentages below are per server/status/error bucket; `calls` gives the error mix. Add the equivalent chat query by source/endpoint.
+
+```sql
+WITH paired AS (
+  SELECT n.*, l.tool_arguments_workspace_id AS legacy_workspace_id
+  FROM mcp_tool_called n
+  LEFT JOIN legacy_mcp_tool_called l ON n.call_key = l.call_key
+    AND l.received_at >= :audit_start AND l.received_at < :audit_end
+  WHERE n.received_at >= :audit_start AND n.received_at < :audit_end
+)
+SELECT server_name, tool_status, error_type, COUNT(*) AS calls,
+  SUM(CASE WHEN NULLIF(legacy_workspace_id, '') IS NOT NULL
+    AND NULLIF(account_id, '') IS NULL THEN 1 ELSE 0 END) AS lost_workspace_calls,
+  100.0 * COUNT(NULLIF(account_id, '')) / COUNT(*) AS account_id_pct,
+  100.0 * COUNT(NULLIF(legacy_workspace_id, '')) / COUNT(*) AS legacy_workspace_id_pct,
+  100.0 * COUNT(NULLIF(user_id, '')) / COUNT(*) AS user_id_pct,
+  100.0 * COUNT(NULLIF(client_name, '')) / COUNT(*) AS client_name_pct,
+  100.0 * COUNT(NULLIF(client_version, '')) / COUNT(*) AS client_version_pct,
+  100.0 * COUNT(NULLIF(mcp_session_id, '')) / COUNT(*) AS mcp_session_id_pct,
+  100.0 * COUNT(NULLIF(trace_id, '')) / COUNT(*) AS trace_id_pct,
+  100.0 * COUNT(call_index) / COUNT(*) AS call_index_pct,
+  100.0 * COUNT(NULLIF(server_version, '')) / COUNT(*) AS server_version_pct,
+  100.0 * COUNT(NULLIF(intent, '')) / COUNT(*) AS intent_pct,
+  100.0 * COUNT(NULLIF(user_sentiment, '')) / COUNT(*) AS user_sentiment_pct
+FROM paired
+GROUP BY server_name, tool_status, error_type
+ORDER BY server_name, tool_status, error_type;
+```
+
+Report observed gaps against the plan and the paired legacy fields. Every accepted trade-off gets a follow-up ticket with owner and acceptance criteria, linked from the plan; a Known limits row alone is insufficient. No production access or deployment yet: report the audit as not verified and record its follow-up ticket.
