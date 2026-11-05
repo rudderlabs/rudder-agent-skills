@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unique call pairs and lost workspace identity. MCP `request_context` is
   opt-in from those SDKs: plans default it off and verify expects it only
   when enabled.
+  Production lessons add provider/model and legacy-cost checks, legacy-table consumers, background attribution and per-user panel parity; setup and instrumentation preserve non-content extras, feedback and client events while the server switch is unknown.
 
 - **`rudder-ai-events` 0.0.7** — tightened setup, instrumentation and verification
   with rollout lessons: install and Agent SDK upgrade preflight, durable usage
