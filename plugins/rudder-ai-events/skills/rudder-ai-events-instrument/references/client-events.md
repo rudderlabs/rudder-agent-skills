@@ -114,7 +114,7 @@ One-shot features (generate, suggest, autofill, rewrite, fix; `conversation_id_s
 
 A chat API on another origin needs `credentials: 'include'` (and CORS that allows credentials) for the cookies to arrive.
 
-Chat-response switch: replace the helper's `AI_EVENTS_ON` declaration with `let AI_EVENTS_ON` and use this submit variant. Send panel and action events immediately while unknown, preserving their originating turn and context; a panel-only visit may never receive the switch. Read it on success and error responses; an absent field retains the latest known value. Each turn gates its copies with that value.
+Chat-response switch: replace the helper's `AI_EVENTS_ON` declaration with `let AI_EVENTS_ON` and use this submit variant. Send panel and action events immediately while unknown, preserving their originating turn and context; a panel-only visit may never receive the switch. Read it on success and error responses; an absent field retains the latest known value. Capture the switch at turn start and use it for both prompt and answer copies, including paused segments; response updates apply to later turns and panel/action events.
 
 ```js
 let interactionId = crypto.randomUUID();
@@ -124,7 +124,7 @@ const promptCopy = {
   prompt_source: 'composer',
   prompt_length: message.length,
 };
-let aiEventsOn = AI_EVENTS_ON;
+const aiEventsOn = AI_EVENTS_ON; // one switch snapshot for both copies of this turn
 trackAi('ai_user_prompt_created', { ...promptCopy, interaction_id: interactionId }, aiEventsOn);
 let status; // no success default when the backend supplies no final status
 let errorKind;
@@ -135,8 +135,7 @@ try {
     body: JSON.stringify({ message, conversationId }),
   });
   const data = response.ok ? await response.json() : await response.json().catch(() => ({}));
-  aiEventsOn = data.aiEventsEnabled ?? AI_EVENTS_ON; // missing switch retains known state or stays unknown
-  AI_EVENTS_ON = aiEventsOn;
+  AI_EVENTS_ON = data.aiEventsEnabled ?? AI_EVENTS_ON; // update future events; keep this turn's snapshot
   conversationId = data.conversationId ?? conversationId;
   interactionId = data.interactionId ?? interactionId;
   status = data.responseStatus; // final backend status mapped to the client schema, or omitted
