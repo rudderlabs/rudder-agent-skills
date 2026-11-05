@@ -2,7 +2,7 @@
 
 Node.js 24+, or Deno with npm compatibility. The SDK relies on `AsyncLocalStorage` and `node:` builtins, which Deno supports; the first instrumented PR must prove context propagation and captured events under the repo's own `deno test`. ESM shown; CommonJS works the same with `require('@rudderstack/ai')` and `require('@rudderstack/ai/openai')`. Every entry point: `@rudderstack/ai`, `/openai`, `/anthropic`, `/google-genai`, `/bedrock`, `/vercel-ai-sdk`, `/langchain`, `/claude-agent-sdk`, `/openai-agents`, `/middleware`, `/mcp`, `/tracing` and `/tracing/vercel-ai-sdk` (advanced OpenTelemetry export, not needed for AI events).
 
-`<VERSION>` below is the plan's `sdks[].version`: 0.9.0 or later.
+`<VERSION>` below is the plan's `sdks[].version`: 0.10.0 or later.
 
 Full API reference: the package README, shipped at `node_modules/@rudderstack/ai/README.md` and shown on npmjs.com.
 
@@ -442,7 +442,8 @@ import { wrapMcpServer } from '@rudderstack/ai/mcp';
 wrapMcpServer(server, {
   analytics, // or omit to use configure()'s client
   identify: (auth) => ({ userId: auth?.extra?.sub as string, accountId: auth?.extra?.workspace_id as string }), // plan mcp.servers[].identify
-  requestContext: { intents: ['debug_delivery', 'build_audience'] }, // plan request_context.intents, without other; false turns it off
+  requestContext: false, // off by default when omitted
+  // requestContext: { intents: ['debug_delivery', 'build_audience'] }, // only when the plan enables it; without other
   // eventRules: { tools: { create_audience: 'audience_created' } },   // plan declared tool events
   // capabilityRequests: { capabilities: ['bulk_export'] },            // plan capability_requests
 });
@@ -457,13 +458,13 @@ import { McpServer, createMcpHandler } from '@modelcontextprotocol/server';
 function buildServer(): McpServer {
   const server = new McpServer({ name: 'workspace-mcp', version: '1.4.0' });
   server.registerTool('create_audience', { inputSchema }, createAudience); // unchanged
-  return wrapMcpServer(server, { analytics, identify, requestContext: { intents: ['build_audience'] } });
+  return wrapMcpServer(server, { analytics, identify }); // requestContext omitted: off
 }
 const handler = createMcpHandler(buildServer);
 ```
 
 - `identify(authInfo)` runs per request and returns any of `userId`, `anonymousId`, `accountId`, `oauthClientId`, `tokenScopes`, `authMethod`, `country`. Without auth (stdio) events go out as `ai_system`, attributed to the session.
-- `request_context` is added to every tool's input schema and stripped before the tool runs; the model fills `intent` (from the list, or `other`) and `user_sentiment`. `call_reason` and `capability_detail` only with `captureContent`.
+- `requestContext` is off when omitted; `requestContext: true` or an options object enables it. When off, no `request_context` is added to `tools/list`, and a client-sent `request_context` passes to the tool untouched. When enabled, it is added to every tool's input schema and stripped before the tool runs (a tool that declares its own argument keeps it); the model fills `intent` (from the list, or `other`) and `user_sentiment`. `call_reason` and `capability_detail` only with `captureContent`.
 - Supported: `@modelcontextprotocol/sdk` `>=1.31.0 <2.0.0` (protocol up to 2025-11-25) and `@modelcontextprotocol/server` `>=2.0.0 <3.0.0` (also the stateless 2026-07-28, with elicitation through `input_required`), on stdio and Streamable HTTP, plus the deprecated HTTP+SSE on 1.x only.
 - State (`mcp_client_seen` window, call counters, retry hashes, pending elicitations) is in memory per server name, per process: servers rebuilt per request under one name share it, so give each distinct server a unique name. Each replica reports its own `mcp_client_seen`.
 - Flush when the process stops (section 7): the existing shutdown hook for HTTP servers; for stdio, on stdin `end` and `SIGTERM`.

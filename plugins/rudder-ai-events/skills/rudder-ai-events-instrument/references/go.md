@@ -4,12 +4,12 @@ Events carry `context.wrapperLibrary.name: ai-sdk-go`. The root module (package 
 
 | Needs | |
 |---|---|
-| Go | the `go` line of the pinned version's `go.mod` (v0.5.1: `go 1.26.10`), for the root module and every integration module |
+| Go | the `go` line of the pinned version's `go.mod` (v0.6.0: `go 1.26.10`), for the root module and every integration module |
 | RudderStack client | `github.com/rudderlabs/analytics-go/v4` v4.3.1+, the app's existing one or a new one |
 | Model clients | `github.com/openai/openai-go/v3` v3.70.0+, `github.com/anthropics/anthropic-sdk-go` v1.78.0+, `google.golang.org/genai` v1.72.0+, `github.com/aws/aws-sdk-go-v2/service/bedrockruntime` v1.63.1+; anything else through `RecordCall` |
 | MCP servers | `github.com/modelcontextprotocol/go-sdk` v1.8.0 (`rudderstackai.WrapMCPServer`) or `github.com/mark3labs/mcp-go` v0.55.1+, tested through v1.2.1 (`ruddermcpgo.WrapServer`) |
 
-`<VERSION>` is the plan's `sdks[].version`: v0.5.1 or later for the root module. Each integration module is tagged on its own (`rudderopenai/v0.3.0`, `rudderanthropic/v0.3.0`, `ruddergenai/v0.3.0`, `rudderbedrock/v0.3.0`, `rudderotel/v0.1.1`): install each at the exact version the plan records in `sdks[].extras` (`rudderopenai@v0.3.0`), never a newer one resolved here; a plan without versions there goes back to setup. The modules are public on proxy.golang.org. Never pin a branch or pseudo-version.
+`<VERSION>` is the plan's `sdks[].version`: v0.6.0 or later for the root module. Each integration module is tagged on its own (`rudderopenai/v0.3.2`, `rudderanthropic/v0.3.2`, `ruddergenai/v0.4.2`, `rudderbedrock/v0.3.2`, `rudderotel/v0.1.1`): install each at the exact version the plan records in `sdks[].extras` (`rudderopenai@v0.3.2`), never a newer one resolved here; a plan without versions there goes back to setup. The modules are public on proxy.golang.org. Never pin a branch or pseudo-version.
 
 Runnable references in the SDK repository's `examples/`: `openai`, `anthropic`, `google-genai`, `bedrock-converse`, `background-agent`, `manual`, `mcp-server`, `mcp-server-mcpgo`, `mcp-stateless-http`, `mcp-auth`.
 
@@ -368,7 +368,8 @@ err = rudderstackai.WrapMCPServer(server, rudderstackai.Options{
 		workspace, _ := tok.Extra["workspace_id"].(string)
 		return rudderstackai.Identity{UserID: tok.UserID, AccountID: workspace}, nil
 	},
-	RequestContext: rudderstackai.RequestContextOptions{Intents: []string{"debug_delivery", "build_audience"}}, // without other
+	// RequestContext is off by default; only when the plan enables it:
+	// RequestContext: rudderstackai.RequestContextOptions{Enabled: true, Intents: []string{"debug_delivery", "build_audience"}}, // without other
 	// EventRules: rudderstackai.EventRules{Tools: map[string]rudderstackai.ToolEventRule{"create_audience": {Event: "audience_created"}}},
 	// CapabilityRequests: &rudderstackai.CapabilityRequestOptions{Capabilities: []string{"bulk_export"}},
 	// ServerName: "workspace-mcp", // when several distinct servers share a name
@@ -381,7 +382,7 @@ if err != nil {
 
 - Serves protocol 2025-06-18, 2025-11-25 and 2026-07-28 (stateless) on v1.8. Examples: `mcp-server`, `mcp-auth` (bearer token and `Identify`), `mcp-stateless-http` (2026-07-28 with an `input_required` elicitation).
 - `Identity` fields: `UserID`, `AnonymousID` (default `ai_system`), `AccountID`, `OAuthClientID` (from your verifier's `Extra`), `TokenScopes`, `AuthMethod`, `Country`. If `Identify` fails or panics, the request is anonymous.
-- `RequestContext` is on by default: `intent` (from the list, plus `other`) and `user_sentiment`; `Disabled: true` turns it off. `CaptureContent: true` adds `call_reason` and `capability_detail`, masked and capped at 200 characters.
+- `RequestContext` is off by default; opt in with `RequestContext: rudderstackai.RequestContextOptions{Enabled: true, Intents: []string{"debug_delivery", "build_audience"}}`. `Disabled` was removed; `Intents`, `DisableUserSentiment` and `CaptureContent` alone do not enable it. When enabled, the wrapper adds `request_context` to each tool schema and strips it before the tool runs (a tool that declares its own argument keeps it), recording `intent` (from the list, plus `other`) and `user_sentiment`. When off, it adds nothing to `tools/list` and passes a client-sent `request_context` to the tool untouched. With request context enabled, `CaptureContent: true` adds `call_reason` and `capability_detail`, masked and capped at 200 characters.
 - Elicitation: `rudderstackai.Elicit(ctx, req.Session, params)` instead of `session.Elicit`, so clients without elicitation support are recorded too.
 - State is per server name, per process: give each distinct server its own name; servers rebuilt per request under one name share it.
 - A declared tool event is still sent when the call fails input validation, with `tool_status: error`. A 2026-07-28 retry that answers an `input_required` elicitation keeps the leg's `call_index` and `ms_since_previous_call` (the leg itself sends no `mcp_tool_called`).
@@ -399,7 +400,8 @@ if err := ruddermcpgo.WrapServer(s, ruddermcpgo.Options{
 		workspace, _ := ctx.Value(workspaceKey{}).(string) // set by the app's auth, e.g. server.WithHTTPContextFunc
 		return rudderstackai.Identity{AccountID: workspace}, nil
 	},
-	RequestContext: rudderstackai.RequestContextOptions{Intents: []string{"debug_delivery", "build_audience"}},
+	// RequestContext is off by default; only when the plan enables it:
+	// RequestContext: rudderstackai.RequestContextOptions{Enabled: true, Intents: []string{"debug_delivery", "build_audience"}},
 	// Transport: rudderstackai.TransportStdio,
 }); err != nil {
 	log.Fatal(err)

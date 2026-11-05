@@ -134,9 +134,9 @@ Every model ID constant in the repo, Bedrock geo-prefixed IDs included. claude-h
 
 ## Dependencies and blockers
 
-- `@rudderstack/ai` 0.9.0 (npm, exact pin); `rudderstack-ai` 0.9.0 (uv, exact pin): the latest when this plan was written.
+- `@rudderstack/ai` 0.10.0 (npm, exact pin); `rudderstack-ai` 0.10.0 (uv, exact pin): the latest when this plan was written.
 - Registry and auth: public npm and PyPI; no private registry.
-- Release-age gates: pnpm `minimumReleaseAge: 10080` (minutes, so 7 days); `@rudderstack/ai` 0.9.0 was published on 2026-11-04, less than 7 days ago when this plan was written, so it needs a `minimumReleaseAgeExclude` entry until it ages past the gate.
+- Release-age gates: pnpm `minimumReleaseAge: 10080` (minutes, so 7 days); `@rudderstack/ai` 0.10.0 is less than 7 days old when this plan is written, so it needs a `minimumReleaseAgeExclude` entry until it ages past the gate.
 - Peer ranges: `openai` 7.34.0 is inside `>=7.0.0 <8.0.0`; `@rudderstack/rudder-sdk-node` 3.0.14 is below `>=3.0.16`: upgrade it to 3.0.16 in the same change.
 - Blockers: none.
 
@@ -169,9 +169,9 @@ metadata:
   name: support-app
 spec:
   sdks:
-    - { language: node, path: ., package: "@rudderstack/ai", version: "0.9.0", extras: [], package_manager: pnpm,
+    - { language: node, path: ., package: "@rudderstack/ai", version: "0.10.0", extras: [], package_manager: pnpm,
         runtime: ">=24 (package.json engines)" }
-    - { language: python, path: ., package: rudderstack-ai, version: "0.9.0", extras: [anthropic], package_manager: uv,
+    - { language: python, path: ., package: rudderstack-ai, version: "0.10.0", extras: [anthropic], package_manager: uv,
         runtime: "3.12 (.python-version)" }
   rudderstack:
     client: existing
@@ -295,7 +295,7 @@ spec:
         session_mode: stateful
         processes: several
         identify: { auth: "requireBearerAuth (src/mcp/auth.ts)", user_id: auth.extra.sub, account_id: auth.extra.workspace_id }
-        request_context: { enabled: true, intents: [search_docs, read_page, other], user_sentiment: true }
+        request_context: { enabled: false, intents: [search_docs, read_page, other], user_sentiment: true }
         tools: [search_docs, get_page]
         resources: []
         prompts: []
@@ -312,7 +312,7 @@ spec:
 
 Values not shown in the example:
 
-- `sdks[].version`: the exact latest published release resolved in setup step 2.3, or a user-named unreleased exact target (Dependencies and blockers notes that install waits for publication) (0.9.0 / v0.5.1 or later). `runtime` for Go: the `go` line of that version's `go.mod`. `extras`: Python extras, or Go integration modules with their exact versions, resolved in step 2.3 like the root (`[rudderopenai@v0.3.0, rudderotel@v0.1.1]`); instrument installs those versions only. `package_manager`: `npm | pnpm | yarn | bun | deno | uv | poetry | pip | go`. Deno keeps `language: node`, records its exact detected version in `runtime`, and uses `deno.lock`.
+- `sdks[].version`: the exact latest published release resolved in setup step 2.3, or a user-named unreleased exact target (Dependencies and blockers notes that install waits for publication) (0.10.0 / v0.6.0 or later). `runtime` for Go: the `go` line of that version's `go.mod`. `extras`: Python extras, or Go integration modules with their exact versions, resolved in step 2.3 like the root (`[rudderopenai@v0.3.2, rudderotel@v0.1.1]`); instrument installs those versions only. `package_manager`: `npm | pnpm | yarn | bun | deno | uv | poetry | pip | go`. Deno keeps `language: node`, records its exact detected version in `runtime`, and uses `deno.lock`.
 - `server_dependency`: `{ repo, plan, pr_order: server_first, response_changes: [{ path, symbol, fields }] }` for a separate backend; `repo` and `plan` identify its repo and AI events plan, `response_changes` lists backend contract changes needed by this browser (IDs and switch field). Describe them under Breaking and semantic changes and Dependencies and blockers; Files to change lists only this repo's files and the server-first PR split.
 - `rudderstack.client`: `existing | new` (new adds `rudder-sdk-node` / `rudder-sdk-python`).
 - `config.capture_content: true` sends prompt, answer and feedback text, score explanations and MCP `call_reason` / `capability_detail` (masked); with a client surface the browser copies may carry prompt and feedback text too, masked the same way, never answer text.
@@ -411,7 +411,8 @@ Ids for Config `known_limits`; the plan's Known limits section names each one th
 - Feedback eligibility: mark AI-backed replies and suppress actions on greetings, guards and pre-model errors. Emit `feedback_retracted` only after a stored rating was actually removed (check affected rows); repeated deletion sends no retraction.
 - `surfaces[].status`: `skipped` (user chose not to, no browser SDK, or dev-only CLI/REPL with no user identity recommended in the batched questions, override any), `blocked` (runtime or library version, or an unsupported MCP SDK), `unsupported` (no SDK for the language or framework: AI events sent from Java, Ruby, PHP or raw HTTP, and mobile RudderStack SDKs; the reason names which, and setup offers the spec-only tracking-plan path).
 - `surfaces[]` with `type: mcp` carry only `id`, `type`, `status`, `reason`, `feature` and `entry_points`; the rest is under `mcp.servers[]` with the same `surface_id`.
-- `mcp.servers[].request_context.intents`: drafted like chat intents from tool names and descriptions, ending with `other`; instrumentation passes the list without `other`. It is published in every tool's schema: keep it short and free of sensitive categories.
+- `mcp.servers[].request_context.enabled`: default `false`; opt in only for internal/private servers not submitted to a public MCP directory, since OpenAI MCP directory reviews flag the injected argument as collecting conversation or behavioral data for analytics rather than the user-requested operation. When off, omit the SDK option or pass `false` in Node.js/Python; passing an options object/dict enables it even with no intents. Go requires `RequestContextOptions{Enabled: true}` to opt in. When off, the wrapper adds no `request_context` to `tools/list` and passes a client-sent `request_context` to the tool untouched.
+- `mcp.servers[].request_context.intents`: drafted like chat intents from tool names and descriptions, ending with `other`; instrumentation passes the list without `other`. When enabled, it is published in every tool's schema: keep it short and free of sensitive categories.
 - `mcp.servers[].identify`: user identity comes from expressions over the verified token, never a token value. `account_id` may also use the planned tool-name/argument mapping, only for the workspace the tool acts on. Without auth the server's events go out as `ai_system`.
 - Background `child_tasks`: one entry per nested step that should report its own usage. The parent task then reports only calls made outside the children; per-run totals come from summing the tree by `parent_interaction_id`. Children default to `trigger_source: agent`.
 - `client_events.events[].event`: only the browser events listed in `rudder-ai-events-instrument` `references/client-events.md` ("Who sends what"). Browser-sent actions live here; server-sent ones under `surfaces[].feedback`.
