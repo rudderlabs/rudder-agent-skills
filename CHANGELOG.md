@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`rudder-mcp`.** Add a plugin README (contents, install, data handling) for
+  directory submissions.
+
 - **`rudder-ai-events` 0.0.7** — tightened setup, instrumentation and verification
   with rollout lessons: install and Agent SDK upgrade preflight, durable usage
   snapshot cleanup, feedback eligibility, browser render/context handling,
