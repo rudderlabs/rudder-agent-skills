@@ -24,11 +24,11 @@ Also connects your agent to RudderStack's hosted MCP server at `https://mcp.rudd
 /plugin install rudder-core@rudder-agent-skills
 ```
 
-To pick single skills instead, or to use another agent such as Cursor, use the Skills CLI: `npx skills add rudderlabs/rudder-agent-skills --skill <skill-name>`.
+To pick single skills instead, or to use another agent such as Cursor, use the Skills CLI: `npx skills add rudderlabs/rudder-agent-skills --skill <skill-name>`. The Skills CLI copies skill folders only, so it does not create the MCP connection. Add the server yourself: in Claude Code, `claude mcp add --scope user --transport http rudderstack https://mcp.rudderstack.com/mcp`; in other agents, an HTTP MCP server with that URL.
 
 ## Data handling
 
-The plugin ships skills and one MCP connection to mcp.rudderstack.com. It stores no data and sends nothing anywhere else itself. The MCP server and the tools your agent runs because of these skills use your own RudderStack sign-in, so they only see what your account is allowed to see.
+The plugin ships skills and one MCP connection to mcp.rudderstack.com. It stores no data and sends nothing anywhere else itself. The MCP connection uses your RudderStack browser sign-in, so it only sees what your account is allowed to see. Other workflows in these skills use tools you configure yourself, such as `rudder-cli` with its own access token, and those follow the credentials you give them.
 
 ## Links
 

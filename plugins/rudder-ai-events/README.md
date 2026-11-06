@@ -19,7 +19,7 @@ To pick single skills instead, or to use another agent such as Cursor, use the S
 
 ## Data handling
 
-The plugin ships skills only. It stores no data and sends nothing anywhere itself. The tools your agent runs because of these skills use your own RudderStack credentials, so they only see what your account is allowed to see.
+The plugin ships skills only. It stores no data and sends nothing anywhere itself. The instrumentation it adds to your app sends events with the write key and data plane URL you configure. The skills tell your agent not to paste keys into chat or commit them.
 
 ## Links
 

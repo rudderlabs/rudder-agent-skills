@@ -21,7 +21,7 @@ To pick single skills instead, or to use another agent such as Cursor, use the S
 
 ## Data handling
 
-The plugin ships skills only. It stores no data and sends nothing anywhere itself. The tools your agent runs because of these skills use your own RudderStack credentials, so they only see what your account is allowed to see.
+The plugin ships skills only. It stores no data and sends nothing anywhere itself. Profiles projects connect to your warehouse with credentials you configure, which are separate from your RudderStack sign-in. What your agent can read or write there depends on the permissions of that warehouse role, not on your RudderStack account, so use a role with only the access you intend.
 
 ## Links
 

@@ -18,7 +18,7 @@ To pick single skills instead, or to use another agent such as Cursor, use the S
 
 ## Data handling
 
-The plugin ships skills only. It stores no data and sends nothing anywhere itself. The tools your agent runs because of these skills use your own RudderStack credentials, so they only see what your account is allowed to see.
+The plugin ships skills only. It stores no data and sends nothing anywhere itself. The Terraform provider uses the RudderStack access token you configure (`RUDDERSTACK_ACCESS_TOKEN`), so what it can change follows that token.
 
 ## Links
 
