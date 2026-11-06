@@ -35,7 +35,7 @@ For single skills, or another agent such as Cursor, use the Skills CLI: `npx ski
 
 ## Data handling
 
-The plugin ships no code and stores no data. The plugins it installs ship skills, and `rudder-core` adds one MCP connection to mcp.rudderstack.com. Everything your agent does through them uses your own RudderStack sign-in, so it only sees what your account is allowed to see.
+The plugin ships no code and stores no data. The plugins it installs ship skills, and `rudder-core` adds one MCP connection to mcp.rudderstack.com. That connection uses your RudderStack browser sign-in, so it only sees what your account is allowed to see. The other workflows use credentials you configure separately: `rudder-cli` and Terraform use a RudderStack access token, Profiles connects to your warehouse with its own role, and AI events sends events with your write key. What they can do follows those credentials, not your browser sign-in.
 
 ## Links
 
