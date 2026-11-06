@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`rudderstack-skills` 0.0.1.** Umbrella plugin that depends on `rudder-core`,
+  `rudder-cli`, `rudder-mcp`, `rudder-profiles`, `rudder-terraform` and
+  `rudder-ai-events`, so one install gets every RudderStack skill. Marketplace
+  catalog version 0.0.7.
+
 ### Changed
 
 - **`rudder-core`, `rudder-cli`, `rudder-profiles`, `rudder-ai-events`, `rudder-terraform`.**

@@ -6,9 +6,23 @@
   },
   "metadata": {
     "description": "Skills for working with RudderStack via CLI, MCP server, Terraform, Profiles, and AI events workflows.",
-    "version": "0.0.6"
+    "version": "0.0.7"
   },
   "plugins": [
+    {
+      "name": "rudderstack-skills",
+      "source": "plugins/rudderstack-skills",
+      "description": "Installs every RudderStack skill plugin in one step: core knowledge, CLI, MCP, Terraform, Profiles and AI events.",
+      "author": {
+        "name": "RudderStack"
+      },
+      "homepage": "https://www.rudderstack.com/",
+      "repository": "https://github.com/rudderlabs/rudder-agent-skills",
+      "license": "MIT",
+      "category": "devtools",
+      "keywords": ["rudderstack", "agentic-cdp", "cdp", "agent-skills"],
+      "tags": ["rudderstack", "umbrella"]
+    },
     {
       "name": "rudder-core",
       "source": "plugins/rudder-core",

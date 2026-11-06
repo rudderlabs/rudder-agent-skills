@@ -1,0 +1,13 @@
+{
+  "name": "rudderstack-skills",
+  "description": "Skills for RudderStack, the agentic CDP that runs on your warehouse: instrumentation, tracking plans, CLI, MCP, Terraform, Profiles and AI events. Installs every RudderStack skill plugin in one step.",
+  "version": "0.0.1",
+  "author": {
+    "name": "RudderStack"
+  },
+  "homepage": "https://www.rudderstack.com/",
+  "repository": "https://github.com/rudderlabs/rudder-agent-skills",
+  "license": "MIT",
+  "keywords": ["rudderstack", "agentic-cdp", "cdp", "agent-skills"],
+  "dependencies": ["rudder-core", "rudder-cli", "rudder-mcp", "rudder-profiles", "rudder-terraform", "rudder-ai-events"]
+}
