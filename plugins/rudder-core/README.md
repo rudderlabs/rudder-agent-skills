@@ -1,0 +1,37 @@
+# rudder-core
+
+Core RudderStack knowledge for your coding agent: the data catalog, tracking plans, data graphs, instrumentation planning and debugging, and destination delivery debugging. Install it first; the tool plugins build on it.
+
+Also connects your agent to RudderStack's hosted MCP server at `https://mcp.rudderstack.com/mcp`. The first time an MCP tool runs, your agent asks you to sign in to RudderStack in the browser. No token goes in a config file.
+
+## What's included
+
+- `rudder-code-first-instrumentation`: Derives tracking plans from existing codebase types and structures.
+- `rudder-data-catalog`: Creates and manages events, properties, categories, and custom types for instrumentation schemas.
+- `rudder-data-graphs`: Produces Data Graph YAML from RETL sources for Audiences.
+- `rudder-design-first-instrumentation`: Plans instrumentation for new features starting from product requirements before code exists.
+- `rudder-destination-debugging`: Diagnoses why events are failing, dropping, or not arriving at a destination.
+- `rudder-environment-check`: Checks RudderStack tool prerequisites and reports status.
+- `rudder-instrumentation-debugging`: Diagnoses and fixes validation errors, schema issues, and instrumentation problems.
+- `rudder-instrumentation-planning`: Designs event taxonomies and instrumentation strategies from business requirements.
+- `rudder-setup`: Takes an app from no analytics to one real event delivered to a destination the user picks, with the pipeline as rudder-cli specs in git.
+- `rudder-tracking-plans`: Creates and manages tracking plans that validate events against schema contracts.
+
+## Install
+
+```
+/plugin marketplace add rudderlabs/rudder-agent-skills
+/plugin install rudder-core@rudder-agent-skills
+```
+
+To pick single skills instead, or to use another agent such as Cursor, use the Skills CLI: `npx skills add rudderlabs/rudder-agent-skills --skill <skill-name>`.
+
+## Data handling
+
+The plugin ships skills and one MCP connection to mcp.rudderstack.com. It stores no data and sends nothing anywhere else itself. The MCP server and the tools your agent runs because of these skills use your own RudderStack sign-in, so they only see what your account is allowed to see.
+
+## Links
+
+- Repository: https://github.com/rudderlabs/rudder-agent-skills
+- Homepage: https://www.rudderstack.com/
+- License: MIT

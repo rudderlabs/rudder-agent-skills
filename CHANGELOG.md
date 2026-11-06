@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`rudder-core`, `rudder-cli`, `rudder-profiles`, `rudder-ai-events`, `rudder-terraform`.**
+  Add a plugin README to each (contents, install, data handling) for directory
+  submissions.
+
 - **`rudder-mcp`.** Add a plugin README (contents, install, data handling) for
   directory submissions.
 
