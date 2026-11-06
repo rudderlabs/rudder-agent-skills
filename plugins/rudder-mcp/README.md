@@ -5,7 +5,7 @@ Skills that connect your coding agent to RudderStack's hosted MCP server at `htt
 ## What's included
 
 - `rudder-mcp-setup`: adds the server to Claude Code, signs in with OAuth in the browser, and checks the connection by listing sources in a workspace. It also covers the access-token route for headless sessions such as CI.
-- `rudder-mcp-workflow`: step-by-step workflows for the MCP tools, such as checking event delivery, reviewing tracking plan violations, testing transformations and building audiences.
+- `rudder-mcp-workflow`: step-by-step workflows for the MCP tools, such as checking event delivery, reviewing tracking plan violations, testing transformations and debugging live events.
 
 ## Install
 
