@@ -33,9 +33,11 @@ The checker (`check`, `what-changes`), the recorders and both schemas ship with 
    - **Cost:** for Claude Agent SDK resume, drive a resumed turn and check the planned `usage_baseline_source`: a persisted baseline survives a fresh process and yields per-turn cost; test the missing-baseline fallback in a fresh process without registered prices (no cost); same-process resumes may use cached baselines and report per-turn cost, even with `resumed_no_cost`. Then every model ID constant the app can send is priced; `unpriced_models` get dummy prices, so missing rates never fail (section 4).
    - **Breaking and semantic changes:** each row and delta matches what was captured; a difference the section does not list is a FAIL. Fix the plan or the code.
    - **Page-load calls:** with any UI-triggered surface, load the page without typing: a call that fires sends `trigger: system` and no `ai_user_prompt_created`. `n/a` only when no surface is UI-triggered.
+   - **Spec coverage:** read the code for each planned surface and check every spec event that fits something the app already does is sent or listed as a known limit (checklist row `Spec coverage`). Parity with legacy events does not show this: most gaps were never in legacy.
 7. **Fix and repeat.** A failure in app wiring goes back to `rudder-ai-events-instrument`; a wrong plan assumption goes back to `rudder-ai-events-setup` (plan `status` back to `draft`). A gap that matches a known limit in the plan is reported, not fixed.
 8. **Regenerate `## What changes`.** After the first PASS, run the checker's `what-changes` on the switch-off and switch-on captures (section 5) and complete the six parts. Output it as a block ready for the PR body; update the plan's section only where the capture contradicts it.
 9. **Report.**
+10. **Before a legacy turn-off,** compare with production (`references/verification.md`, section 7): parity and coverage, broken down by `feature` and surface.
 
 ## Report
 
@@ -56,7 +58,7 @@ Next: <fixes, or: open the PR with the What changes block below>
 
 ## Common failures
 
-Finding-to-cause table: `references/verification.md`, section 7. Two that read oddly: `feature None not in [...]` on an `ai_response_received` is an answer that escaped its interaction (a model call after the interaction ended or without its context); and `what-changes` counts such stray answers as ordinary new `ai_response_received`, so compare its answer count with the final and paused segments of the turns and runs you drove.
+Finding-to-cause table: `references/verification.md`, section 8. Two that read oddly: `feature None not in [...]` on an `ai_response_received` is an answer that escaped its interaction (a model call after the interaction ended or without its context); and `what-changes` counts such stray answers as ordinary new `ai_response_received`, so compare its answer count with the final and paused segments of the turns and runs you drove.
 
 ## Credential Security
 
