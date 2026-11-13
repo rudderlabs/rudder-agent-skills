@@ -530,6 +530,11 @@ Needs: `sender`.
 1. Summarise in a table: workspace resources (as specs in git), code changes (files and events), evidence (delivered and failed counts since started_at), the commits, and the undo, which you run only when the user asks for it. It reverts these commits and removes from the workspace what this run created. If step 1 added a source beside an old one of another type, say that the old source and its connection stay, and that the user can delete them by removing their specs from `rudder/` and applying once no build sends to the old source. If you ran rudder-cli by its full path (rule), end the summary with `export PATH="$HOME/.local/bin:$PATH"` and say that adding this line to their shell profile, such as `~/.zshrc`, lets a new terminal run `rudder-cli`. Then run `sh '<skill folder>/references/run-record.sh' close`, so a later setup here starts a run of its own.
 2. If step 4 started a quick tunnel, stop its server and tunnel with `kill` and the two process ids its start command printed, never `pkill`. Say that the webhook's URL stops answering, so the destination fails each delivery until the user points it at a lasting endpoint and applies again.
 3. If the repository has a remote, offer to push a branch and open a pull request.
+4. If `sender` is `app`, ask one question: "Add a line to <file> so your agent checks analytics edits against RudderStack before it reports a task as done?" with the choices Yes and No. `<file>` is `AGENTS.md` when it exists, else `CLAUDE.md` when it exists, else `AGENTS.md`. On yes, append the line below unless the file already names `rudder-tracking-review`, creating the file if it is missing. Make no commit. Step 1's probes ignore these files, and the run record does not hold the line, so an undo leaves it in place. On no, write nothing and do not ask again.
+
+   ```text
+   This app sends analytics events to RudderStack. After you change code that sends events, use the rudder-tracking-review skill before you report the task as done.
+   ```
 
 If `sender` is `curl`:
 
@@ -552,6 +557,7 @@ Not in scope yet, mention as a next step if relevant:
 ## After the workflow
 
 - A tracking plan for the agreed events: the rudder-tracking-plans skill.
+- A check of later changes to the events against the live pipeline: the rudder-tracking-review skill.
 - Typed helpers generated from that plan: the rudder-typer-workflow skill.
 - A second destination. It is one more spec in `rudder/destinations/` and one more line in `rudder/connections.yaml`.
 
