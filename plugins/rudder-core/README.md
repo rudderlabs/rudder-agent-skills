@@ -27,22 +27,9 @@ Also connects your agent to RudderStack's hosted MCP server at `https://mcp.rudd
 
 To pick single skills instead, or to use another agent such as Cursor, use the Skills CLI: `npx skills add rudderlabs/rudder-agent-skills --skill <skill-name>`. The Skills CLI copies skill folders only, so it does not create the MCP connection. Add the server yourself: in Claude Code, `claude mcp add --scope user --transport http rudderstack https://mcp.rudderstack.com/mcp`; in other agents, an HTTP MCP server with that URL.
 
-## Moving from Rudder AI Reviewer
-
-`rudder-tracking-review` replaces the Rudder AI Reviewer GitHub Action. It works in a different way:
-
-- It runs in your coding agent, on your machine, before the change ships. Ask the agent to review a change, or let it check its own edits to analytics calls before it reports a task as done.
-- It tells the agent what to look for and how to check it against your workspace. The agent reports in the chat. It does not post PR comments, and it does not run in CI.
-- It only reads. It never changes your workspace.
-- The Action took a Source ID input. Give the agent your source ID or source name instead, or let it match the source. It asks you when more than one source matches.
-- The Action took a token secret. The skill reads pipeline context through the RudderStack MCP server or `rudder-cli` instead. Connect one of them:
-  - MCP server, interactive: the browser sign-in at `https://mcp.rudderstack.com/mcp`. The `rudder-mcp-setup` skill covers it.
-  - MCP server, headless: `https://mcp.rudderstack.com/bearer-auth-mcp`. Send `Authorization: Bearer ${RUDDERSTACK_ACCESS_TOKEN}` and the `X-Workspace-ID` header for the workspace. Keep the token in the environment variable, never in a committed file. The "Access-token route" section of `rudder-mcp-setup` has the exact config.
-  - `rudder-cli`: the `rudder-cli-setup` skill installs and authenticates it. The CLI gives tracking plans and specs, but not received event schemas or destination settings.
-
 ## Make your agent check its own edits
 
-`rudder-tracking-review` loads when you ask for a review. An agent that edits tracking code as part of a larger task does not always load it on its own. You decide how to tell your agent to use it. One way is a line in the `AGENTS.md` or `CLAUDE.md` of your project:
+`rudder-tracking-review` loads when you ask for a review. An agent that edits tracking code as part of a larger task does not always load it on its own. In our tests, the same agent loaded it in some runs and skipped it in others. An instruction in your project is what makes the check reliable. You decide how to give it. One way is a line in the `AGENTS.md` or `CLAUDE.md` of your project:
 
 ```text
 This app sends analytics events to RudderStack. After you change code that sends events, use the rudder-tracking-review skill before you report the task as done.
