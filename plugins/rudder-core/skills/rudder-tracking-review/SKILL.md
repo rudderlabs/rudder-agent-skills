@@ -79,13 +79,29 @@ A renamed event is safe for a transformation or a mapping only when it handles t
 When the change also edits tracking plan specs in the repo, compare the code with those specs and with the live plan. Say so when the workspace does not have the spec change yet.
 When the change has no SDK calls and no event name in a constant or a generated client, say so. Do not report missing instrumentation for it.
 
-The JavaScript SDK signatures are `identify(userId, traits, options)`, `track(event, properties, options)`, `page(category, name, properties, options)`, `group(groupId, traits, options)`, `alias(newId, previousId, options)` and `reset()`. Several accept overloads, and this list is a subset. Check the SDK reference before you report a wrong signature:
+The JavaScript SDK signatures are `identify(userId, traits, options)`, `track(event, properties, options)`, `page(category, name, properties, options)`, `group(groupId, traits, options)`, `alias(newId, previousId, options)` and `reset()`. Several accept overloads, and this list is a subset. Read the documentation of the SDK that the app uses before you report a wrong signature or a wrong option:
 
-- JavaScript: https://www.rudderstack.com/docs/sources/event-streams/sdks/rudderstack-javascript-sdk/supported-api/
-- Kotlin (Android): https://www.rudderstack.com/docs/sources/event-streams/sdks/kotlin-sdk/
-- Swift (iOS): https://www.rudderstack.com/docs/sources/event-streams/sdks/swift-sdk/
-- Legacy Android and iOS: https://www.rudderstack.com/docs/sources/event-streams/sdks/rudderstack-android-sdk/ and https://www.rudderstack.com/docs/sources/event-streams/sdks/rudderstack-ios-sdk/
-- Every other SDK: https://www.rudderstack.com/docs/sources/event-streams/sdks/
+| SDK | Documentation |
+|---|---|
+| JavaScript (web) | https://www.rudderstack.com/docs/sources/event-streams/sdks/rudderstack-javascript-sdk/supported-api/ and https://www.rudderstack.com/docs/sources/event-streams/sdks/rudderstack-javascript-sdk/load-js-sdk/ |
+| Android (Kotlin) SDK, `com.rudderstack.sdk.kotlin`, and iOS (Swift) SDK, `rudder-sdk-swift` | https://www.rudderstack.com/docs/sources/event-streams/sdks/mobile-sdk-apis/ and https://www.rudderstack.com/docs/sources/event-streams/sdks/kotlin-sdk/configuration-options/ and https://www.rudderstack.com/docs/sources/event-streams/sdks/swift-sdk/configuration-options/ |
+| Android (Java) SDK, legacy, `com.rudderstack.android.sdk` | https://www.rudderstack.com/docs/sources/event-streams/sdks/rudderstack-android-sdk/ |
+| iOS (Obj-C) SDK, legacy, the `Rudder` pod or `rudder-sdk-ios` | https://www.rudderstack.com/docs/sources/event-streams/sdks/rudderstack-ios-sdk/ |
+| React Native | https://www.rudderstack.com/docs/sources/event-streams/sdks/rudderstack-react-native-sdk/ |
+| Flutter | https://www.rudderstack.com/docs/sources/event-streams/sdks/rudderstack-flutter-sdk/supported-api/ |
+| Unity | https://www.rudderstack.com/docs/sources/event-streams/sdks/rudderstack-unity-sdk/ |
+| Cordova, end of life on 1 December 2026 | https://www.rudderstack.com/docs/sources/event-streams/sdks/rudderstack-cordova-sdk/ |
+| AMP | https://www.rudderstack.com/docs/sources/event-streams/sdks/rudderstack-amp-analytics/ |
+| Node.js | https://www.rudderstack.com/docs/sources/event-streams/sdks/rudderstack-node-sdk/ |
+| Python | https://www.rudderstack.com/docs/sources/event-streams/sdks/rudderstack-python-sdk/ |
+| Go | https://www.rudderstack.com/docs/sources/event-streams/sdks/rudderstack-go-sdk/ |
+| Java | https://www.rudderstack.com/docs/sources/event-streams/sdks/rudderstack-java-sdk/ |
+| Ruby | https://www.rudderstack.com/docs/sources/event-streams/sdks/rudderstack-ruby-sdk/ |
+| PHP | https://www.rudderstack.com/docs/sources/event-streams/sdks/rudderstack-php-sdk/ |
+| .NET | https://www.rudderstack.com/docs/sources/event-streams/sdks/rudderstack-dotnet-sdk/ |
+| Rust | https://www.rudderstack.com/docs/sources/event-streams/sdks/rudderstack-rust-sdk/ |
+
+For JavaScript, the first link is the API and the second is the `load` options. For Kotlin and Swift, the first link is the API that both SDKs share, and the other two are the configuration options of each. Pick the mobile row by the SDK package in the dependencies, not by the language of the app. The Kotlin SDK also serves Java apps, and the Swift SDK also serves Objective-C apps.
 
 The documentation tools of the MCP server, `ask_docs` and `search_docs`, read the same pages.
 
