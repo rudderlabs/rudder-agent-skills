@@ -20,7 +20,7 @@ One marketplace (`rudder-agent-skills`) bundling six plugins, plus `rudderstack-
 
 | Plugin | Status | Scope |
 |---|---|---|
-| [`rudder-core`](plugins/rudder-core/) | ✅ Available | Cross-tool domain knowledge: data catalog, tracking plans, data graphs, instrumentation planning & debugging |
+| [`rudder-core`](plugins/rudder-core/) | ✅ Available | Cross-tool domain knowledge: data catalog, tracking plans, data graphs, instrumentation planning, debugging & review |
 | [`rudder-cli`](plugins/rudder-cli/) | ✅ Available | Workflows for [`rudder-cli`](https://github.com/rudderlabs/rudder-iac) and [`rudder-typer`](https://www.rudderstack.com/docs/features/ruddertyper/) |
 | [`rudder-mcp`](plugins/rudder-mcp/) | ✅ Available | Workflows for [RudderStack's hosted MCP server](https://mcp.rudderstack.com/docs) at `mcp.rudderstack.com` |
 | [`rudder-terraform`](plugins/rudder-terraform/) | ✅ Available | Workflows for the [Terraform provider](https://github.com/rudderlabs/terraform-provider-rudderstack) |
@@ -92,6 +92,7 @@ in other agents, an HTTP MCP server with that URL.
 | `rudder-tracking-plans` | Creating tracking plans to group events for specific sources |
 | `rudder-instrumentation-planning` | Designing event taxonomy from scratch or restructuring |
 | `rudder-instrumentation-debugging` | Fixing validation errors, schema issues, or instrumentation problems |
+| `rudder-tracking-review` | Reviewing or self-reviewing a code change that touches analytics calls, to find what it breaks in the tracking plan, received event schemas, transformations, and destinations |
 | `rudder-environment-check` | Checking prerequisites and setup status |
 
 ### `rudder-cli`

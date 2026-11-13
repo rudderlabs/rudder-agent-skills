@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`rudder-core` 0.0.11 / `rudder-tracking-review`.** New skill for a coding
+  agent that reviews, or self-reviews, a code change to analytics calls. It says what
+  to look for, and how to check the change against the tracking plan, the events the
+  source receives, the transformations and the destinations, through the MCP server.
+  `rudder-cli` covers the tracking plans when the MCP server is not connected. It only
+  reads.
+
 - **`rudderstack-skills` 0.0.1.** Umbrella plugin that depends on `rudder-core`,
   `rudder-cli`, `rudder-mcp`, `rudder-profiles`, `rudder-terraform` and
   `rudder-ai-events`, so one install gets every RudderStack skill. Marketplace
