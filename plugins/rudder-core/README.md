@@ -1,6 +1,6 @@
 # rudder-core
 
-Core RudderStack knowledge for your coding agent: the data catalog, tracking plans, data graphs, instrumentation planning and debugging, and destination delivery debugging. Install it first; the tool plugins build on it.
+Core RudderStack knowledge for your coding agent: the data catalog, tracking plans, data graphs, instrumentation planning, debugging and review, and destination delivery debugging. Install it first; the tool plugins build on it.
 
 Also connects your agent to RudderStack's hosted MCP server at `https://mcp.rudderstack.com/mcp`. The first time an MCP tool runs, your agent asks you to sign in to RudderStack in the browser. No token goes in a config file.
 
@@ -14,6 +14,7 @@ Also connects your agent to RudderStack's hosted MCP server at `https://mcp.rudd
 - `rudder-environment-check`: Checks RudderStack tool prerequisites and reports status.
 - `rudder-instrumentation-debugging`: Diagnoses and fixes validation errors, schema issues, and instrumentation problems.
 - `rudder-instrumentation-planning`: Designs event taxonomies and instrumentation strategies from business requirements.
+- `rudder-tracking-review`: Reviews or self-reviews a code change that touches analytics calls against the tracking plan, received event schemas, transformations, and destinations, and reports what the change breaks.
 - `rudder-setup`: Takes an app from no analytics to one real event delivered to a destination the user picks, with the pipeline as rudder-cli specs in git.
 - `rudder-tracking-plans`: Creates and manages tracking plans that validate events against schema contracts.
 
@@ -25,6 +26,14 @@ Also connects your agent to RudderStack's hosted MCP server at `https://mcp.rudd
 ```
 
 To pick single skills instead, or to use another agent such as Cursor, use the Skills CLI: `npx skills add rudderlabs/rudder-agent-skills --skill <skill-name>`. The Skills CLI copies skill folders only, so it does not create the MCP connection. Add the server yourself: in Claude Code, `claude mcp add --scope user --transport http rudderstack https://mcp.rudderstack.com/mcp`; in other agents, an HTTP MCP server with that URL.
+
+## Make your agent check its own edits
+
+`rudder-tracking-review` loads when you ask for a review. An agent that edits tracking code as part of a larger task does not always load it on its own. In our tests, the same agent loaded it in some runs and skipped it in others. An instruction in your project is what makes the check reliable. You decide how to give it. One way is a line in the `AGENTS.md` or `CLAUDE.md` of your project:
+
+```text
+This app sends analytics events to RudderStack. After you change code that sends events, use the rudder-tracking-review skill before you report the task as done.
+```
 
 ## Data handling
 

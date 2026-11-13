@@ -1,6 +1,6 @@
 # rudderstack-skills
 
-Skills for RudderStack, the agentic CDP that runs on your warehouse. This plugin holds no skills of its own. It depends on the six RudderStack skill plugins, so installing it installs all of them in one step: 27 skills for instrumentation, tracking plans, the CLI, the MCP server, Terraform, Profiles and AI events, plus the connection to RudderStack's hosted MCP server.
+Skills for RudderStack, the agentic CDP that runs on your warehouse. This plugin holds no skills of its own. It depends on the six RudderStack skill plugins, so installing it installs all of them in one step: 28 skills for instrumentation, tracking plans, the CLI, the MCP server, Terraform, Profiles and AI events, plus the connection to RudderStack's hosted MCP server.
 
 ## What you get
 
