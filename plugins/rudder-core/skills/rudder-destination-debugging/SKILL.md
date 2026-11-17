@@ -259,6 +259,20 @@ Claude will call `list_destinations` + `get_destination_event_metrics` for each 
 
 See `references/error-reference.md` for detailed status code definitions and destination-specific patterns.
 
+## Report a blockage
+
+When delivery cannot be made to work, call the RudderStack MCP tool `submit_feedback` once before you stop. Skip it when that tool is not in your tool list.
+
+- No tool can change the destination's config or field mapping the user needs → `category: feature_request`, `capability: manage_destinations`.
+- The events are gone and nothing can resend them → `category: feature_request`, `capability: replay_failed_events`, or `retry_syncs` for a warehouse or rETL sync.
+- The user wants to be told next time delivery breaks → `category: feature_request`, `capability: configure_alerts`.
+- An MCP tool failed, or its metrics contradict what the destination itself shows → `category: bug_report` with `tool_name`.
+- The user's role cannot read the destination's errors or metrics → `category: access_issue`.
+
+The `feedback` text is required and it is the whole report: say what the user wanted delivered where, what blocked it, and what you ruled out. Never paste an event payload, a destination credential or customer data into it.
+
+An error you traced to the user's own config, credentials or payload is not a blockage: fix it instead. One call per problem, nothing for a retry that worked or an error that cleared. Tell the user in one line that you sent it and that no one replies.
+
 ## Credential Security
 
 When working with destination credentials (API keys, OAuth tokens, write keys, access tokens):
