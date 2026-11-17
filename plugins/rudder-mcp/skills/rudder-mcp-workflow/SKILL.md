@@ -60,7 +60,7 @@ On the access-token route, the `X-Workspace-ID` header picks the workspace for e
 
 ## Tool catalog
 
-The server exposes tools across five categories. Exact names are discovered dynamically by your MCP client — inspect your client's tools panel (or ask Claude "what RudderStack tools do you have?") for the authoritative list. The names below are representative.
+The server exposes tools across six categories. Exact names are discovered dynamically by your MCP client — inspect your client's tools panel (or ask Claude "what RudderStack tools do you have?") for the authoritative list. The names below are representative.
 
 ### Data sources
 List sources and fetch a specific source's details, definitions, event schemas, event metrics, and the tracking plan(s) bound to it. Useful for: "what's broken in source X?", "what events does source X emit?".
@@ -77,6 +77,9 @@ Stream and inspect live events flowing through your workspace. Useful for: "show
 ### Documentation
 Search RudderStack documentation from inside your client. Useful for: "how does RETL handle late-arriving rows?", "what destination types support transformations?".
 
+### Feedback
+`submit_feedback` sends one note to the team that owns the server. It takes a `category`, a required `feedback` description in plain text (up to 2000 characters), an optional `tool_name`, and a `capability` for a feature request. The client asks the user before it sends, and they see your text in that prompt. Nobody replies to it. See "Report a blockage".
+
 ## Common workflows
 
 Patterns to ask Claude — phrased as a user would say them:
@@ -84,6 +87,24 @@ Patterns to ask Claude — phrased as a user would say them:
 - **"What's broken in my sources?"** — list sources, then for each one check event metrics and tracking-plan violations.
 - **"Draft a transformation and test it."** — find similar existing transformations, draft a new one, run it against captured payloads, then save.
 - **"Live-debug this connection."** — inspect live events for the source and correlate with recent destination errors.
+
+## Report a blockage
+
+When the user cannot get what they came for, call `submit_feedback` once before you move on or stop. A blockage is a bug or a missing capability that holds up the user's goal, not a hiccup you worked around. `submit_feedback` lives on this server, so skip this when it is not in your tool list.
+
+| What you hit | The call |
+|---|---|
+| No tool or product feature does what the user needs | `category: feature_request`, closest `capability` (`other` when none fits) |
+| A tool failed or returned a wrong result, with correct arguments | `category: bug_report`, `tool_name` |
+| Auth or permissions stop a call and the user cannot grant them | `category: access_issue`, `tool_name` |
+| A call times out or is too slow to use | `category: performance_issue`, `tool_name` |
+| A tool description, argument help or doc page sent you wrong | `category: documentation_issue`, `tool_name` |
+
+Write the `feedback` text yourself, in plain words: what the user was trying to do, what blocked them, and what you tried. That text is the whole report, so a category alone tells the team nothing. Keep event payloads, credentials, customer data and anything from a live event out of it. The server masks the text and drops it when masking still leaves something sensitive, which costs you the report, so write it clean the first time.
+
+- One call per problem. Two blockages in a session are two calls.
+- Don't report a retry that worked, an error that cleared on its own, the wrong workspace, or your own mistake.
+- Send it, then tell the user in one line what you reported and that no one replies. Carry on with the part of their goal you can still reach.
 
 ## Instrumentation Verification Workflow
 
