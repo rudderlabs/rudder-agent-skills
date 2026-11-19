@@ -1,0 +1,9 @@
+{
+  "name": "rudder-analytics-assessment",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Scans a website's event tracking setup and writes a Markdown assessment report.",
+  "type": "module",
+  "scripts": { "assess": "node assess.mjs" },
+  "dependencies": { "playwright-core": "1.48.2" }
+}
