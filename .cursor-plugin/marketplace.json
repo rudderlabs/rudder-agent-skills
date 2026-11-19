@@ -26,7 +26,7 @@
     {
       "name": "rudder-core",
       "source": "plugins/rudder-core",
-      "description": "Cross-tool RudderStack domain knowledge: data catalog, tracking plans, data graphs, instrumentation planning, instrumentation debugging, review of code changes to analytics calls, and destination delivery debugging.",
+      "description": "Cross-tool RudderStack domain knowledge: data catalog, tracking plans, data graphs, instrumentation planning, instrumentation debugging, review of code changes to analytics calls, destination delivery debugging, and assessment of a website's tracking setup.",
       "author": {
         "name": "RudderStack"
       },

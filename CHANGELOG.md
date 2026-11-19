@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`rudder-core` 0.0.12 / `rudder-analytics-assessment`.** New skill that assesses the
+  event tracking setup of a public website from the outside. A Node script loads the
+  site in headless Chrome like a first-time visitor and writes a Markdown report: about
+  65 analytics, CDP, tag manager, ad pixel, session replay and consent tools, which of
+  them sent data, event names and IDs, 11 checks with a fix each, and a score. Next
+  steps point to `rudder-instrumentation-planning`, `rudder-tracking-plans` and the MCP
+  server. Needs Node 18+ and Google Chrome; installs `playwright-core` only.
+
 - **`rudder-core` 0.0.11 / `rudder-tracking-review`.** New skill for a coding
   agent that reviews, or self-reviews, a code change to analytics calls. It says what
   to look for, and how to check the change against the tracking plan, the events the

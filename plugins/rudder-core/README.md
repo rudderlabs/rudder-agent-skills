@@ -6,6 +6,7 @@ Also connects your agent to RudderStack's hosted MCP server at `https://mcp.rudd
 
 ## What's included
 
+- `rudder-analytics-assessment`: Scans a public website in headless Chrome and writes a Markdown report on its event tracking: analytics, CDP, tag managers, ad pixels and consent tools found, the events they send, and checks with fixes.
 - `rudder-code-first-instrumentation`: Derives tracking plans from existing codebase types and structures.
 - `rudder-data-catalog`: Creates and manages events, properties, categories, and custom types for instrumentation schemas.
 - `rudder-data-graphs`: Produces Data Graph YAML from RETL sources for Audiences.
@@ -37,7 +38,7 @@ This app sends analytics events to RudderStack. After you change code that sends
 
 ## Data handling
 
-The plugin ships skills and one MCP connection to mcp.rudderstack.com. It stores no data and sends nothing anywhere else itself. The MCP connection uses your RudderStack browser sign-in, so it only sees what your account is allowed to see. Other workflows in these skills use tools you configure yourself, such as `rudder-cli` with its own access token, and those follow the credentials you give them.
+The plugin ships skills and one MCP connection to mcp.rudderstack.com. It stores no data and sends nothing anywhere else itself. `rudder-analytics-assessment` loads the public pages you name in a local headless Chrome and writes the report on your machine; it sends nothing to RudderStack. The MCP connection uses your RudderStack browser sign-in, so it only sees what your account is allowed to see. Other workflows in these skills use tools you configure yourself, such as `rudder-cli` with its own access token, and those follow the credentials you give them.
 
 ## Links
 

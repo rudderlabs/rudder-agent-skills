@@ -94,6 +94,7 @@ in other agents, an HTTP MCP server with that URL.
 | `rudder-instrumentation-debugging` | Fixing validation errors, schema issues, or instrumentation problems |
 | `rudder-tracking-review` | Reviewing or self-reviewing a code change that touches analytics calls, to find what it breaks in the tracking plan, received event schemas, transformations, and destinations |
 | `rudder-environment-check` | Checking prerequisites and setup status |
+| `rudder-analytics-assessment` | Auditing the event tracking on a website from the outside: tools found, what they send, checks with fixes, as a Markdown report |
 
 ### `rudder-cli`
 
