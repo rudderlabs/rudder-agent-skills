@@ -1,7 +1,7 @@
 ---
 name: rudder-setup
 description: Takes an app from no analytics to one real event delivered to a destination the user picks, with the pipeline as rudder-cli specs in git. Use when the user says "set up RudderStack", "onboard" or "send my first event", or when the RudderStack Get started card or plugin sent them here.
-allowed-tools: Bash(rudder-cli *), Bash(git *), Bash(npm *), Bash(npx *), Bash(curl *), Bash(jq *), Bash(test *), Bash(ls *), Bash(grep *), Bash(wc *), Bash(date *), Bash(mkdir *), Read, Write, Edit, Grep, Glob
+allowed-tools: Bash(rudder-cli *), Bash(RUDDERSTACK_CLI_SKILL=rudder-setup rudder-cli *), Bash(git *), Bash(npm *), Bash(npx *), Bash(curl *), Bash(jq *), Bash(test *), Bash(ls *), Bash(grep *), Bash(wc *), Bash(date *), Bash(mkdir *), Read, Write, Edit, Grep, Glob
 ---
 
 # Set up RudderStack in this project
@@ -27,6 +27,7 @@ Done means one real event reached the destination the user chose. The app sends 
 
 - Begin each step with one line, `Step N of 9 · <title>`, so the user can follow along.
 - After you install rudder-cli, run `command -v rudder-cli`. If it prints nothing, or a path other than `$HOME/.local/bin/rudder-cli`, a plain `rudder-cli` does not run the copy you installed. Then, for the rest of the session, run `"$HOME/.local/bin/rudder-cli"` wherever this skill or its references say `rudder-cli` in a command, probes and recipes included. Do the same when step 1 settles on a copy that an earlier install left in `~/.local/bin`. Tell the user once that you run rudder-cli by its full path. When you ask the user to run a rudder-cli command, such as `rudder-cli auth login`, give it with the full path as well. Do not ask them to edit a shell profile or to restart you for this. Step 9's summary gives them the `export PATH` line, and so does your last message whenever you stop before step 9. `allowed-tools` does not cover the full path, so the user may be asked to approve those calls.
+- Put `RUDDERSTACK_CLI_SKILL=rudder-setup` in front of every rudder-cli command, as in `RUDDERSTACK_CLI_SKILL=rudder-setup rudder-cli workspace info --json`, also inside a wrapper or a pipe and before a full path. In a multi-line script that runs rudder-cli, write `export RUDDERSTACK_CLI_SKILL=rudder-setup` as its first line instead. rudder-cli adds the name to its usage telemetry and to the User-Agent of its API calls, so RudderStack can count setup runs and see where they stop. It carries nothing about the project. A rudder-cli that does not know the variable ignores it, and one with telemetry turned off sends neither.
 - Work in `work_dir`, the folder step 1 settles on. Never run `git init` in the home folder or in a folder that holds several repositories.
 - Specs live in `rudder/`. Pass `-l rudder` to every `validate` and `apply`. Never pass `-l .` in an app repository. The CLI parses every YAML file under the location, so a CI workflow file fails validation.
 - Show the dry run and get a yes before every apply. Apply as `rudder-cli apply -l rudder --confirm=false`, because without a terminal the default asks, declines on its own, and still exits 0.

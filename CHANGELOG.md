@@ -26,6 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`rudder-core` / `rudder-setup`.** The skill sets `RUDDERSTACK_CLI_SKILL=rudder-setup`
+  on every rudder-cli command it runs. A rudder-cli that reads the variable
+  (rudderlabs/rudder-iac#1054) adds the name to its usage telemetry and to the
+  User-Agent of its API calls. An older rudder-cli ignores it, and one with telemetry
+  turned off sends neither.
+
 - **`rudder-core`, `rudder-cli`, `rudder-profiles`, `rudder-ai-events`, `rudder-terraform`.**
   Add a plugin README to each (contents, install, data handling) for directory
   submissions.

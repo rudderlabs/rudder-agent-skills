@@ -51,7 +51,7 @@ rudder-cli during the workflow.
 ### 1. Start the listener
 
 ```sh
-export RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_SOURCES_LISTEN=true
+export RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_SOURCES_LISTEN=true RUDDERSTACK_CLI_SKILL=rudder-setup
 rudder-cli sources listen --help >/dev/null 2>&1 || { rudder-cli --version; echo 'this rudder-cli has no sources listen'; exit 4; }
 d=$(mktemp -d)
 rudder-cli sources listen --port 0 --store >"$d/events" 2>"$d/log" &
@@ -146,7 +146,7 @@ cannot answer in its place. Give the call a timeout longer than the wait, for ex
 line with the app's own start command, pointed at `$url`, on `$port`.
 
 ```sh
-export RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_SOURCES_LISTEN=true
+export RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_SOURCES_LISTEN=true RUDDERSTACK_CLI_SKILL=rudder-setup
 check='<CHECK>'; port=5199; wait_s=300
 rudder-cli sources listen --help >/dev/null 2>&1 || { rudder-cli --version; echo 'this rudder-cli has no sources listen'; exit 4; }
 curl -s -o /dev/null --max-time 2 "http://localhost:$port"; [ $? -eq 7 ] || { echo "port $port is in use. Stop what holds it, or set port to a free one and tell the user"; exit 5; }
