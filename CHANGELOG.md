@@ -34,7 +34,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `feedback` description, what to keep out of it (payloads, credentials, customer data),
   what not to report, and the line to tell the user. `rudder-mcp-workflow` lists the tool
   in its catalog. Skipped when the tool is not in the agent's tool list.
+  `rudder-core` is now 0.0.13 and `rudder-mcp` 0.0.4.
 
+- **`rudder-core` / `rudder-setup`; `docs/installation.md`.** Added a Codex CLI
+  token check and a restart command for sessions that hide an exported
+  `RUDDERSTACK_ACCESS_TOKEN` from shell tools. The command starts a fresh process
+  and inherits the terminal environment. If the token remains filtered, the
+  skill now checks policy filters or uses a saved CLI login instead of retrying.
+  Documented how to give Codex CLI access to the CLI home log when the sandbox
+  blocks even `rudder-cli --version`.
+  `rudder-core` is now 0.0.12.
 - **`rudder-core`, `rudder-cli`, `rudder-profiles`, `rudder-ai-events`, `rudder-terraform`.**
   Add a plugin README to each (contents, install, data handling) for directory
   submissions.
