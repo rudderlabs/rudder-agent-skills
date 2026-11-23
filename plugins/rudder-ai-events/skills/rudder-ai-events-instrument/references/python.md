@@ -1,8 +1,8 @@
-# Python recipes (`rudderstack-ai`, spec v0.3)
+# Python recipes (`rudderstack-ai`, spec v0.4)
 
 Python 3.12+. The package has no dependencies of its own; the extra for each library the app uses (`openai`, `anthropic`, `google-genai`, `bedrock`, `langchain`, `openai-agents`, `claude-agent-sdk`, `litellm`, `mcp`, `tracing`) only declares the supported version of that library, which the app already has. `tracing` is only for exporting OpenTelemetry spans; AI events do not need it.
 
-`<VERSION>` below is the plan's `sdks[].version`: 0.7.0 or later.
+`<VERSION>` below is the plan's `sdks[].version`: 0.8.0 or later.
 
 Full API reference: the package README on the `rudderstack-ai` PyPI page.
 
@@ -64,6 +64,19 @@ class LazyRudder:
 rudderstack.ai.configure(analytics=LazyRudder())
 ```
 
+Only the v0.4 options the plan enables:
+
+```python
+rudderstack.ai.configure(
+    emit_llm_calls=True,
+    sample_rates={"ai_llm_response_received": 0.1, "mcp_tool_called": 0.05},
+    credits=price_call,  # app function: CreditCall -> nonnegative credits or None
+    emit_task_started=True,  # optional ai_task_started on new tasks, never resume
+)
+```
+
+Unlisted events are unsampled; leave answers out for exact counts and cost. Kept sampled events carry `sample_rate`. The credits hook takes `CreditCall` after USD pricing for successful calls with known usage; `record_call(credits=...)` overrides it. `total_credits` is absent if any successful call has unknown credits.
+
 ## 3. Wrap the model client (or add the framework integration)
 
 ```python
@@ -82,7 +95,7 @@ When a router or fallback serves another model than the one requested, the OpenA
 | Google Gen AI | `wrap_google_genai(genai.Client(...))` from `rudderstack.ai.google_genai` (provider `gcp.gemini`, or `gcp.vertex_ai` for a `vertexai=True` client) |
 | Bedrock | `wrap_bedrock(boto3.client("bedrock-runtime", region_name=...))` from `rudderstack.ai.bedrock`: tracks `converse` / `converse_stream`; `invoke_model` is not tracked (`record_call` below) |
 | LangChain / LangGraph / Deep Agents | `handler = RudderStackCallbackHandler(agent_name="support_agent")` from `rudderstack.ai.langchain`; add it to the run's `config={"callbacks": [handler]}`, never to a model constructor; tag agents with `"tags": ["agent:<name>"]` |
-| Claude Agent SDK | `tracked_query(prompt=..., options=..., user_id=..., conversation_id=...)` from `rudderstack.ai.claude_agent_sdk` instead of `query()`; `ClaudeSDKClient`, an app-owned `query()` chokepoint, or tests that patch `claude_agent_sdk.query` (`tracked_query` imported its own reference): `async for m in tracked_messages(query(...), user_id=..., conversation_id=...)`. Follow `surfaces[].usage_baseline_source`: a session already seen in-process uses its cached baseline for per-turn usage and reported cost, even with `resumed=True`. Across pods/restarts, store `usage_snapshot(result_message)` per session and pass it back as `usage_baseline=`. Without either baseline, the resumed fallback uses per-turn main-loop usage and subagent messages, ignores cumulative SDK cost and uses only registered prices; it can undercount subagent usage. `tracked_query` detects resume/continue itself; for `tracked_messages`, pass `resumed=bool(options.resume or options.continue_conversation)`. Call `query()` inside the `ai_interaction` / `ai_task`, or in-process MCP tools and hooks are counted outside it; a loop the app starts without awaiting: section 4. A turn that ends without a `ResultMessage` (it raised, was cancelled, or the CLI exited) keeps the calls and usage its assistant messages showed |
+| Claude Agent SDK | `tracked_query(prompt=..., options=..., user_id=..., conversation_id=...)` from `rudderstack.ai.claude_agent_sdk` instead of `query()`; `ClaudeSDKClient`, an app-owned `query()` chokepoint, or tests that patch `claude_agent_sdk.query` (`tracked_query` imported its own reference): `async for m in tracked_messages(query(...), user_id=..., conversation_id=...)`. Follow `surfaces[].usage_baseline_source`: a session already seen in-process uses its cached baseline for per-turn usage and reported cost, even with `resumed=True`. Across pods/restarts, store `usage_snapshot(result_message)` per session and pass it back as `usage_baseline=`; follow the app-store snapshot lifecycle in `node.md`, section 4 (session slot before read, `try/finally` cleanup unless a fresh snapshot was durably saved, crash-recovery cleanup). Without either baseline, the resumed fallback uses per-turn main-loop usage and subagent messages, ignores cumulative SDK cost and uses only registered prices; it can undercount subagent usage. `tracked_query` detects resume/continue itself; for `tracked_messages`, pass `resumed=bool(options.resume or options.continue_conversation)`. Call `query()` inside the `ai_interaction` / `ai_task`, or in-process MCP tools and hooks are counted outside it; a loop the app starts without awaiting: section 4. A turn that ends without a `ResultMessage` (it raised, was cancelled, or the CLI exited) keeps the calls and usage its assistant messages showed |
 | OpenAI Agents SDK | `await tracked_run(agent, input, tracking={"user_id": ..., "feature": ...})` from `rudderstack.ai.openai_agents` (`tracked_run_sync`, `tracked_run_streamed` for `Runner.run_sync` / `run_streamed`); keep Agents SDK tracing on (the default): agents used as tools and `tool_breakdown`'s `mcp_server` for an agent's MCP tools come from its trace spans |
 | LiteLLM SDK | `instrument_litellm()` once at startup, from `rudderstack.ai.litellm` |
 | Anything else | inside the interaction: `interaction.record_call(provider=..., model=..., input_tokens=..., output_tokens=..., response_id=...)` |
@@ -109,6 +122,8 @@ interaction.record_call(  # the ai_interaction / ai_task interaction, or rudders
     finish_reason=body.get("stop_reason"),
 )
 ```
+
+Per-call metadata: `wrap_openai(client, call_purpose="summarize", fallback_used=False, byok=True)` (other provider wrappers accept these too), or the same fields on `interaction.record_call(...)`. Wrappers measure `latency_ms` and streamed `time_to_first_token_ms`; manual calls pass `started_ns`, `ended_ns`, `first_token_ns` (wall-clock nanoseconds). Unknown boundaries stay absent.
 
 ## 4. Chat surface: one `ai_interaction` per user turn
 
@@ -181,6 +196,11 @@ with ai_interaction(user_id=user.id, conversation_id=body.chat_id) as interactio
 return StreamingResponse(body_stream, headers={"x-interaction-id": interaction.id})
 ```
 
+- One-shot: `ai_interaction(one_shot=True, input_method="button", feature=feature)` defaults `conversation_id` to the interaction ID when no explicit or context conversation ID exists; return that ID for copies and actions.
+- Agent release / experiment: pass `agent_version` and `variant` to `ai_context`, interactions, tasks, actions or scores.
+- Refusal: `interaction.end(status="blocked", block_reason="policy")` (`guardrail`, `unsupported`, `skipped`, `other` too), without `error_type`. OpenAI Agents SDK tripwire failures still report `guardrail_trip`; context overflow is `context_limit`.
+- Confidence / compaction: `interaction.set_confidence("high")` (`low`, `medium`, `high`), `interaction.record_compaction()`; standard fields, not extra properties. Declared tool events carry observed `mcp_server` and `result_size_bytes`; report `error=True, error_type="denied"` on a tool result for `tool_status: denied`.
+
 ## 5. Feedback and other actions (server copy)
 
 The server copy of each action in `surfaces[].feedback`. By default the browser sends its own copy of feedback too (`references/client-events.md`); dashboards use the client row per `interaction_id` and fall back to this one.
@@ -199,6 +219,8 @@ track_action(
 ```
 
 When the plan opts the server copy out (`client_events.opt_out: [server_feedback]`), keep the call and set `configure(server_feedback=False)` once.
+
+App-enforced limits: `rudderstack.ai.track_limit_reached("credits", feature="support_bot", user_id=user.id)`; provider rate limits remain answer errors. Preset feedback choices go in `action_details["feedback_reasons"]`, scope in `action_details["feedback_scope"]` (`interaction`, `conversation`, `feature`).
 
 ## 6. Background surface: one `ai_task` per run
 
@@ -250,6 +272,19 @@ def main() -> None:
 - A run started by an MCP Events update: `trigger_source="mcp_event"` and `trigger_event_id=` the update's `event_id`.
 - A non-chained `ai_task` flushes on exit, so a cron script or Lambda can exit; keep the app's own `flush()` call. A long-lived worker: `flush=False` and flush at shutdown, so a slow data plane never stalls the loop.
 - Thread pools: `executor.submit(rudderstack.ai.propagate(fn), ...)`; `ThreadPoolExecutor` and `run_in_executor` do not copy context (`asyncio.to_thread` does).
+
+Repeated approvals, with the app's own run store (configure each worker with the same sampling rates):
+
+```python
+with ai_task("refund-approval", trigger_source="queue", resume=db.load(job_id)) as task:
+    answer = client.messages.create(**params)
+    if needs_approval:
+        db.save(job_id, task.pause(reason="approval"))  # JSON snapshot
+```
+
+In process: `task.pause(reason="approval")`, then `task.resume()`, repeated as needed. Each pause emits segment totals; a normal block exit leaves it paused. JSON restore keeps IDs and identity, sends no new prompt or task-started event; the final answer adds `pause_count` and `total_paused_ms`. Paused runs survive TTL and shutdown.
+
+A paused run keeps its `limits.max_open_interactions` slot until it ends; resuming it in process, or restoring its snapshot in the process that paused it, always succeeds, while a snapshot from another process goes through normal admission. End abandoned waits (e.g. on approval timeout) rather than leaving them paused.
 
 ## 7. Flush
 

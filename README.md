@@ -16,16 +16,17 @@ A Claude Code plugin **marketplace** and [Agent Skills](https://agentskills.io) 
 
 ## What's inside
 
-One marketplace (`rudder-agent-skills`) bundling six plugins. Install the ones you use.
+One marketplace (`rudder-agent-skills`) bundling six plugins, plus `rudderstack-skills`, an umbrella that installs all six. Install the ones you use.
 
 | Plugin | Status | Scope |
 |---|---|---|
-| [`rudder-core`](plugins/rudder-core/) | ✅ Available | Cross-tool domain knowledge: data catalog, tracking plans, data graphs, instrumentation planning & debugging |
+| [`rudder-core`](plugins/rudder-core/) | ✅ Available | Cross-tool domain knowledge: data catalog, tracking plans, data graphs, instrumentation planning, debugging & review |
 | [`rudder-cli`](plugins/rudder-cli/) | ✅ Available | Workflows for [`rudder-cli`](https://github.com/rudderlabs/rudder-iac) and [`rudder-typer`](https://www.rudderstack.com/docs/features/ruddertyper/) |
 | [`rudder-mcp`](plugins/rudder-mcp/) | ✅ Available | Workflows for [RudderStack's hosted MCP server](https://mcp.rudderstack.com/docs) at `mcp.rudderstack.com` |
 | [`rudder-terraform`](plugins/rudder-terraform/) | ✅ Available | Workflows for the [Terraform provider](https://github.com/rudderlabs/terraform-provider-rudderstack) |
 | [`rudder-profiles`](plugins/rudder-profiles/) | ✅ Available | Workflows for [RudderStack Profiles](https://github.com/rudderlabs/profiles-mcp): setup, project creation, analysis, updates, and debugging |
 | [`rudder-ai-events`](plugins/rudder-ai-events/) | ✅ Available | Onboard an existing app to RudderStack AI events with [`@rudderstack/ai`](https://www.npmjs.com/package/@rudderstack/ai) (Node.js), [`rudderstack-ai`](https://pypi.org/project/rudderstack-ai/) (Python) and `ai-sdk-go` (Go): discover, plan, instrument, verify |
+| [`rudderstack-skills`](plugins/rudderstack-skills/) | ✅ Available | Umbrella: installs all six plugins above in one step (Claude Code) |
 
 Most users drive RudderStack with more than one tool. Install `rudder-core` plus whichever tool plugins you use; the domain knowledge lives in `rudder-core` so it never duplicates across tool-specific plugins.
 
@@ -56,6 +57,8 @@ npx skills update
 /plugin marketplace add rudderlabs/rudder-agent-skills
 /plugin install rudder-core@rudder-agent-skills      # then add whichever tool plugins you use
 ```
+
+To install everything at once, run `/plugin install rudderstack-skills@rudder-agent-skills`. It installs all six plugins; to go back to a subset, uninstall it and run `claude plugin prune -y`. Don't install it and then disable one of its plugins: the umbrella reports an error until that plugin is enabled again.
 
 Non-interactive equivalent: `claude plugin marketplace add rudderlabs/rudder-agent-skills` then `claude plugin install <plugin>@rudder-agent-skills`. Update with `/plugin marketplace update rudder-agent-skills`.
 
@@ -89,6 +92,7 @@ in other agents, an HTTP MCP server with that URL.
 | `rudder-tracking-plans` | Creating tracking plans to group events for specific sources |
 | `rudder-instrumentation-planning` | Designing event taxonomy from scratch or restructuring |
 | `rudder-instrumentation-debugging` | Fixing validation errors, schema issues, or instrumentation problems |
+| `rudder-tracking-review` | Reviewing or self-reviewing a code change that touches analytics calls, to find what it breaks in the tracking plan, received event schemas, transformations, and destinations |
 | `rudder-environment-check` | Checking prerequisites and setup status |
 
 ### `rudder-cli`

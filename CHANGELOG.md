@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`rudder-core` 0.0.11 / `rudder-tracking-review`.** New skill for a coding
+  agent that reviews, or self-reviews, a code change to analytics calls. It says what
+  to look for, and how to check the change against the tracking plan, the events the
+  source receives, the transformations and the destinations, through the MCP server.
+  `rudder-cli` covers the tracking plans when the MCP server is not connected. It only
+  reads.
+  Step 9 of `rudder-setup` can add one line to `AGENTS.md`, or to `CLAUDE.md`, after
+  one yes/no question, so an agent runs the skill before it reports an analytics change
+  as done.
+
+- **`rudderstack-skills` 0.0.1.** Umbrella plugin that depends on `rudder-core`,
+  `rudder-cli`, `rudder-mcp`, `rudder-profiles`, `rudder-terraform` and
+  `rudder-ai-events`, so one install gets every RudderStack skill. Marketplace
+  catalog version 0.0.7.
+
 ### Changed
 
 - **`rudder-core` / `rudder-setup`; `docs/installation.md`.** Added a Codex CLI
@@ -16,7 +33,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   skill now checks policy filters or uses a saved CLI login instead of retrying.
   Documented how to give Codex CLI access to the CLI home log when the sandbox
   blocks even `rudder-cli --version`.
-  `rudder-core` is now 0.0.11.
+  `rudder-core` is now 0.0.12.
+- **`rudder-core`, `rudder-cli`, `rudder-profiles`, `rudder-ai-events`, `rudder-terraform`.**
+  Add a plugin README to each (contents, install, data handling) for directory
+  submissions.
+
+- **`rudder-mcp`.** Add a plugin README (contents, install, data handling) for
+  directory submissions.
+
+- **`rudder-ai-events` 0.0.7** — tightened setup, instrumentation and verification
+  with rollout lessons: install and Agent SDK upgrade preflight, durable usage
+  snapshot cleanup, feedback eligibility, browser render/context handling,
+  result-aware write rules, tracking-plan coverage and CI integration checks.
+
+- **`rudder-ai-events` / `rudder-ai-events-setup`, `rudder-ai-events-instrument`,
+  `rudder-ai-events-verify`.** Update the unreleased 0.0.6 plugin to spec v0.4:
+  `@rudderstack/ai` and `rudderstack-ai` 0.8.0, `ai-sdk-go` v0.4.0,
+  provider integrations v0.3.0 and `cmd/aicheck` v0.2.0. Discovery plans
+  one-shot buttons with the SDK's conversation-ID default, repeated HITL
+  pauses with in-process or JSON snapshot resume, and per-event sampling for
+  high-volume MCP and per-call sources. Legacy mappings and recipes now use
+  blocked answers and denied tools, confidence, credits and usage limits,
+  per-call timing, purpose, fallback and BYOK, agent versions, variants,
+  compactions and context-limit errors, declared-tool MCP names and result
+  sizes, and the added client controls and feedback fields. Verification
+  checks v0.4 server events, v0.2 client events, segment totals and final pause
+  metrics; SDK checkers accept 0.3.0 and 0.4.0 captures. Removes the five known
+  limits these APIs resolve; plugin version stays 0.0.6.
 - **`rudder-cli` / `rudder-cli-setup`, `rudder-cli-workflow`, `rudder-transformations`,
   `rudder-import-and-evolve`; `rudder-core` / `rudder-instrumentation-debugging`.**
   Agents now check auth with `rudder-cli workspace info --json` and read the token
