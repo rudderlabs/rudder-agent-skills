@@ -26,6 +26,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`rudder-core`, `rudder-mcp`.** Send feedback at a blockage. `rudder-setup`,
+  `rudder-destination-debugging`, `rudder-instrumentation-debugging` and
+  `rudder-mcp-workflow` now call the MCP server's `submit_feedback` tool once when the
+  user's goal is held up by a bug or a missing capability, with the category and
+  capability to use for each kind of wall, what to write in the tool's required
+  `feedback` description, what to keep out of it (payloads, credentials, customer data),
+  what not to report, and the line to tell the user. `rudder-mcp-workflow` lists the tool
+  in its catalog. Skipped when the tool is not in the agent's tool list.
+  `rudder-core` is now 0.0.13 and `rudder-mcp` 0.0.4.
+
 - **`rudder-core` / `rudder-setup`; `docs/installation.md`.** Added a Codex CLI
   token check and a restart command for sessions that hide an exported
   `RUDDERSTACK_ACCESS_TOKEN` from shell tools. The command starts a fresh process
