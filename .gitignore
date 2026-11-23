@@ -23,6 +23,10 @@ logs/
 *.pem
 *.key
 
+# Skills CLI install output. `npx skills add` materialises a full copy of every
+# skill here; committing it would fork the published skills in plugins/.
+.agents/
+
 # Claude Code local settings
 # The root .claude/ is for local development, not for distribution
 # Skills are published from the top-level skills/ directory
