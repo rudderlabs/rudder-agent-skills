@@ -81,6 +81,8 @@ rules:
 
 ## Live Event Debugging
 
+Reproduce with `rudder-cli sources listen` (the `rudder-cli-sources-listen` skill) before checking a workspace. The checks below apply to the captured `properties`.
+
 Events failing validation at runtime:
 
 ### Check Event Name

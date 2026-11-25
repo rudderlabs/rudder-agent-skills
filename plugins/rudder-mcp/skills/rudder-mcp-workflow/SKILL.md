@@ -111,6 +111,10 @@ Write the `feedback` text yourself, in plain words: what the user was trying to 
 After instrumenting events (via CLI, Terraform, or code), verify they reach destinations:
 
 ```
+0. VERIFY LOCALLY (optional, no workspace needed)
+   └── Capture the app's events with rudder-cli sources listen
+       (rudder-cli-sources-listen skill) and fix them before applying
+
 1. APPLY TRACKING PLAN
    └── rudder-cli workspace info --json must show the workspaceID
        of the workspace that steps 3 and 5 query through MCP
