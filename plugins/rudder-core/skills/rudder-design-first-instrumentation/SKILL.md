@@ -17,6 +17,7 @@ This skill guides instrumentation planning for **new features** where events are
 | PM and engineering collaborating on what to track | Yes |
 | Existing product needs instrumentation | No — use `rudder-code-first-instrumentation` |
 | Restructuring existing tracking | No — use `rudder-code-first-instrumentation` |
+| LLM chat, AI agent or MCP server usage | No — use `rudder-ai-events-setup` (standard AI events via the AI SDKs) |
 
 ## The Design-First Workflow
 

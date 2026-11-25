@@ -9,39 +9,62 @@ The server SDK sends the prompt, the answer and feedback. The browser sends its 
 | Event | Sender | Notes |
 |---|---|---|
 | `ai_user_prompt_created`, `ai_response_received` | server SDK | the counted rows: dashboards count answers with `source` absent or `server` |
-| `ai_user_prompt_created`, `ai_response_received` with `source: "client"` | browser, by default | one of each per `interaction_id`, alongside the server's; only what the browser observed |
+| `ai_user_prompt_created`, `ai_response_received` with `source: "client"` | browser, by default | one prompt and an answer copy for each rendered paused or final segment per `interaction_id`, alongside the server's; only what the browser observed |
 | `ai_user_action` feedback (`feedback_given`, `feedback_retracted`) | both, by default: server (`trackAction`) in the feedback endpoint, browser with `source: "client"` in the click handler | dashboards take the client row per `interaction_id` as the final state and fall back to the server row; with no server feedback endpoint, the browser copy is the only one (do not add an endpoint for it) |
 | `ai_user_action` other actions (`copied_response`, `shared`, `reported`, `regenerated`, and `accepted`, `rejected`, `edited` for a draft, code change or other artifact the AI produced) | the browser; also the server when the action already hits a server endpoint | |
-| `ai_user_action` with `action_type: "clicked_through"` | browser only | the user opened a card, resource or doc from the answer, or used a component the AI rendered (a chart, an MCP Apps widget): `action_details.card_kind` names it, `action_details.target_type` the kind of object opened; never a URL. A form the AI rendered that the user submits is tracked by the business action it triggers, not here; nothing is sent just for rendering |
-| `ai_assistant_opened`, `ai_assistant_closed`, `ai_conversation_started`, `ai_conversation_switched`, `ai_conversation_renamed`, `ai_conversation_deleted` | browser | engagement; no server counterpart |
+| `ai_user_action` with `action_type: "clicked_through"` | browser only | the user opened a card, resource or doc from the answer, or used a component the AI rendered (a chart, an MCP Apps widget): `action_details.card_kind` names it, `action_details.target_type` the kind of object opened; never a URL. A form the AI rendered that the user submits is tracked by the business action it triggers, not here; normal chat rendering sends no engagement event; actionable output uses `ai_suggestion_shown` |
+| `ai_assistant_opened`, `ai_assistant_closed`, `ai_conversation_started`, `ai_conversation_switched`, `ai_conversation_renamed`, `ai_conversation_deleted`, `ai_conversation_pinned`, `ai_conversation_shared` | browser | engagement; no server counterpart |
+| `ai_suggestion_shown`, `ai_feedback_requested` | browser | actionable output / feedback request appeared; denominators for acceptance / feedback rates |
+| `ai_agent_selected` | browser | agent or mode picked for the next answer |
+| `ai_limit_reached` | browser; server SDK also has a limit API | client usage wall: `limit_type: rate / quota / credits / plan`, IDs when known |
+
+Escalating to human support has no matching `action_type`: leave it out of AI client actions, or send the app's own product event. Do not force it into another action type.
 
 Either side can opt out of a copy: the plan then omits it (the browser simply does not call `track`; the server endpoint does not call `trackAction`). Client copies are never sampled: if the app samples its browser analytics, send them outside that sampling, since the per-interaction gap needs every row.
 
-Gaps, matched per `interaction_id`: a client prompt with no server prompt means the request never reached the SDK; a server answer with no client answer means it was produced but not shown, or the client event was lost (ad blocker, failed render). The server's `client_disconnected: true` on its answer separates the user leaving from a lost client event. The spec v0.3 SDKs set it when the request closes under their middleware (Node.js middleware, Python ASGI) or a bound stream is cancelled; Django and Flask (WSGI) cannot see a disconnect, so there a missing client copy stays ambiguous.
+Gaps, matched per `interaction_id`: a client prompt with no server prompt means the request never reached the SDK; a server answer with no client answer means it was produced but not shown, or the client event was lost (ad blocker, failed render). The server's `client_disconnected: true` on its answer separates the user leaving from a lost client event. The spec v0.4 SDKs set it when the request closes under their middleware (Node.js middleware, Python ASGI, Go `rudderstackai.Middleware`) or a bound stream is cancelled; Django and Flask (WSGI) cannot see a disconnect, so there a missing client copy stays ambiguous.
 
 Each side reports what it saw: never forward model, provider, tokens, cost, tool counts, `finish_reason` or `trace_id` from the server to the browser to re-send. They stay on the server event; join on `interaction_id`.
 
 `interaction_id`: the browser mints one per prompt (`crypto.randomUUID()`), sends it with the chat request (`x-interaction-id` header or a body field), and uses it for later actions on that answer. The server validates it is a UUID and passes it as `interactionId` / `interaction_id`; if invalid it lets the SDK mint one and returns that. When the plan says `interaction_id_source: sdk` or `app`, the browser instead reads the ID from the chat response.
 
-Identity: the JavaScript SDK supplies `userId` / `anonymousId` itself; `userId` only after the page calls `rudderanalytics.identify(userId)`. Without it, browser events carry only `anonymousId` and join the server's events through that and the cookies; adding `identify()` on login is a separate change the user decides. Its cookies (`rl_anonymous_id`, `rl_session`) reach same-origin server routes, which is how the server's events join the same profile and session. Cross-origin chat APIs need `credentials: 'include'` and a cookie domain the API can read.
+Identity: the JavaScript SDK supplies `userId` / `anonymousId` itself; `userId` only after the page calls `rudderanalytics.identify(userId)`. Without it, browser events carry only `anonymousId` and join the server's events through that and the cookies; adding `identify()` on login is a separate change, out of scope here. Use the answer's account/workspace and group context for browser copies too; take `feature` and `surface` from the active context for a UI serving several features or channels. Its cookies (`rl_anonymous_id`, `rl_session`) reach same-origin server routes, which is how the server's events join the same profile and session. Cross-origin chat APIs need `credentials: 'include'` and a cookie domain the API can read.
 
 ## Code
 
-One helper, so every client AI event carries `source`, `feature` and `surface`, and unknown IDs are left out rather than sent as `null`. Put it in the app's browser analytics module (exported), or at the top of the page script when there is none:
+Without tracking-plan codegen, use the raw helper below. When the repo generates typed tracking calls (RudderTyper or similar), or forbids raw `track` calls, add the planned `ai_*` client events and their properties to its catalog and use the generated client instead. Preserve `source: client`, switch gating, omitted unknown IDs and no sampling in generated calls too. Setup raises this in the batched questions and records `client_events.tracking`; catalog changes are required even when optional tracking-plan upload is declined.
+
+One helper, so every client AI event carries `source`, `feature` and `surface`, unknown IDs are left out rather than sent as `null`, and nothing is sent when the AI events switch is off. This example uses configuration loaded before submission. Put it in the app's browser analytics module (exported), or at the top of the page script when there is none:
 
 ```js
-const AI_FEATURE = 'support_bot'; // the surface's feature from ai-events.yaml
-const AI_SURFACE = 'web'; // the surface's channel from ai-events.yaml (web | mobile | ...)
+// effective backend AI switch from client_events.switch_source, or the app's existing config/flags channel
+const AI_EVENTS_ON = appConfig.aiEventsEnabled === true;
 
-function trackAi(event, properties = {}) {
+function trackAi(event, properties = {}, enabled = AI_EVENTS_ON, context = appContext) {
+  if (!enabled) return; // configure() never reaches the browser, so the switch must
   const defined = Object.fromEntries(Object.entries(properties).filter(([, v]) => v != null));
-  window.rudderanalytics?.track(event, { source: 'client', feature: AI_FEATURE, surface: AI_SURFACE, ...defined });
+  window.rudderanalytics?.track(event, { source: 'client', feature: context.aiFeature, surface: context.aiSurface, ...defined });
+}
+
+function clientResponseStatus(status) {
+  switch (status) {
+    case 'success': return 'success';
+    case 'error': return 'error';
+    case 'timeout': return 'timeout';
+    case 'cancelled': return 'cancelled';
+    case 'blocked': return 'blocked';
+    case 'paused': return 'paused';
+    case 'incomplete': return 'error'; // the client enum has no incomplete status
+    default: return undefined; // omit unavailable or unknown statuses from the client event
+  }
 }
 ```
 
 With `@rudderstack/analytics-js`, call `.track` on the app's existing `RudderAnalytics` instance instead of `window.rudderanalytics`. With the script-tag snippet, check its method stub list includes `track` (calls made before the SDK loads are queued only for stubbed methods).
 
-Chat submit: mint the ID, send the client prompt copy, send the request, then send the client answer copy when the turn reaches its final state on screen (completed, failed, or stopped by the user). From the response on, use the ID the server returns (it differs only if the server rejected yours).
+`appConfig.aiEventsEnabled` stands for the app's own channel: a server-rendered value, the config or flags endpoint the page already fetches, or the flags client it already uses. The server sets it from the same `ai_events_env` value it passes to `configure()`; the page's legacy `track` calls do not read it. With a reloadable switch, the page picks up a change on its next load. In a browser-only or cross-repo plan, `client_events.switch_source` can be a field on an existing backend API response (e.g. `response.aiEventsEnabled`); the named `server_dependency` supplies it from the same switch. Load it before sending client events; for a chat-response switch, use the buffered variant below. Server response/ID changes land in the backend PR first, then this browser PR; no server SDK or `configure()` is added to the browser repo.
+
+Chat submit with configuration loaded before submission: mint the ID, send the client prompt copy, send the request, then send the client answer copy when the turn reaches its final state on screen (completed, failed, or stopped by the user). From the response on, use the ID the server returns (it differs only if the server rejected yours).
 
 ```js
 let interactionId = crypto.randomUUID();
@@ -52,7 +75,7 @@ trackAi('ai_user_prompt_created', {
   prompt_source: 'composer', // composer | starter_suggestion | follow_up_action | retry
   prompt_length: message.length,
 });
-let status = 'success';
+let status; // no success default when the backend supplies no final status
 let errorKind;
 try {
   const response = await fetch('/api/chat', {
@@ -60,31 +83,86 @@ try {
     headers: { 'content-type': 'application/json', 'x-interaction-id': interactionId },
     body: JSON.stringify({ message, conversationId }), // same-origin requests send cookies by default
   });
+  // error bodies carry the IDs too; only they may be unreadable (a stop mid-body still throws: cancelled)
+  const data = response.ok ? await response.json() : await response.json().catch(() => ({}));
+  conversationId = data.conversationId ?? conversationId;
+  interactionId = data.interactionId ?? interactionId;
+  status = data.responseStatus; // final backend status mapped to the client schema, or omitted
   if (!response.ok) {
     status = 'error';
     errorKind = response.status >= 500 ? 'http_5xx' : 'http_4xx';
   } else {
-    const data = await response.json();
+    status = clientResponseStatus(data.response_status ?? status);
     render(data); // the app's existing rendering
-    conversationId = data.conversationId ?? conversationId;
-    interactionId = data.interactionId ?? interactionId;
   }
 } catch (err) {
   status = err?.name === 'AbortError' ? 'cancelled' : 'error'; // the user pressed stop
   if (status === 'error') errorKind = navigator.onLine ? 'interrupted' : 'offline';
 }
-trackAi('ai_response_received', {
+if (conversationId) trackAi('ai_response_received', {
   interaction_id: interactionId,
   conversation_id: conversationId,
-  response_status: status, // success | error | cancelled
+  response_status: status, // rendered success | error | timeout | cancelled | paused | blocked; unknown omitted by trackAi
   client_error_kind: errorKind, // offline | interrupted | http_4xx | http_5xx | agent_error | unknown
   time_to_first_render_ms: Math.round(performance.now() - submittedAt), // streams: at the first chunk shown
 });
 ```
 
-Fit this into the app's existing submit handler; do not restructure it. With `interaction_id_source: sdk` or `app` the browser learns the ID only from the response: send the prompt copy then, just before the answer copy. An error reported inside a successful HTTP response or stream is `client_error_kind: 'agent_error'`.
+Fit this into the app's existing submit handler; do not restructure it. With `interaction_id_source: sdk` or `app` the browser learns the ID only from the response: send the prompt copy then, just before the answer copy. An error reported inside a successful HTTP response or stream is `client_error_kind: 'agent_error'`. The server returns `conversationId` and `interactionId` on its error responses too, once the interaction has opened (a failed answer has a server row to join): extend the route's error path if it returns neither. When the first message of a new thread fails before the server returns a `conversation_id` (the request never reached it, or failed before the interaction opened), skip the answer copy: both schemas require `conversation_id` on `ai_response_received`, and there is no server answer to join.
+
+One-shot features (generate, suggest, autofill, rewrite, fix; `conversation_id_source: interaction_id`): the browser uses the interaction ID (minted in the click handler and sent with the request, or read from the response) as both `interaction_id` and `conversation_id` on the copies and on the `accepted`, `edited`, `rejected` or `regenerated` action; set `input_method: button` and omit `prompt_source` (no value fits a button). The server uses `oneShot: true` / `one_shot=True` / `OneShot: true` without an explicit or context conversation ID.
 
 A chat API on another origin needs `credentials: 'include'` (and CORS that allows credentials) for the cookies to arrive.
+
+Chat-response switch: replace the helper's `AI_EVENTS_ON` declaration with `let AI_EVENTS_ON = false` and use this submit variant. Buffer prompt, panel and action events until the first switch value arrives; replay them if enabled and discard them if disabled, preserving their originating turn and context. The minimal submit example below buffers the prompt; extend the queue to the existing engagement and action handlers. Read the effective switch on success and error responses. A missing switch sends neither copy. Each turn gates its copies with its own response value; later actions use the latest known switch.
+
+```js
+let interactionId = crypto.randomUUID();
+const submittedAt = performance.now();
+const promptCopy = {
+  conversation_id: conversationId,
+  prompt_source: 'composer',
+  prompt_length: message.length,
+};
+let aiEventsOn = false;
+let status; // no success default when the backend supplies no final status
+let errorKind;
+try {
+  const response = await fetch('/api/chat', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-interaction-id': interactionId },
+    body: JSON.stringify({ message, conversationId }),
+  });
+  const data = response.ok ? await response.json() : await response.json().catch(() => ({}));
+  aiEventsOn = data.aiEventsEnabled === true; // effective backend switch, never default an absent field on
+  AI_EVENTS_ON = aiEventsOn;
+  conversationId = data.conversationId ?? conversationId;
+  interactionId = data.interactionId ?? interactionId;
+  status = data.responseStatus; // final backend status mapped to the client schema, or omitted
+  trackAi('ai_user_prompt_created', { ...promptCopy, conversation_id: conversationId, interaction_id: interactionId }, aiEventsOn);
+  if (!response.ok) {
+    status = 'error';
+    errorKind = response.status >= 500 ? 'http_5xx' : 'http_4xx';
+  } else {
+    status = clientResponseStatus(data.response_status ?? status);
+    render(data);
+  }
+} catch (err) {
+  status = err?.name === 'AbortError' ? 'cancelled' : 'error';
+  if (status === 'error') errorKind = navigator.onLine ? 'interrupted' : 'offline';
+}
+if (conversationId) trackAi('ai_response_received', {
+  interaction_id: interactionId,
+  conversation_id: conversationId,
+  response_status: status,
+  client_error_kind: errorKind,
+  time_to_first_render_ms: Math.round(performance.now() - submittedAt),
+}, aiEventsOn);
+```
+
+For streamed and hydrated answers, send the answer copy after the final state is rendered on screen, including a turn completed before the stream listener attached. Send one copy per rendered paused or final segment under the same IDs. Measure first render at the first visible response, including a question or approval card. Propagate final server status to the browser (a non-throwing failed result is still failed); if the response contract has no status, omit `response_status` rather than defaulting to success. The submit examples normalise `data.response_status` or `data.responseStatus` through `clientResponseStatus` for that contract; send the copy after the app's render commit, including its error or stopped state.
+
+Stamp cards with the live turn's ID before the done frame, and restore that ID for running turns hydrated after refresh. Gate feedback on the AI-backed reply marker, so guards, greetings and pre-model errors emit no `ai_user_action`. A retraction requires confirmed removal of a stored rating. Capture the session generation and answer context when starting async work; discard stale completions after a workspace/session switch so they cannot overwrite gates, IDs or account context. Normalise app enum spellings (e.g. `trackingPlan` to the catalog's value) at the analytics boundary. Track external answer links as click-throughs too, with kinds only, never URLs.
 
 Actions the browser sends (those listed in the plan's `client_events`):
 
@@ -94,7 +172,7 @@ trackAi('ai_user_action', {
   interaction_id: interactionId,
   conversation_id: conversationId,
   action_type: 'feedback_given', // feedback_retracted when the user takes it back, same feedback_type
-  action_details: { feedback_type: 'thumbs', feedback_value: helpful ? 1 : -1 },
+  action_details: { feedback_type: 'thumbs', feedback_value: helpful ? 1 : -1, feedback_reasons: ['incorrect'], feedback_scope: 'interaction' }, // preset reasons; scope also conversation | feature
 });
 
 // copy button
@@ -131,103 +209,21 @@ trackAi('ai_conversation_renamed', { conversation_id: conversationId }); // neve
 trackAi('ai_conversation_deleted', { conversation_id: conversationId });
 ```
 
-Never send prompt, answer, feedback text or conversation titles from the browser.
+Only the controls the plan lists (never suggestion text, conversation titles or share links):
+
+```js
+trackAi('ai_suggestion_shown', { interaction_id: interactionId, conversation_id: conversationId, suggestion_kind: 'autofill', item_count: 1 });
+trackAi('ai_feedback_requested', { interaction_id: interactionId, conversation_id: conversationId, trigger: 'after_answer' });
+trackAi('ai_agent_selected', { agent_name: nextAgent, from_agent_name: currentAgent }); // or mode / from_mode
+trackAi('ai_conversation_pinned', { conversation_id: conversationId });
+trackAi('ai_conversation_shared', { conversation_id: conversationId });
+trackAi('ai_limit_reached', { limit_type: 'credits', interaction_id: interactionId, conversation_id: conversationId });
+```
+
+Conversation / feature feedback still carries both IDs: mint an interaction ID for it and use it as `conversation_id` too when no thread exists; that scoped feedback needs no matching answer. For repeated pauses, send an answer copy for each paused or final segment the UI renders under the same IDs; counts, credits and pause metrics stay server-owned.
+
+The browser sends prompt text (`prompt_text` on its `ai_user_prompt_created` copy) and feedback text (`action_details.feedback_text`) only when the plan sets `capture_content: true`, masked in `trackAi` with the same rules as the server: the SDKs' fixed-shape patterns (emails, phones, cards, IPs, US SSNs, IBANs, keys, tokens, PEM keys and passwords; known limit `masking_fixed_shapes`) plus the app's own `redact` rules when the plan has them. The SDKs export no browser masker, so port the patterns; a page that cannot apply them leaves the text to the server copy. It never sends answer text or conversation titles.
 
 ## Schema
 
-The AI events v0.3 JSON Schema (`ai-events-v0.3.schema.json`) defines the client copies' fields (`source`, `prompt_source`, `client_error_kind`, `clicked_through`, `card_kind`) but not the engagement events, and it cannot tell a client copy that carries generation details from a server row. Validate client events against both: the v0.3 schema for the three copies, and this schema for the client-only rules: `source: client`, no text, no generation details, and the engagement events.
-
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://rudderstack.com/schemas/ai-client-events/0.2.0",
-  "title": "RudderStack AI client events v0.2.0 (draft, follows AI events spec v0.3)",
-  "$defs": {
-    "common": {
-      "type": "object",
-      "required": ["source"],
-      "properties": {
-        "source": { "const": "client" },
-        "feature": { "type": "string", "minLength": 1 },
-        "surface": { "enum": ["web", "mobile", "slack", "teams", "email", "chatgpt_app", "claude_app", "ide", "api", "other"] },
-        "conversation_id": { "type": "string", "minLength": 1 }
-      }
-    },
-    "with_conversation": {
-      "allOf": [{ "$ref": "#/$defs/common" }],
-      "required": ["conversation_id"]
-    },
-    "with_interaction": {
-      "allOf": [{ "$ref": "#/$defs/with_conversation" }],
-      "required": ["interaction_id"],
-      "properties": { "interaction_id": { "type": "string", "minLength": 1 } }
-    },
-    "ai_assistant_opened": {
-      "allOf": [{ "$ref": "#/$defs/common" }],
-      "properties": { "entry_point": { "type": "string", "examples": ["launcher", "shortcut", "deep_link", "auto"] } }
-    },
-    "ai_assistant_closed": {
-      "allOf": [{ "$ref": "#/$defs/common" }],
-      "properties": { "open_duration_ms": { "type": "integer", "minimum": 0 } }
-    },
-    "ai_conversation_started": { "allOf": [{ "$ref": "#/$defs/common" }] },
-    "ai_conversation_switched": {
-      "allOf": [{ "$ref": "#/$defs/with_conversation" }],
-      "required": ["from_conversation_id"],
-      "properties": { "from_conversation_id": { "type": "string", "minLength": 1 } }
-    },
-    "ai_conversation_renamed": {
-      "allOf": [{ "$ref": "#/$defs/with_conversation" }],
-      "not": { "anyOf": [{ "required": ["title"] }, { "required": ["name"] }] }
-    },
-    "ai_conversation_deleted": { "allOf": [{ "$ref": "#/$defs/with_conversation" }] },
-    "ai_user_action": {
-      "allOf": [{ "$ref": "#/$defs/with_interaction" }],
-      "required": ["action_type"],
-      "properties": {
-        "action_type": {
-          "enum": ["feedback_given", "feedback_retracted", "copied_response", "shared", "reported", "regenerated", "accepted", "rejected", "edited", "clicked_through"]
-        },
-        "action_details": {
-          "type": "object",
-          "properties": {
-            "feedback_type": { "type": "string" },
-            "card_kind": { "type": "string" },
-            "target_type": { "type": "string", "not": { "pattern": "[/?=]" } }
-          },
-          "not": { "anyOf": [{ "required": ["feedback_text"] }, { "required": ["url"] }, { "required": ["target_url"] }] }
-        }
-      }
-    },
-    "ai_user_prompt_created": {
-      "allOf": [{ "$ref": "#/$defs/common" }],
-      "required": ["interaction_id"],
-      "properties": {
-        "interaction_id": { "type": "string", "minLength": 1 },
-        "prompt_source": { "enum": ["composer", "starter_suggestion", "follow_up_action", "retry"] },
-        "suggestion_id": { "type": "string", "minLength": 1 },
-        "prompt_length": { "type": "integer", "minimum": 0 }
-      },
-      "not": { "required": ["prompt_text"] }
-    },
-    "ai_response_received": {
-      "allOf": [{ "$ref": "#/$defs/with_interaction" }],
-      "required": ["response_status"],
-      "properties": {
-        "response_status": { "enum": ["success", "error", "timeout", "cancelled"] },
-        "client_error_kind": { "enum": ["offline", "interrupted", "http_4xx", "http_5xx", "agent_error", "unknown"] },
-        "time_to_first_render_ms": { "type": "integer", "minimum": 0 }
-      },
-      "not": {
-        "anyOf": [
-          { "required": ["response_text"] }, { "required": ["primary_model"] }, { "required": ["primary_provider"] },
-          { "required": ["total_tokens"] }, { "required": ["total_cost_usd"] }, { "required": ["llm_call_count"] },
-          { "required": ["tool_call_count"] }, { "required": ["usage_breakdown"] }, { "required": ["tool_breakdown"] },
-          { "required": ["finish_reason"] }, { "required": ["trace_id"] }, { "required": ["client_disconnected"] },
-          { "required": ["total_input_tokens"] }, { "required": ["total_output_tokens"] }, { "required": ["error_type"] }
-        ]
-      }
-    }
-  }
-}
-```
+The AI events v0.4 JSON Schema (`ai-events-v0.4.schema.json`) defines the client copies' fields (`source`, `prompt_source`, `client_error_kind`, `clicked_through`, `card_kind`) but not the engagement events, and it cannot tell a client copy that carries generation details from a server row. The client-only rules (`source: client`, no answer text, prompt and feedback text typed for capture-on plans, no generation details, the engagement events) are in the browser-event schema the SDKs ship, `ai-client-events-v0.2.schema.json` (`node_modules/@rudderstack/ai/spec/`, the `rudderstack-ai` wheel's `rudderstack/ai/check/`, the `cmd/aicheck` Go module's `schemas/`); `rudder-ai-events-verify` validates client events against both with the SDK checker.

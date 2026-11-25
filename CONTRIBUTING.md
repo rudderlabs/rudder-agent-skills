@@ -28,7 +28,7 @@ The marketplace ships six plugins. A new skill goes into exactly one:
 | `rudder-mcp` | The skill teaches workflows for RudderStack's MCP server at `mcp.rudderstack.com` — tool catalog, auth/setup, AI-agent patterns for managing RudderStack via MCP. |
 | `rudder-terraform` | The skill teaches Terraform-provider workflows — resource/data-source usage, state management, HCL patterns specific to RudderStack. |
 | `rudder-profiles` | The skill teaches RudderStack Profiles workflows — `pb` usage, profiles-mcp discovery, project YAML authoring, project analysis, and Profiles-specific debugging. |
-| `rudder-ai-events` | The skill teaches AI events instrumentation of an app's own code with the `@rudderstack/ai` / `rudderstack-ai` / `ai-sdk-go` SDKs — discovery, the `ai-events.yaml` plan, instrumentation, and verification. |
+| `rudder-ai-events` | The skill teaches AI events instrumentation of an app's own code with the `@rudderstack/ai` / `rudderstack-ai` / `ai-sdk-go` SDKs — discovery, the `ai-events.md` plan, instrumentation, and verification. |
 
 If a new skill spans two surfaces, default to `rudder-core` and reference surface-specific material through `references/*.md` files rather than duplicating across plugins.
 

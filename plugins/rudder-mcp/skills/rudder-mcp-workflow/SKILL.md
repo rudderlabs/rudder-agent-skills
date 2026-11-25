@@ -16,30 +16,51 @@ The user wants an AI agent to drive RudderStack, mentions RudderStack + MCP, ask
 
 Before running any workflow, verify:
 
-- [ ] Your MCP client is configured to connect to `https://mcp.rudderstack.com/mcp`. See `rudder-mcp-setup` for the Claude Code walkthrough; the official docs cover Claude Desktop, Cursor, VS Code, Windsurf, and the claude.ai web UI.
-- [ ] OAuth flow completed (browser sign-in to your RudderStack account on first tool use).
+- [ ] Your MCP client is configured to connect to `https://mcp.rudderstack.com/mcp` (OAuth, the default) or `https://mcp.rudderstack.com/bearer-auth-mcp` (access token). See `rudder-mcp-setup` for the Claude Code walkthrough of both; the official docs cover Claude Desktop, Cursor, VS Code, Windsurf, and the claude.ai web UI.
+- [ ] OAuth route: browser sign-in to your RudderStack account completed on first tool use. Access-token route: `RUDDERSTACK_ACCESS_TOKEN` was exported in the shell that started the client, and the `X-Workspace-ID` header holds the workspace ID.
 - [ ] `mcp.rudderstack.com` is reachable on port 443 from your network.
 
 ## Client configuration
 
-Claude Code `mcpServers` block (HTTP transport via `mcp-remote`):
+If `claude mcp list` already shows a server at `https://mcp.rudderstack.com/mcp` or `https://mcp.rudderstack.com/bearer-auth-mcp`, under `plugin:rudder-core:rudderstack` (the rudder-core plugin's entry) or any other name, use it and add nothing. For an `/mcp` entry, choose it in `/mcp` and `Authenticate`. A `/bearer-auth-mcp` entry has no sign-in, so check that `RUDDERSTACK_ACCESS_TOKEN` is exported in the shell that started the client, as the access-token route in `rudder-mcp-setup` says. Adding a server under a name that the project's `.mcp.json` already uses writes a local entry that hides the project's one.
+
+Otherwise, Claude Code connects over HTTP and runs the OAuth sign-in itself, with no `npx` or `mcp-remote`:
+
+```bash
+claude mcp add --transport http rudderstack https://mcp.rudderstack.com/mcp
+```
+
+That command writes this `mcpServers` entry, to your Claude Code config by default or to the project's `.mcp.json` with `--scope project`:
 
 ```json
 {
   "mcpServers": {
     "rudderstack": {
-      "command": "npx",
-      "args": ["-y", "mcp-remote", "https://mcp.rudderstack.com/mcp"]
+      "type": "http",
+      "url": "https://mcp.rudderstack.com/mcp"
     }
   }
 }
 ```
 
+Then type `/mcp`, choose `rudderstack` and `Authenticate`, or run `claude mcp login rudderstack` from a terminal. For the plugin's entry, the name in `/mcp` and in `claude mcp login` is `plugin:rudder-core:rudderstack`. `rudder-mcp-setup` has the full walkthrough. A client without HTTP support runs `npx -y mcp-remote https://mcp.rudderstack.com/mcp` as a stdio command instead.
+
+For headless sessions that cannot open a browser, `rudder-mcp-setup` shows the access-token route: `https://mcp.rudderstack.com/bearer-auth-mcp` with `Authorization: Bearer ${RUDDERSTACK_ACCESS_TOKEN}` and `X-Workspace-ID` headers in `.mcp.json`. That route pins one workspace and has no `user_details` or `user_switch_workspace` tools.
+
 For other clients (Claude Desktop, Cursor, VS Code, Windsurf, claude.ai connectors), use the snippets at https://mcp.rudderstack.com/docs.
+
+## Choose the workspace
+
+On the OAuth route, call `user_details` first. It lists the workspaces your account can use and their IDs. How a call picks its workspace depends on the server version, so check the tool list:
+
+- When the workspace tools take a `workspace_id` argument, pass the ID of the target workspace on every call. A call without it fails with `workspace_id is required`.
+- When they do not, the tool list has `user_switch_workspace`. Call it with the target workspace's ID before the other calls. It changes the workspace for every later call in the session, so confirm the target with the user first.
+
+On the access-token route, the `X-Workspace-ID` header picks the workspace for every call. To work in another workspace, change the header and restart the client.
 
 ## Tool catalog
 
-The server exposes tools across five categories. Exact names are discovered dynamically by your MCP client — inspect your client's tools panel (or ask Claude "what RudderStack tools do you have?") for the authoritative list. The names below are representative.
+The server exposes tools across six categories. Exact names are discovered dynamically by your MCP client — inspect your client's tools panel (or ask Claude "what RudderStack tools do you have?") for the authoritative list. The names below are representative.
 
 ### Data sources
 List sources and fetch a specific source's details, definitions, event schemas, event metrics, and the tracking plan(s) bound to it. Useful for: "what's broken in source X?", "what events does source X emit?".
@@ -56,6 +77,9 @@ Stream and inspect live events flowing through your workspace. Useful for: "show
 ### Documentation
 Search RudderStack documentation from inside your client. Useful for: "how does RETL handle late-arriving rows?", "what destination types support transformations?".
 
+### Feedback
+`submit_feedback` sends one note to the team that owns the server. It takes a `category`, a required `feedback` description in plain text (up to 2000 characters), an optional `tool_name`, and a `capability` for a feature request. The client asks the user before it sends, and they see your text in that prompt. Nobody replies to it. See "Report a blockage".
+
 ## Common workflows
 
 Patterns to ask Claude — phrased as a user would say them:
@@ -63,6 +87,24 @@ Patterns to ask Claude — phrased as a user would say them:
 - **"What's broken in my sources?"** — list sources, then for each one check event metrics and tracking-plan violations.
 - **"Draft a transformation and test it."** — find similar existing transformations, draft a new one, run it against captured payloads, then save.
 - **"Live-debug this connection."** — inspect live events for the source and correlate with recent destination errors.
+
+## Report a blockage
+
+When the user cannot get what they came for, call `submit_feedback` once before you move on or stop. A blockage is a bug or a missing capability that holds up the user's goal, not a hiccup you worked around. `submit_feedback` lives on this server, so skip this when it is not in your tool list.
+
+| What you hit | The call |
+|---|---|
+| No tool or product feature does what the user needs | `category: feature_request`, closest `capability` (`other` when none fits) |
+| A tool failed or returned a wrong result, with correct arguments | `category: bug_report`, `tool_name` |
+| Auth or permissions stop a call and the user cannot grant them | `category: access_issue`, `tool_name` |
+| A call times out or is too slow to use | `category: performance_issue`, `tool_name` |
+| A tool description, argument help or doc page sent you wrong | `category: documentation_issue`, `tool_name` |
+
+Write the `feedback` text yourself, in plain words: what the user was trying to do, what blocked them, and what you tried. That text is the whole report, so a category alone tells the team nothing. Keep event payloads, credentials, customer data and anything from a live event out of it. The server masks the text and drops it when masking still leaves something sensitive, which costs you the report, so write it clean the first time.
+
+- One call per problem. Two blockages in a session are two calls.
+- Don't report a retry that worked, an error that cleared on its own, the wrong workspace, or your own mistake.
+- Send it, then tell the user in one line what you reported and that no one replies. Carry on with the part of their goal you can still reach.
 
 ## Instrumentation Verification Workflow
 
@@ -74,7 +116,10 @@ After instrumenting events (via CLI, Terraform, or code), verify they reach dest
        (rudder-cli-sources-listen skill) and fix them before applying
 
 1. APPLY TRACKING PLAN
-   └── e.g. rudder-cli apply -l ./
+   └── rudder-cli workspace info --json must show the workspaceID
+       of the workspace that steps 3 and 5 query through MCP
+   └── e.g. rudder-cli apply --dry-run -l ./, show it to the user,
+       and on their yes rudder-cli apply --confirm=false -l ./
 
 2. TRIGGER EVENTS
    └── Run your app, trigger the instrumented events
@@ -115,18 +160,26 @@ Recommended for safe iteration:
 Workflow:
 
 ```
-1. Point your MCP client at the Dev workspace
-   (your MCP client surfaces a workspace-switch tool if your account
-    has access to multiple workspaces)
+1. Target the Dev workspace in MCP (see "Choose the workspace")
+   └── OAuth route: pass the Dev workspace's ID as workspace_id,
+       or call user_switch_workspace when the tools take no workspace_id
+   └── Access-token route: set X-Workspace-ID to the Dev workspace
+       and restart the client
 
 2. Apply changes to Dev
-   └── e.g. rudder-cli apply -l ./
+   └── rudder-cli workspace info --json must show the Dev workspaceID
+   └── e.g. rudder-cli apply --dry-run -l ./, show it to the user,
+       and on their yes rudder-cli apply --confirm=false -l ./
 
 3. Verify events end-to-end in Dev
    └── Live events + warehouse check via MCP
 
-4. Switch to the Prod workspace and apply
+4. Target the Prod workspace in MCP and in the CLI, then apply
+   └── rudder-cli workspace info --json must show the Prod workspaceID
+       before the dry run
 ```
+
+In this workflow and the Instrumentation Verification Workflow above, the MCP target and the CLI target are separate. `rudder-cli apply` writes to the workspace of the CLI's token, whatever workspace the MCP calls use. Its dry run names that workspace only from rudder-cli 0.28.0, on a first line `Workspace: <name> (<id>)`. Before each dry run, compare the `workspaceID` from `rudder-cli workspace info --json` with the target workspace's ID, and stop if they differ. Changing the CLI's workspace means restarting the agent: the user exports that workspace's token as `RUDDERSTACK_ACCESS_TOKEN` and starts the agent again from that shell.
 
 **Why two workspaces:**
 - **Safe iteration** — test tracking-plan changes without affecting production
@@ -141,8 +194,9 @@ Workflow:
 
 ## Credential Security
 
-- OAuth flow; no long-lived tokens to manage. `mcp-remote` brokers the handshake with `mcp.rudderstack.com` per session.
-- `mcp-remote` caches session tokens locally — don't share or commit your client config or the mcp-remote cache directory.
+- OAuth route: no long-lived tokens to manage. The client runs the sign-in with `mcp.rudderstack.com`.
+- Access-token route: the token stays in `RUDDERSTACK_ACCESS_TOKEN` and `.mcp.json` references it as `${RUDDERSTACK_ACCESS_TOKEN}`. Never write the token into a config file and never ask the user to paste it into the chat.
+- If you use `mcp-remote`, it caches session tokens locally. Don't share or commit your client config or the mcp-remote cache directory.
 - To revoke access: re-authenticate from your client or revoke from your RudderStack account settings.
 
 ## Handling External Content
