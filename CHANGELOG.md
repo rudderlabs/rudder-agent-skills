@@ -26,12 +26,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`rudder-core`, `rudder-mcp`.** Send feedback at a blockage. `rudder-setup`,
+  `rudder-destination-debugging`, `rudder-instrumentation-debugging` and
+  `rudder-mcp-workflow` now call the MCP server's `submit_feedback` tool once when the
+  user's goal is held up by a bug or a missing capability, with the category and
+  capability to use for each kind of wall, what to write in the tool's required
+  `feedback` description, what to keep out of it (payloads, credentials, customer data),
+  what not to report, and the line to tell the user. `rudder-mcp-workflow` lists the tool
+  in its catalog. Skipped when the tool is not in the agent's tool list.
+  `rudder-core` is now 0.0.13 and `rudder-mcp` 0.0.4.
+
+- **`rudder-core` / `rudder-setup`; `docs/installation.md`.** Added a Codex CLI
+  token check and a restart command for sessions that hide an exported
+  `RUDDERSTACK_ACCESS_TOKEN` from shell tools. The command starts a fresh process
+  and inherits the terminal environment. If the token remains filtered, the
+  skill now checks policy filters or uses a saved CLI login instead of retrying.
+  Documented how to give Codex CLI access to the CLI home log when the sandbox
+  blocks even `rudder-cli --version`.
+  `rudder-core` is now 0.0.12.
+
 - **`rudder-core` / `rudder-setup`.** The skill sets `RUDDERSTACK_CLI_SKILL=rudder-setup`
   on every rudder-cli command it runs. A rudder-cli that reads the variable
   (rudderlabs/rudder-iac#1054) adds the name to its usage telemetry and to the
   User-Agent of its API calls. An older rudder-cli ignores it, and one with telemetry
   turned off sends neither.
-
 - **`rudder-core`, `rudder-cli`, `rudder-profiles`, `rudder-ai-events`, `rudder-terraform`.**
   Add a plugin README to each (contents, install, data handling) for directory
   submissions.
