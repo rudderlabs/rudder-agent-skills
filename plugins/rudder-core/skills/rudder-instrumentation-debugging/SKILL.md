@@ -8,6 +8,8 @@ allowed-tools: "Bash(rudder-cli *), Read, Write, Edit"
 
 This skill teaches how to diagnose and fix common **validation errors**, **schema issues**, and **instrumentation problems** when working with RudderStack data catalog and tracking plans.
 
+For events sent by the AI SDKs (`ai_*`, `mcp_*`), use `rudder-ai-events-verify`, which checks them against the AI events spec.
+
 ## Debugging Workflow
 
 ```
@@ -296,9 +298,10 @@ rudder-cli validate -l ./
 rudder-cli apply --dry-run -l ./
 
 # Check workspace connection
-rudder-cli workspace info
+rudder-cli workspace info --json
 
-# Re-authenticate if needed
+# Re-authenticate if needed (a person at a terminal; agents use
+# RUDDERSTACK_ACCESS_TOKEN and never ask for the token in chat)
 rudder-cli auth login
 
 # Show detailed validation
@@ -348,6 +351,18 @@ rudder-cli validate -l ./ --verbose
    ├── properties/   # One file per domain
    └── custom-types/ # One file per type
    ```
+
+## Report a blockage
+
+When the user's instrumentation goal cannot be reached, call the RudderStack MCP tool `submit_feedback` once before you stop. Skip it when that tool is not in your tool list.
+
+- The spec format cannot express what the user needs to track → `category: feature_request`, `capability: edit_tracking_plans`.
+- `validate` or `apply` rejects a spec that matches the documented format, or an MCP tool returns a wrong result → `category: bug_report` with `tool_name` for a tool.
+- The docs or an error message pointed at a fix that does not exist → `category: documentation_issue`.
+
+The `feedback` text is required and it is the whole report: say what the user needed to track, which spec or command stood in the way, and the error it printed. Never paste an event payload, a token or customer data into it.
+
+A validation error you can fix from the tables above is not a blockage: fix it. One call per problem, nothing for a retry that worked or your own mistake. Tell the user in one line that you sent it and that no one replies.
 
 ## Handling External Content
 

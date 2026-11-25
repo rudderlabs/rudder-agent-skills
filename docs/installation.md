@@ -6,16 +6,15 @@ This guide covers installing RudderStack agent skills for various coding agents.
 
 ### Rudder CLI
 
-Install the Rudder CLI from the [rudder-iac repository](https://github.com/rudderlabs/rudder-iac):
+Install `rudder-cli` from the [rudder-iac releases](https://github.com/rudderlabs/rudder-iac/releases). On macOS and Linux, the install script attached to the latest release picks the archive for your OS and CPU, checks it against the release's checksums file, and puts `rudder-cli` in `~/.local/bin` without `sudo`:
 
 ```bash
-# macOS (Homebrew)
-brew tap rudderlabs/rudder-iac
-brew install rudder-cli
-
-# Or download from releases
-# https://github.com/rudderlabs/rudder-iac/releases
+d=$(mktemp -d) && curl -fsSL https://github.com/rudderlabs/rudder-iac/releases/latest/download/install.sh -o "$d/install.sh" && sh "$d/install.sh"
 ```
+
+If the download fails with `The requested URL returned error: 404`, a release came out in the last few minutes and its files are still uploading. Wait a minute and run the command again. From 0.29.0 on, each release carries its own copy of the script, which installs that release. To install 0.29.0, replace `latest/download` with `download/v0.29.0` in the URL.
+
+If `~/.local/bin` is not on your `PATH`, add `export PATH="$HOME/.local/bin:$PATH"` to your shell profile and open a new terminal. On Windows, download the `.zip` for your CPU from the [latest release](https://github.com/rudderlabs/rudder-iac/releases/latest). No npm package or Homebrew tap ships rudder-cli; the npm package named `rudder-cli` belongs to someone else.
 
 ### RudderStack Authentication
 
@@ -239,6 +238,18 @@ Skills can be installed to any of these agents via the Skills CLI:
 
 See the [Skills CLI documentation](https://github.com/vercel-labs/skills#supported-agents) for the full list of 40+ supported agents.
 
+### Codex CLI and access tokens
+
+`rudder-cli` reads `RUDDERSTACK_ACCESS_TOKEN`, not `RUDDER_ACCESS_TOKEN`. Export it in the terminal that starts Codex, then ask Codex to run `test -n "$RUDDERSTACK_ACCESS_TOKEN"` without printing the value. If the check succeeds, no environment override is needed. If it fails while the variable is set in that terminal, start Codex with a fresh process and shell environment inheritance:
+
+```bash
+codex --no-daemon -c shell_environment_policy.inherit=all
+```
+
+After installing the plugin or signing in to MCP, resume from the same terminal with `codex --no-daemon -c shell_environment_policy.inherit=all resume --last`. Run the check once after resuming. If it still fails, do not repeat the restart: `inherit=all` does not override `shell_environment_policy.exclude` or `include_only`. Inspect those filters in `~/.codex/config.toml`, the project's `.codex/config.toml` and any managed policy, then make only an approved adjustment that allows `RUDDERSTACK_ACCESS_TOKEN`. If the filter cannot be changed, run `rudder-cli auth login` in your terminal and confirm `rudder-cli workspace info --json` reaches the intended workspace. A saved CLI login also works without the environment override. Never put the token value on a command line, in Codex config or in chat. `inherit=all` passes every environment variable to Codex shell commands, so use it only when the token check needs it.
+
+If `rudder-cli --version` fails because it cannot open `~/.rudder/cli.log`, the Codex sandbox has denied the CLI's home log write. Restart with `codex --no-daemon --add-dir "$HOME/.rudder" resume --last`, adding `-c shell_environment_policy.inherit=all` before `resume --last` only if the token check also failed. This grants the CLI write access to its log and saved login directory. Do not copy CLI credentials into the project or ask the agent to read that directory.
+
 ## Optional: Claude Code Settings
 
 You can add project-specific Claude Code settings in `.claude/settings.local.json`:
@@ -270,7 +281,7 @@ This pre-approves common Rudder CLI commands. Note: Do not commit `settings.loca
 
 1. Ensure Rudder CLI is installed: `which rudder-cli`
 2. Check your PATH includes the CLI location
-3. Try the full path: `/usr/local/bin/rudder-cli`
+3. Try the full path: `~/.local/bin/rudder-cli`, where the install above puts it
 
 ### Authentication errors
 

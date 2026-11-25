@@ -16,6 +16,7 @@ This skill guides instrumentation planning for **existing products** where you d
 | Codebase has domain types (enums, interfaces) you want to track | Yes |
 | Restructuring messy existing tracking | Yes |
 | Building new feature, events not yet defined | No — use `rudder-design-first-instrumentation` |
+| LLM chat, AI agent or MCP server usage | No — use `rudder-ai-events-setup` (standard AI events via the AI SDKs) |
 
 ## Why Code-First?
 
@@ -368,7 +369,9 @@ const plan: BillingPlan = CodeBillingPlan.GROWTH;
 ### Dev Workspace Testing
 
 ```bash
-# Apply to dev workspace first
+# Apply to dev workspace first. apply writes to the workspace of the
+# CLI's token, so check that workspaceID is the dev workspace
+rudder-cli workspace info --json
 rudder-cli apply -l ./
 
 # Trigger events in dev
@@ -390,7 +393,10 @@ Query: SELECT * FROM transformations WHERE event = 'Transformation Created' LIMI
 ### Apply to Production
 
 ```bash
-# After verification, apply to prod
+# After verification, switch the CLI to the prod workspace. An agent
+# asks the user to export that workspace's RUDDERSTACK_ACCESS_TOKEN
+# and restart it. Check that workspaceID is prod, then apply
+rudder-cli workspace info --json
 rudder-cli apply -l ./
 ```
 
