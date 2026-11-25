@@ -8,6 +8,8 @@ allowed-tools: "Bash(rudder-cli *), Read, Write, Edit"
 
 This skill guides you through designing an **instrumentation strategy** - the systematic approach to deciding what events and properties to track in your application.
 
+LLM chat, AI agents and MCP servers have a standard event set; for those surfaces use `rudder-ai-events-setup` instead of designing custom events.
+
 ## Why Planning Matters
 
 Poor instrumentation leads to:

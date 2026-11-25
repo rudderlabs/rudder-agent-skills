@@ -8,7 +8,7 @@ allowed-tools: "Read, Write, Edit"
 
 This skill teaches how to diagnose and fix **event delivery failures** between RudderStack and a destination — covering dropped events, auth errors, rate limiting, transformation filters, and warehouse sync failures.
 
-Requires RudderStack MCP connected. See `rudder-mcp-setup` if not yet configured.
+Requires the RudderStack MCP server, connected and signed in. If its tools, such as `list_sources`, are missing, connect the server that is there before adding one. In Claude Code, `claude mcp list` prints each server's name and URL, and a RudderStack server can have any name; the rudder-core plugin's is `plugin:rudder-core:rudderstack`. If one points at `https://mcp.rudderstack.com/bearer-auth-mcp`, the access-token route, keep it: leave the plugin's entry disabled, and check that `RUDDERSTACK_ACCESS_TOKEN` is exported in the shell Claude Code was started from, because that entry signs in with the token, not with `Authenticate`. If `claude mcp list` shows that entry as disabled, enable it in `/mcp` without choosing `Authenticate`. If it shows it as pending approval, as it does for an entry in the project's `.mcp.json` until the user approves it, start Claude Code again and approve it. Otherwise, if one points at `https://mcp.rudderstack.com/mcp`, type `/mcp`, choose it, enable it if it is disabled, and choose `Authenticate`. If none does, run `claude mcp add --scope user --transport http rudderstack https://mcp.rudderstack.com/mcp`, start Claude Code again and authenticate it the same way. In other agents, add an HTTP MCP server with that URL in the agent's MCP settings and sign in. `rudder-mcp-setup` covers both routes in full.
 
 ## Event Delivery Pipeline
 
@@ -258,6 +258,20 @@ Claude will call `list_destinations` + `get_destination_event_metrics` for each 
 | High latency | Latency metrics | Destination incident or retry queue backlog |
 
 See `references/error-reference.md` for detailed status code definitions and destination-specific patterns.
+
+## Report a blockage
+
+When delivery cannot be made to work, call the RudderStack MCP tool `submit_feedback` once before you stop. Skip it when that tool is not in your tool list.
+
+- No tool can change the destination's config or field mapping the user needs → `category: feature_request`, `capability: manage_destinations`.
+- The events are gone and nothing can resend them → `category: feature_request`, `capability: replay_failed_events`, or `retry_syncs` for a warehouse or rETL sync.
+- The user wants to be told next time delivery breaks → `category: feature_request`, `capability: configure_alerts`.
+- An MCP tool failed, or its metrics contradict what the destination itself shows → `category: bug_report` with `tool_name`.
+- The user's role cannot read the destination's errors or metrics → `category: access_issue`.
+
+The `feedback` text is required and it is the whole report: say what the user wanted delivered where, what blocked it, and what you ruled out. Never paste an event payload, a destination credential or customer data into it.
+
+An error you traced to the user's own config, credentials or payload is not a blockage: fix it instead. One call per problem, nothing for a retry that worked or an error that cleared. Tell the user in one line that you sent it and that no one replies.
 
 ## Credential Security
 
